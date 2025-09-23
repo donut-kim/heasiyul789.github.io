@@ -374,19 +374,10 @@
         box-shadow: 0 24px 38px rgba(255, 144, 104, 0.5);
       }
     </style>
+    <!-- ✅ 전역 스크립트는 head 안에 넣기 -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7590985049508335"
+      crossorigin="anonymous"></script>    
   </head>
-  <!-- 전역 스크립트 (head 영역에 한 번만 추가) -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7590985049508335"
-     crossorigin="anonymous"></script>
-
-<!-- 사이드 광고 블록 -->
-<ins class="adsbygoogle"
-     style="display:block;width:300px;height:600px"
-     data-ad-client="ca-pub-7590985049508335"
-     data-ad-slot="1234567890"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
   <body>
     <div id="game-wrapper">
       <canvas id="game-canvas" width="960" height="540"></canvas>
@@ -460,7 +451,13 @@
 
       <div id="modal-overlay"></div>
     </div>
-
+    <ins class="adsbygoogle"
+        style="display:block;width:300px;height:600px"
+        data-ad-client="ca-pub-7590985049508335"
+        data-ad-slot="1234567890"></ins>
+    <script>
+        (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
     <script src="donut-kim.js" type="module"></script>
   </body>
 </html>
