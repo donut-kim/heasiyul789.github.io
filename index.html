@@ -373,12 +373,35 @@
         transform: translateY(-2px);
         box-shadow: 0 24px 38px rgba(255, 144, 104, 0.5);
       }
+      .page-wrap {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 20px; /* 광고와 게임 사이 간격 */
+      }
+      
+      .ad-rail {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 160px; /* 광고 폭 */
+        height: var(--playfield-height);
+      }
     </style>
     <!-- ✅ 전역 스크립트는 head 안에 넣기 -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7590985049508335"
       crossorigin="anonymous"></script>    
   </head>
   <body>
+    <!-- 🔹 왼쪽 광고 -->
+    <aside class="ad-rail">
+      <ins class="adsbygoogle"
+          style="display:block;width:160px;height:600px"
+          data-ad-client="ca-pub-7590985049508335"
+          data-ad-slot="1111111111"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    </aside>
+    
     <div id="game-wrapper">
       <canvas id="game-canvas" width="960" height="540"></canvas>
       <aside id="side-panel">
