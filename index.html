@@ -423,14 +423,14 @@
     /* Mobile joystick (semi-transparent + crisp compositing) */
     #joystick {
       position: absolute;
-      left: 18px;
+      left: 50%;
       bottom: 18px;
       width: 140px;
       height: 140px;
       border-radius: 50%;
       background: radial-gradient(circle at 48% 48%, rgba(18, 26, 36, 0.55), rgba(8, 12, 18, 0.38));
       border: 1px solid rgba(110, 214, 255, 0.28);
-      opacity: 0.75;                 /* ✅ 반투명 */
+      opacity: 0.375;              /* 50% 더 투명 */
       display: none;
       touch-action: none;
       z-index: 15;
@@ -438,7 +438,7 @@
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       will-change: transform;
-      transform: translateZ(0);      /* ✅ 레이어 승격으로 그래픽 깨짐 방지 */
+      transform: translateX(-50%) translateZ(0); /* ✅ 하단 중앙 배치 */
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), inset 0 0 1px rgba(255,255,255,0.08);
     }
     #joystick-stick {
@@ -487,8 +487,9 @@
       }
       #joystick {
         display: block;           /* 모바일: 조이스틱 표시 */
-        left: calc(env(safe-area-inset-left, 0px) + 18px);
+        left: 50%;                /* ✅ 하단 중앙 기준 */
         bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+        /* transform은 상단 전역 규칙의 translateX(-50%) translateZ(0)를 유지 */
       }
       #xp-bar-wrapper {
         left: calc(env(safe-area-inset-left, 0px) + 8px);
@@ -605,7 +606,7 @@
       <div id="start-overlay" class="active">
         <div class="start-card">
           <h1>Donut-kim Survivors</h1>
-          <p>닉네임을 입력하고 초코 도넛 생존전을 시작하세요!</p>
+          <p>닉네임을 입력하고 김도넛군의 생존전을 시작하세요!</p>
           <label for="nickname-input">닉네임 (4~9자)</label>
           <input id="nickname-input" type="text" maxlength="12" autocomplete="off" placeholder="예: SweetDonut" />
           <button id="start-button" type="button" disabled>게임 시작</button>
