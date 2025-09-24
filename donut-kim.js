@@ -271,26 +271,18 @@ function formatTime(seconds) {
 }
 
 function computeFinalScoreDetails() {
-  const survivalSeconds = Math.min(state.elapsed, MAX_SURVIVAL_TIME);
-  const survivalRatio = survivalSeconds / MAX_SURVIVAL_TIME;
-  const survivalScore = survivalRatio * 300;
-
-  const benchmark = Math.max(1, state.scoreBenchmark);
-  const scoreRatio = Math.min(state.score / benchmark, 1);
-  const scoreScore = scoreRatio * 200;
-
-  const bossScore = state.victory ? 500 : 0;
-  const total = Math.round(clamp(survivalScore + scoreScore + bossScore, 0, 1000));
+  const totalScore = calculateTotalScore();
+  const baseScore = state.score;
+  const timeBonus = state.elapsed > 180 ? Math.floor(state.elapsed - 180) : 0;
 
   return {
-    survivalSeconds,
-    survivalScore: Math.round(survivalScore),
-    scoreScore: Math.round(scoreScore),
-    bossScore,
-    survivalRatio,
-    scoreRatio,
-    benchmark,
-    total,
+    totalScore,
+    baseScore,
+    timeBonus,
+    time: state.elapsed,
+    stage: state.stage,
+    level: state.level,
+    total: totalScore, // 기존 코드 호환성을 위해 추가
     bossCleared: state.victory,
   };
 }
@@ -1277,14 +1269,41 @@ function attemptStart() {
 }
 
 function buildResultHtml(details) {
-  return `
+  let html = `
     <div class="result-block" style="background: rgba(18,26,38,0.0); border: none; box-shadow: none;">
       <span class="result-label" style="display:block; font-size:14px; color:#9fb4d8; margin-bottom:8px;">최종 점수</span>
       <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
-        ${details.total.toLocaleString()}
+        ${details.totalScore.toLocaleString()}
       </span>
     </div>
-  `;
+    <div class="result-block">
+      <span class="result-label">기본 점수</span>
+      <span class="result-value">${details.baseScore.toString().padStart(5, '0')}</span>
+    </div>`;
+
+  if (details.timeBonus > 0) {
+    html += `
+    <div class="result-block">
+      <span class="result-label">시간 보너스</span>
+      <span class="result-value">+${details.timeBonus}</span>
+    </div>`;
+  }
+
+  html += `
+    <div class="result-block">
+      <span class="result-label">생존 시간</span>
+      <span class="result-value">${formatTime(details.time)}</span>
+    </div>
+    <div class="result-block">
+      <span class="result-label">도달 스테이지</span>
+      <span class="result-value">${details.stage}</span>
+    </div>
+    <div class="result-block">
+      <span class="result-label">최종 레벨</span>
+      <span class="result-value">${details.level}</span>
+    </div>`;
+
+  return html;
 }
 
 const upgradeDescriptions = {
@@ -2780,57 +2799,6 @@ function calculateTotalScore() {
   }
 
   return totalScore;
-}
-
-function computeFinalScoreDetails() {
-  const totalScore = calculateTotalScore();
-  const baseScore = state.score;
-  const timeBonus = state.elapsed > 180 ? Math.floor(state.elapsed - 180) : 0;
-
-  return {
-    totalScore,
-    baseScore,
-    timeBonus,
-    time: state.elapsed,
-    stage: state.stage,
-    level: state.level
-  };
-}
-
-function buildResultHtml(details) {
-  let html = `
-    <div class="result-block">
-      <span class="result-label">최종 점수</span>
-      <span class="result-value">${details.totalScore.toString().padStart(5, '0')}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">기본 점수</span>
-      <span class="result-value">${details.baseScore.toString().padStart(5, '0')}</span>
-    </div>`;
-
-  if (details.timeBonus > 0) {
-    html += `
-    <div class="result-block">
-      <span class="result-label">시간 보너스</span>
-      <span class="result-value">+${details.timeBonus}</span>
-    </div>`;
-  }
-
-  html += `
-    <div class="result-block">
-      <span class="result-label">생존 시간</span>
-      <span class="result-value">${formatTime(details.time)}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">도달 스테이지</span>
-      <span class="result-value">${details.stage}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">최종 레벨</span>
-      <span class="result-value">${details.level}</span>
-    </div>`;
-
-  return html;
 }
 
 function updateHud() {
