@@ -92,7 +92,7 @@ const HALF_HEIGHT = HEIGHT / 2;
 const PLAYER_SIZE = 40;
 const PLAYER_SPEED = 230;
 const PLAYER_MAX_HEALTH = 5;
-const PLAYER_FIRE_INTERVAL = 0.35;
+const PLAYER_FIRE_INTERVAL = 0.42;
 const PLAYER_INVULN_TIME = 1.0;
 
 const BULLET_SIZE = 12;
@@ -111,6 +111,14 @@ const BIG_ENEMY_HEALTH = 4;
 const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.8; // slightly slower than small ones
 const BIG_ENEMY_SPAWN_TIME = 90; // seconds (1m 30s)
 const BIG_ENEMY_SPAWN_CHANCE = 0.35; // 35% of spawns after threshold
+
+// Dark Blue Enemy (Stage 2+)
+const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2; // 48
+const DARK_BLUE_ENEMY_HEALTH = 8;
+const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7; // 30% slower than normal
+const DARK_BLUE_ENEMY_FIRE_INTERVAL = 2.5; // shoots every 2.5 seconds
+const DARK_BLUE_PROJECTILE_SIZE = 16;
+const DARK_BLUE_PROJECTILE_SPEED = 200;
 function createBacteriaSpritePurple(size) {
   const off = document.createElement('canvas');
   off.width = size;
@@ -676,125 +684,252 @@ function createClampBossSprite(size) {
   const ict = off.getContext('2d');
   const half = size / 2;
   ict.translate(half, half);
-  const handleLength = size * 0.42;
-  const handleWidth = size * 0.18;
-  const jawLength = size * 0.52;
-  const jawWidth = size * 0.16;
 
   ict.lineCap = 'round';
   ict.lineJoin = 'round';
 
-  const armGradient = ict.createLinearGradient(-jawLength, 0, jawLength, 0);
-  armGradient.addColorStop(0, '#d6dee9');
-  armGradient.addColorStop(0.3, '#f6f9ff');
-  armGradient.addColorStop(1, '#ccd3dd');
+  // 가위 손잡이 부분
+  const handleLength = size * 0.25;
+  const handleWidth = size * 0.08;
+  const bladeLength = size * 0.35;
 
-  ict.strokeStyle = '#7c899e';
-  ict.lineWidth = size * 0.035;
-  ict.fillStyle = armGradient;
+  // 가위의 금속질감 그라디언트
+  const metalGradient = ict.createLinearGradient(-handleLength, -handleLength, handleLength, handleLength);
+  metalGradient.addColorStop(0, '#9ca3af');
+  metalGradient.addColorStop(0.5, '#d1d5db');
+  metalGradient.addColorStop(1, '#6b7280');
 
+  // 위쪽 가위날 (손잡이 포함)
   ict.save();
-  ict.rotate(Math.PI / 18);
-  roundRect(ict, -jawLength, -jawWidth / 2, jawLength, jawWidth, jawWidth / 2.2);
-  ict.fill();
-  ict.stroke();
-  ict.restore();
+  ict.rotate(-Math.PI / 6);
 
-  ict.save();
-  ict.rotate(-Math.PI / 18);
-  roundRect(ict, 0, -jawWidth / 2, jawLength, jawWidth, jawWidth / 2.2);
-  ict.fill();
-  ict.stroke();
-  ict.restore();
+  // 손잡이
+  ict.fillStyle = '#4b5563';
+  ict.strokeStyle = '#374151';
+  ict.lineWidth = size * 0.015;
+  ict.fillRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
+  ict.strokeRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
 
-  ict.fillStyle = '#ffc2b6';
+  // 날 부분
+  ict.fillStyle = metalGradient;
+  ict.strokeStyle = '#4b5563';
+  ict.lineWidth = size * 0.02;
   ict.beginPath();
-  ict.moveTo(jawLength * 0.75, -jawWidth * 0.7);
-  ict.lineTo(jawLength * 1.05, -jawWidth * 0.2);
-  ict.lineTo(jawLength * 0.78, jawWidth * 0.4);
-  ict.quadraticCurveTo(jawLength * 0.6, 0, jawLength * 0.75, -jawWidth * 0.7);
+  ict.moveTo(-handleLength * 0.2, 0);
+  ict.lineTo(bladeLength, -handleWidth * 0.3);
+  ict.lineTo(bladeLength + size * 0.08, 0);
+  ict.lineTo(bladeLength, handleWidth * 0.3);
+  ict.closePath();
   ict.fill();
   ict.stroke();
 
-  ict.beginPath();
-  ict.moveTo(-jawLength * 0.75, -jawWidth * 0.7);
-  ict.lineTo(-jawLength * 1.05, -jawWidth * 0.2);
-  ict.lineTo(-jawLength * 0.78, jawWidth * 0.4);
-  ict.quadraticCurveTo(-jawLength * 0.6, 0, -jawLength * 0.75, -jawWidth * 0.7);
-  ict.fill();
-  ict.stroke();
-
-  ict.strokeStyle = '#7c899e';
-  ict.lineWidth = size * 0.03;
-  ict.fillStyle = '#eef3fb';
-  ict.beginPath();
-  ict.ellipse(-handleLength, -handleWidth * 0.65, handleWidth * 0.55, handleWidth, 0.35, 0, Math.PI * 2);
-  ict.fill();
-  ict.stroke();
-  ict.beginPath();
-  ict.ellipse(handleLength, -handleWidth * 0.65, handleWidth * 0.55, handleWidth, -0.35, 0, Math.PI * 2);
-  ict.fill();
-  ict.stroke();
-
-  const hingeWidth = size * 0.36;
-  const hingeHeight = size * 0.34;
-  const hingeGradient = ict.createRadialGradient(0, 0, hingeWidth * 0.15, 0, 0, hingeWidth * 0.7);
-  hingeGradient.addColorStop(0, '#f1f4fb');
-  hingeGradient.addColorStop(1, '#aebbd3');
-  roundRect(ict, -hingeWidth / 2, -hingeHeight / 2, hingeWidth, hingeHeight, hingeWidth / 2.4);
-  ict.fillStyle = hingeGradient;
-  ict.fill();
-  ict.strokeStyle = '#5f6f8a';
-  ict.lineWidth = size * 0.018;
-  roundRect(ict, -hingeWidth / 2, -hingeHeight / 2, hingeWidth, hingeHeight, hingeWidth / 2.4);
-  ict.stroke();
-
-  ict.strokeStyle = 'rgba(90,100,120,0.25)';
-  ict.lineWidth = size * 0.01;
-  for (let i = -2; i <= 2; i++) {
-    ict.beginPath();
-    ict.moveTo(-hingeWidth * 0.45, i * hingeHeight * 0.12);
-    ict.lineTo(hingeWidth * 0.45, i * hingeHeight * 0.12);
-    ict.stroke();
-  }
-
+  // 날 끝의 눈
+  const eyeX = bladeLength + size * 0.04;
   ict.fillStyle = '#ffffff';
-  const eyeOffset = hingeWidth * 0.24;
   ict.beginPath();
-  ict.arc(-eyeOffset, -hingeHeight * 0.18, size * 0.08, 0, Math.PI * 2);
-  ict.arc(eyeOffset, -hingeHeight * 0.18, size * 0.08, 0, Math.PI * 2);
+  ict.arc(eyeX, 0, size * 0.05, 0, Math.PI * 2);
   ict.fill();
-  ict.strokeStyle = '#1d2433';
+  ict.strokeStyle = '#1f2937';
   ict.lineWidth = size * 0.01;
   ict.stroke();
-  ict.fillStyle = '#1d2433';
+
+  // 빨간 눈동자
+  ict.fillStyle = '#dc2626';
   ict.beginPath();
-  ict.arc(-eyeOffset, -hingeHeight * 0.18, size * 0.04, 0, Math.PI * 2);
-  ict.arc(eyeOffset, -hingeHeight * 0.18, size * 0.04, 0, Math.PI * 2);
+  ict.arc(eyeX, 0, size * 0.025, 0, Math.PI * 2);
   ict.fill();
 
-  ict.strokeStyle = '#2a3547';
-  ict.lineWidth = size * 0.012;
+  // 눈동자 반짝이
+  ict.fillStyle = '#ffffff';
   ict.beginPath();
-  ict.arc(0, hingeHeight * 0.05, size * 0.18, 0, Math.PI);
+  ict.arc(eyeX + size * 0.01, -size * 0.01, size * 0.01, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.restore();
+
+  // 아래쪽 가위날 (손잡이 포함)
+  ict.save();
+  ict.rotate(Math.PI / 6);
+
+  // 손잡이
+  ict.fillStyle = '#4b5563';
+  ict.strokeStyle = '#374151';
+  ict.lineWidth = size * 0.015;
+  ict.fillRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
+  ict.strokeRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
+
+  // 날 부분
+  ict.fillStyle = metalGradient;
+  ict.strokeStyle = '#4b5563';
+  ict.lineWidth = size * 0.02;
+  ict.beginPath();
+  ict.moveTo(-handleLength * 0.2, 0);
+  ict.lineTo(bladeLength, -handleWidth * 0.3);
+  ict.lineTo(bladeLength + size * 0.08, 0);
+  ict.lineTo(bladeLength, handleWidth * 0.3);
+  ict.closePath();
+  ict.fill();
   ict.stroke();
 
-  ict.fillStyle = '#2a3547';
-  ict.font = `bold ${size * 0.14}px sans-serif`;
-  ict.textAlign = 'center';
-  ict.fillText('꽉', 0, hingeHeight * 0.22);
+  // 날 끝의 눈
+  ict.fillStyle = '#ffffff';
+  ict.beginPath();
+  ict.arc(eyeX, 0, size * 0.05, 0, Math.PI * 2);
+  ict.fill();
+  ict.strokeStyle = '#1f2937';
+  ict.lineWidth = size * 0.01;
+  ict.stroke();
+
+  // 빨간 눈동자
+  ict.fillStyle = '#dc2626';
+  ict.beginPath();
+  ict.arc(eyeX, 0, size * 0.025, 0, Math.PI * 2);
+  ict.fill();
+
+  // 눈동자 반짝이
+  ict.fillStyle = '#ffffff';
+  ict.beginPath();
+  ict.arc(eyeX + size * 0.01, -size * 0.01, size * 0.01, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.restore();
+
+  // 중심 연결부 (나사/리벳)
+  const centerRadius = size * 0.06;
+  const centerGradient = ict.createRadialGradient(0, 0, 0, 0, 0, centerRadius);
+  centerGradient.addColorStop(0, '#f3f4f6');
+  centerGradient.addColorStop(0.7, '#d1d5db');
+  centerGradient.addColorStop(1, '#9ca3af');
+
+  ict.fillStyle = centerGradient;
+  ict.beginPath();
+  ict.arc(0, 0, centerRadius, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.strokeStyle = '#6b7280';
+  ict.lineWidth = size * 0.01;
+  ict.stroke();
+
+  // 나사 십자 표시
+  ict.strokeStyle = '#4b5563';
+  ict.lineWidth = size * 0.008;
+  ict.beginPath();
+  ict.moveTo(-centerRadius * 0.5, 0);
+  ict.lineTo(centerRadius * 0.5, 0);
+  ict.moveTo(0, -centerRadius * 0.5);
+  ict.lineTo(0, centerRadius * 0.5);
+  ict.stroke();
 
   return off;
 }
+
+function createBacteriaSpriteDarkBlue(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const radius = center - 2;
+
+  // 남색 그라디언트
+  const bodyGradient = ict.createRadialGradient(center, center, radius * 0.2, center, center, radius);
+  bodyGradient.addColorStop(0, '#4c6ce6');
+  bodyGradient.addColorStop(0.6, '#2d4ac7');
+  bodyGradient.addColorStop(1, '#1d2f8a');
+
+  ict.fillStyle = bodyGradient;
+  ict.beginPath();
+  ict.arc(center, center, radius, 0, Math.PI * 2);
+  ict.fill();
+
+  // 테두리
+  ict.strokeStyle = '#1a237e';
+  ict.lineWidth = 3;
+  ict.stroke();
+
+  // 위협적인 가시들
+  ict.fillStyle = '#303f9f';
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    const spikeLength = 8 + Math.sin(i) * 3;
+    const x1 = center + Math.cos(angle) * radius;
+    const y1 = center + Math.sin(angle) * radius;
+    const x2 = center + Math.cos(angle) * (radius + spikeLength);
+    const y2 = center + Math.sin(angle) * (radius + spikeLength);
+
+    ict.beginPath();
+    ict.moveTo(center + Math.cos(angle) * (radius - 3), center + Math.sin(angle) * (radius - 3));
+    ict.lineTo(x2, y2);
+    ict.lineTo(x1, y1);
+    ict.closePath();
+    ict.fill();
+  }
+
+  // 내부 패턴 (더 위협적으로)
+  ict.fillStyle = '#1a237e';
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    const dist = radius * 0.5;
+    const x = center + Math.cos(angle) * dist;
+    const y = center + Math.sin(angle) * dist;
+    ict.beginPath();
+    ict.arc(x, y, 4, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // 중앙 핵심 부분
+  ict.fillStyle = '#0d1757';
+  ict.beginPath();
+  ict.arc(center, center, radius * 0.3, 0, Math.PI * 2);
+  ict.fill();
+
+  return off;
+}
+
+function createEnemyProjectileSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const radius = center - 1;
+
+  // 빨간색 그라디언트
+  const gradient = ict.createRadialGradient(center, center, 0, center, center, radius);
+  gradient.addColorStop(0, '#ff6b6b');
+  gradient.addColorStop(0.7, '#e74c3c');
+  gradient.addColorStop(1, '#c0392b');
+
+  ict.fillStyle = gradient;
+  ict.beginPath();
+  ict.arc(center, center, radius, 0, Math.PI * 2);
+  ict.fill();
+
+  // 테두리
+  ict.strokeStyle = '#a93226';
+  ict.lineWidth = 2;
+  ict.stroke();
+
+  // 중심 하이라이트
+  ict.fillStyle = '#ff8a80';
+  ict.beginPath();
+  ict.arc(center - 2, center - 2, radius * 0.4, 0, Math.PI * 2);
+  ict.fill();
+
+  return off;
+}
+
 const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '들기름김'];
 
 const sprites = {
   player: createDonutSprite(PLAYER_SIZE),
   enemy: createBacteriaSprite(ENEMY_SIZE),
   bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
+  darkBlueEnemy: createBacteriaSpriteDarkBlue(DARK_BLUE_ENEMY_SIZE),
   boss: createClampBossSprite(BOSS_RADIUS * 2.6),
   blades: GIM_VARIANTS.map((label) => createGimSprite(BLADE_SIZE, label)),
   bullet: createSeaweedSprite(BULLET_SIZE),
+  enemyProjectile: createEnemyProjectileSprite(DARK_BLUE_PROJECTILE_SIZE),
   mine: createMineSprite(MINE_SIZE),
   toothpaste: createToothpasteSprite(48),
 };
@@ -968,10 +1103,12 @@ const state = {
   playerInvuln: 0,
   score: 0,
   elapsed: 0,
+  stage: 1,
   fireTimer: 0,
   spawnTimer: SPAWN_INTERVAL,
   autoAimAngle: 0,
   bullets: [],
+  enemyProjectiles: [],
   enemies: [],
   boss: null,
   bossWarningTimer: 0,
@@ -1004,6 +1141,10 @@ const state = {
   pendingLevelBlast: 0,
   toothpasteGlowPhase: 0,
   hasGanjangGim: false,
+  hpBarTimer: 0,
+  lastPlayerHealth: PLAYER_MAX_HEALTH,
+  joystickCenter: null,
+  joystickActive: false,
 };
 
 const keys = new Set();
@@ -1011,13 +1152,27 @@ let processingLevelChain = false;
 
 function handleVictory() {
   if (state.victory) return;
-  state.victory = true;
-  state.paused = true;
-  const details = computeFinalScoreDetails();
-  showModal('VICTORY', '축하합니다! 다시 시작을 누르면 새로 플레이합니다.', {
-    showRestart: true,
-    extraHTML: buildResultHtml(details),
+
+  // 스테이지 진행
+  state.stage += 1;
+  state.elapsed = 0; // 시간을 다시 흐르게 함
+  state.boss = null;
+  state.bossWarningTimer = 0;
+
+  // 모든 적과 발사체 제거
+  state.enemies = [];
+  state.enemyProjectiles = [];
+
+  // 성공 메시지 표시
+  showModal('스테이지 클리어!', `스테이지 ${state.stage - 1} 완료! 스테이지 ${state.stage}가 시작됩니다.`, {
+    showRestart: false,
   });
+
+  // 2초 후 모달 닫기 및 다음 스테이지 시작
+  setTimeout(() => {
+    hideModal();
+    state.paused = false;
+  }, 2000);
 }
 
 function handleGameOver() {
@@ -1041,7 +1196,9 @@ function resetGameplayState() {
   state.spawnTimer = SPAWN_INTERVAL;
   state.autoAimAngle = 0;
   state.bullets = [];
+  state.enemyProjectiles = [];
   state.enemies = [];
+  state.stage = 1;
   state.boss = null;
   state.bossWarningTimer = 0;
   state.mine = { pos: vector(0, 0), active: true };
@@ -1074,6 +1231,10 @@ function resetGameplayState() {
   state.pendingLevelBlast = 0;
   state.toothpasteGlowPhase = 0;
   state.hasGanjangGim = false; // 간장김 스킬은 1회용 - 새 게임에서 해제
+  state.hpBarTimer = 0;
+  state.lastPlayerHealth = PLAYER_MAX_HEALTH;
+  state.joystickCenter = null;
+  state.joystickActive = false;
   keys.clear();
   recomputePlayerStats();
   ensureChunk(0, 0);
@@ -1404,6 +1565,26 @@ function spawnEnemy() {
   state.enemies.push({ id: enemyIdCounter++, pos, speed, health: 1, size: ENEMY_SIZE, sprite: sprites.enemy });
 }
 
+function spawnDarkBlueEnemy() {
+  const angle = randRange(0, Math.PI * 2);
+  const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
+  const pos = vector(
+    state.playerPos.x + Math.cos(angle) * radius,
+    state.playerPos.y + Math.sin(angle) * radius,
+  );
+  const speed = DARK_BLUE_ENEMY_SPEED + state.elapsed * ENEMY_SPEED_SCALE * DARK_BLUE_ENEMY_SPEED;
+  state.enemies.push({
+    id: enemyIdCounter++,
+    pos,
+    speed,
+    health: DARK_BLUE_ENEMY_HEALTH,
+    size: DARK_BLUE_ENEMY_SIZE,
+    sprite: sprites.darkBlueEnemy,
+    fireTimer: randRange(0, DARK_BLUE_ENEMY_FIRE_INTERVAL),
+    type: 'darkBlue'
+  });
+}
+
 function spawnBigEnemy() {
   const angle = randRange(0, Math.PI * 2);
   const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
@@ -1532,49 +1713,84 @@ function collidesWithObstacles(x, y, size) {
 
 let lastTimestamp = performance.now();
 
-// ===== Joystick events (mobile only) =====
-if (isMobile && joystick) {
+// ===== Dynamic Joystick events (mobile only) =====
+if (isMobile && canvas) {
   const maxRadius = 56; // px movement for stick inside base
 
   const setStick = (clientX, clientY) => {
-    const center = getElementCenter(joystick);
-    const dx = clientX - center.x;
-    const dy = clientY - center.y;
+    if (!state.joystickCenter) return;
+
+    const dx = clientX - state.joystickCenter.x;
+    const dy = clientY - state.joystickCenter.y;
     const v = vectorClampLength(vector(dx, dy), maxRadius);
-    // visual
+
+    // Update joystick visual position
+    joystick.style.left = `${state.joystickCenter.x}px`;
+    joystick.style.top = `${state.joystickCenter.y}px`;
+    joystick.style.transform = 'translate(-50%, -50%)';
     joystickStick.style.transform = `translate(${v.x}px, ${v.y}px)`;
+
     // normalized dir
     touchInput.dir = vectorNormalize(v);
   };
 
   const start = (x, y) => {
     touchInput.active = true;
+    state.joystickActive = true;
+    state.joystickCenter = { x, y };
+    joystick.style.display = 'block';
     setStick(x, y);
   };
+
   const move = (x, y) => {
     if (!touchInput.active) return;
     setStick(x, y);
   };
+
   const end = () => {
     touchInput.active = false;
+    state.joystickActive = false;
+    state.joystickCenter = null;
     touchInput.dir = vector(0, 0);
+    joystick.style.display = 'none';
     joystickStick.style.transform = 'translate(0px, 0px)';
   };
 
-  joystick.addEventListener('touchstart', (e) => {
+  // Add touch events to canvas instead of joystick element
+  canvas.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
-    start(t.clientX, t.clientY);
-    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const canvasHeight = rect.height;
+    const touchY = t.clientY - rect.top;
+
+    // Only activate joystick if touch is in bottom half of screen
+    if (touchY > canvasHeight * 0.5) {
+      start(t.clientX, t.clientY);
+      e.preventDefault();
+    }
   }, { passive: false });
 
-  joystick.addEventListener('touchmove', (e) => {
-    const t = e.touches[0];
-    move(t.clientX, t.clientY);
-    e.preventDefault();
+  canvas.addEventListener('touchmove', (e) => {
+    if (touchInput.active) {
+      const t = e.touches[0];
+      move(t.clientX, t.clientY);
+      e.preventDefault();
+    }
   }, { passive: false });
 
-  joystick.addEventListener('touchend', () => end());
-  joystick.addEventListener('touchcancel', () => end());
+  canvas.addEventListener('touchend', (e) => {
+    if (touchInput.active) {
+      end();
+      e.preventDefault();
+    }
+  });
+
+  canvas.addEventListener('touchcancel', (e) => {
+    if (touchInput.active) {
+      end();
+      e.preventDefault();
+    }
+  });
 
   // Optional mouse support for desktop testing
   joystick.addEventListener('mousedown', (e) => {
@@ -1602,6 +1818,7 @@ function update(dt) {
   state.levelBlastTimer = Math.max(0, state.levelBlastTimer - dt);
   state.toothpasteFlashTimer = Math.max(0, state.toothpasteFlashTimer - dt);
   state.toothpasteGlowPhase = (state.toothpasteGlowPhase + dt * 4) % (Math.PI * 2);
+  state.hpBarTimer = Math.max(0, state.hpBarTimer - dt);
   if (state.bossWarningTimer > 0) {
     state.bossWarningTimer = Math.max(0, state.bossWarningTimer - dt);
   }
@@ -1639,6 +1856,7 @@ function update(dt) {
   handleShooting(dt);
   handleBullets(dt);
   handleEnemies(dt);
+  handleEnemyProjectiles(dt);
   if (state.boss) {
     updateBoss(dt);
   }
@@ -1689,7 +1907,10 @@ function handleMovement(dt) {
     if (!state.boss) {
       const batch = 1 + Math.floor(state.elapsed / 30);
       for (let i = 0; i < batch; i++) {
-        if (state.elapsed >= BIG_ENEMY_SPAWN_TIME && Math.random() < BIG_ENEMY_SPAWN_CHANCE) {
+        // 스테이지 2부터 남색 세균 등장 (30% 확률)
+        if (state.stage >= 2 && Math.random() < 0.3) {
+          spawnDarkBlueEnemy();
+        } else if (state.elapsed >= BIG_ENEMY_SPAWN_TIME && Math.random() < BIG_ENEMY_SPAWN_CHANCE) {
           spawnBigEnemy();
         } else {
           spawnEnemy();
@@ -1952,9 +2173,27 @@ function handleEnemies(dt) {
     const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
     enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || ENEMY_SIZE);
     clampWorldPosition(enemy.pos);
+
+    // 남색 세균의 발사 로직
+    if (enemy.type === 'darkBlue') {
+      enemy.fireTimer -= dt;
+      if (enemy.fireTimer <= 0) {
+        // 플레이어 현재 위치로 발사
+        const fireDirection = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
+        state.enemyProjectiles.push({
+          pos: vectorCopy(enemy.pos),
+          dir: fireDirection,
+          speed: DARK_BLUE_PROJECTILE_SPEED,
+          size: DARK_BLUE_PROJECTILE_SIZE
+        });
+        enemy.fireTimer = DARK_BLUE_ENEMY_FIRE_INTERVAL;
+      }
+    }
+
     if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, (enemy.size || ENEMY_SIZE) / 2, state.playerPos, PLAYER_SIZE / 2)) {
       state.playerHealth -= 1;
       state.playerInvuln = PLAYER_INVULN_TIME;
+      state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
         handleGameOver();
       }
@@ -1978,11 +2217,41 @@ function handleEnemies(dt) {
     if (!killed) nextEnemies.push(enemy);
   }
   state.enemies = nextEnemies;
+}
+
+function handleEnemyProjectiles(dt) {
+  const nextProjectiles = [];
+  for (const projectile of state.enemyProjectiles) {
+    projectile.pos = vectorAdd(projectile.pos, vectorScale(projectile.dir, projectile.speed * dt));
+
+    // 화면 밖으로 나가면 제거
+    if (Math.abs(projectile.pos.x) > WORLD_BOUNDS || Math.abs(projectile.pos.y) > WORLD_BOUNDS) {
+      continue;
+    }
+
+    // 플레이어와 충돌 검사
+    if (state.playerInvuln <= 0 && circleIntersects(
+      projectile.pos, projectile.size / 2,
+      state.playerPos, PLAYER_SIZE / 2
+    )) {
+      state.playerHealth -= 1;
+      state.playerInvuln = PLAYER_INVULN_TIME;
+      state.hpBarTimer = 1.0;
+      if (state.playerHealth <= 0) {
+        handleGameOver();
+      }
+      continue; // 발사체 제거
+    }
+
+    nextProjectiles.push(projectile);
+  }
+  state.enemyProjectiles = nextProjectiles;
 
   if (state.boss) {
     if (state.playerInvuln <= 0 && circleIntersects(state.boss.pos, BOSS_RADIUS, state.playerPos, PLAYER_SIZE / 2)) {
       state.playerHealth -= 2;
       state.playerInvuln = PLAYER_INVULN_TIME;
+      state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
         handleGameOver();
       }
@@ -2069,6 +2338,11 @@ function render() {
     drawBulletSprite(bullet);
   }
 
+  // 적 발사체 그리기
+  for (const projectile of state.enemyProjectiles) {
+    drawSprite(sprites.enemyProjectile, projectile.pos, projectile.size);
+  }
+
   if (state.blades.length > 0) {
     for (const blade of state.blades) {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
@@ -2091,6 +2365,7 @@ function render() {
   if (state.levelBlastTimer > 0) {
     drawLevelBlast();
   }
+  drawPlayerHPBar();
 
   ctx.restore();
 
@@ -2292,6 +2567,11 @@ function drawPlayer() {
     ctx.globalAlpha = clamp(alpha, 0.2, 1);
     ctx.drawImage(sprites.player, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
     ctx.globalAlpha = 1;
+  } else if (state.playerHealth <= 2) {
+    const alpha = 0.3 + 0.7 * Math.sin(performance.now() * 0.008);
+    ctx.globalAlpha = clamp(alpha, 0.3, 1);
+    ctx.drawImage(sprites.player, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.globalAlpha = 1;
   } else {
     ctx.drawImage(sprites.player, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
   }
@@ -2358,10 +2638,72 @@ function drawBossEntity(boss) {
 }
 
 function drawBossWarning() {
-  ctx.font = "700 48px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
-  ctx.fillStyle = 'rgba(255,220,120,0.88)';
+  const { halfW, halfH } = getWorldDims();
+  const screenX = halfW;
+  const screenY = halfH * 0.3;
+
+  // 텍스트 그림자 효과
+  ctx.font = "900 64px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
   ctx.textAlign = 'center';
-  ctx.fillText('돌진!', HALF_WIDTH, 100);
+  ctx.textBaseline = 'middle';
+
+  // 검은색 그림자
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillText('돌진!', screenX + 3, screenY + 3);
+
+  // 빨간색 메인 텍스트
+  ctx.fillStyle = '#ff0000';
+  ctx.fillText('돌진!', screenX, screenY);
+
+  // 흰색 테두리
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.strokeText('돌진!', screenX, screenY);
+
+  // 빨간색 글로우 효과
+  ctx.shadowColor = '#ff0000';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#ff4444';
+  ctx.fillText('돌진!', screenX, screenY);
+
+  // 그림자 효과 초기화
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+}
+
+function drawPlayerHPBar() {
+  if (state.hpBarTimer <= 0) return;
+
+  const { halfW, halfH } = getWorldDims();
+  const screenX = halfW;
+  const screenY = halfH - PLAYER_SIZE / 2 - 20;
+
+  const barWidth = 80;
+  const barHeight = 8;
+  const bgColor = 'rgba(0, 0, 0, 0.6)';
+  const hpColor = '#ff4444';
+  const fullColor = '#ff4444';
+
+  const alpha = Math.min(1, state.hpBarTimer);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(screenX - barWidth / 2, screenY - barHeight / 2, barWidth, barHeight);
+
+  const hpRatio = state.playerHealth / PLAYER_MAX_HEALTH;
+  const fillWidth = barWidth * hpRatio;
+
+  if (state.playerHealth <= 2) {
+    const flash = 0.7 + 0.3 * Math.sin(performance.now() * 0.01);
+    ctx.globalAlpha = alpha * flash;
+  }
+
+  ctx.fillStyle = hpRatio > 0.5 ? fullColor : hpColor;
+  ctx.fillRect(screenX - barWidth / 2, screenY - barHeight / 2, fillWidth, barHeight);
+
+  ctx.restore();
 }
 
 function drawMineFlash() {
@@ -2428,17 +2770,82 @@ function drawLevelBlast() {
   ctx.stroke();
 }
 
+function calculateTotalScore() {
+  let totalScore = state.score;
+
+  // 3분(180초) 이후의 시간을 점수에 추가
+  if (state.elapsed > 180) {
+    const bonusTime = Math.floor(state.elapsed - 180);
+    totalScore += bonusTime;
+  }
+
+  return totalScore;
+}
+
+function computeFinalScoreDetails() {
+  const totalScore = calculateTotalScore();
+  const baseScore = state.score;
+  const timeBonus = state.elapsed > 180 ? Math.floor(state.elapsed - 180) : 0;
+
+  return {
+    totalScore,
+    baseScore,
+    timeBonus,
+    time: state.elapsed,
+    stage: state.stage,
+    level: state.level
+  };
+}
+
+function buildResultHtml(details) {
+  let html = `
+    <div class="result-block">
+      <span class="result-label">최종 점수</span>
+      <span class="result-value">${details.totalScore.toString().padStart(5, '0')}</span>
+    </div>
+    <div class="result-block">
+      <span class="result-label">기본 점수</span>
+      <span class="result-value">${details.baseScore.toString().padStart(5, '0')}</span>
+    </div>`;
+
+  if (details.timeBonus > 0) {
+    html += `
+    <div class="result-block">
+      <span class="result-label">시간 보너스</span>
+      <span class="result-value">+${details.timeBonus}</span>
+    </div>`;
+  }
+
+  html += `
+    <div class="result-block">
+      <span class="result-label">생존 시간</span>
+      <span class="result-value">${formatTime(details.time)}</span>
+    </div>
+    <div class="result-block">
+      <span class="result-label">도달 스테이지</span>
+      <span class="result-value">${details.stage}</span>
+    </div>
+    <div class="result-block">
+      <span class="result-label">최종 레벨</span>
+      <span class="result-value">${details.level}</span>
+    </div>`;
+
+  return html;
+}
+
 function updateHud() {
+  const totalScore = calculateTotalScore();
+
   statNickname.textContent = state.nickname || '---';
   statTime.textContent = formatTime(state.elapsed);
-  statScore.textContent = state.score.toString().padStart(5, '0');
+  statScore.textContent = totalScore.toString().padStart(5, '0');
   statHP.textContent = `${Math.max(0, state.playerHealth)} / ${PLAYER_MAX_HEALTH}`;
   statLevel.textContent = state.level;
 
   // Mirror to mobile top HUD if available
   if (mobileHud) {
     if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${PLAYER_MAX_HEALTH}`;
-    if (mobileScore) mobileScore.textContent = state.score.toString().padStart(5, '0');
+    if (mobileScore) mobileScore.textContent = totalScore.toString().padStart(5, '0');
     if (mobileTime) mobileTime.textContent = formatTime(state.elapsed);
   }
 

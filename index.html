@@ -423,24 +423,22 @@
 
     /* Mobile joystick (semi-transparent + crisp compositing) */
     #joystick {
-      position: absolute;
-      left: 50%;
-      bottom: 18px;
+      position: fixed;
       width: 140px;
       height: 140px;
       border-radius: 50%;
       background: radial-gradient(circle at 48% 48%, rgba(18, 26, 36, 0.55), rgba(8, 12, 18, 0.38));
       border: 1px solid rgba(110, 214, 255, 0.28);
       opacity: 0.375;              /* 50% 더 투명 */
-      display: none;
+      display: none;               /* 기본적으로 숨김 */
       touch-action: none;
       z-index: 15;
       -webkit-tap-highlight-color: transparent;
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       will-change: transform;
-      transform: translateX(-50%) translateZ(0); /* ✅ 하단 중앙 배치 */
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), inset 0 0 1px rgba(255,255,255,0.08);
+      pointer-events: none;        /* 터치 이벤트를 캔버스로 전달 */
     }
     #joystick-stick {
       position: absolute;
@@ -485,12 +483,6 @@
         top: calc(env(safe-area-inset-top, 0px) + 8px);
         left: calc(env(safe-area-inset-left, 0px) + 8px);
         right: calc(env(safe-area-inset-right, 0px) + 8px);
-      }
-      #joystick {
-        display: block;           /* 모바일: 조이스틱 표시 */
-        left: 50%;                /* ✅ 하단 중앙 기준 */
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
-        /* transform은 상단 전역 규칙의 translateX(-50%) translateZ(0)를 유지 */
       }
       #xp-bar-wrapper {
         left: calc(env(safe-area-inset-left, 0px) + 8px);
