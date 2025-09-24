@@ -101,10 +101,69 @@ const BULLET_LIFETIME = 1.8;
 
 const ENEMY_SIZE = 20;
 const ENEMY_BASE_SPEED = 48;
-const ENEMY_SPEED_SCALE = 0.04;
+const ENEMY_SPEED_SCALE = 0.02;
 
 const SPAWN_INTERVAL = 2.0;
-const SPAWN_INTERVAL_FLOOR = 0.35;
+const SPAWN_INTERVAL_FLOOR = 0.7;
+// ==== Big Enemy constants ====
+const BIG_ENEMY_SIZE = ENEMY_SIZE * 2; // 40
+const BIG_ENEMY_HEALTH = 4;
+const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.8; // slightly slower than small ones
+const BIG_ENEMY_SPAWN_TIME = 90; // seconds (1m 30s)
+const BIG_ENEMY_SPAWN_CHANCE = 0.35; // 35% of spawns after threshold
+function createBacteriaSpritePurple(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const spikes = 12;
+  const baseRadius = size / 2.2;
+  ict.translate(center, center);
+  ict.fillStyle = '#a178ff';   // body fill (purple)
+  ict.strokeStyle = '#6b3fb3'; // outline (darker purple)
+  ict.lineWidth = 3;
+  ict.beginPath();
+  for (let i = 0; i <= spikes; i++) {
+    const angle = (Math.PI * 2 * i) / spikes;
+    const radius = baseRadius + Math.sin(angle * 3) * (size * 0.08);
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) {
+      ict.moveTo(x, y);
+    } else {
+      ict.lineTo(x, y);
+    }
+  }
+  ict.closePath();
+  ict.fill();
+  ict.stroke();
+
+  // eyes/highlights
+  ict.fillStyle = '#efe5ff';
+  ict.beginPath();
+  ict.arc(-size * 0.15, -size * 0.1, size * 0.18, 0, Math.PI * 2);
+  ict.fill();
+  ict.beginPath();
+  ict.arc(size * 0.18, -size * 0.05, size * 0.14, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.fillStyle = '#3a1d6e';
+  ict.beginPath();
+  ict.arc(-size * 0.15, -size * 0.1, size * 0.07, 0, Math.PI * 2);
+  ict.fill();
+  ict.beginPath();
+  ict.arc(size * 0.18, -size * 0.05, size * 0.06, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.strokeStyle = '#7b46c9';
+  ict.lineWidth = 2;
+  ict.beginPath();
+  ict.arc(0, size * 0.15, size * 0.2, 0, Math.PI);
+  ict.stroke();
+
+  return off;
+}
 const SPAWN_RADIUS_MIN = 420;
 const SPAWN_RADIUS_MAX = 680;
 
@@ -148,7 +207,7 @@ const MINE_TRIGGER_RADIUS = 60;
 const MINE_FLASH_DURATION = 0.6;
 
 const BACKGROUND_COLOR = '#101218';
-const GRID_COLOR = '#1e242a';
+const GRID_COLOR = '#c6ccd4'; // stainless-like grid color
 
 const XP_PER_KILL = 20;
 const BASE_XP_TO_LEVEL = 200;
@@ -732,6 +791,7 @@ const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '들�
 const sprites = {
   player: createDonutSprite(PLAYER_SIZE),
   enemy: createBacteriaSprite(ENEMY_SIZE),
+  bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
   boss: createClampBossSprite(BOSS_RADIUS * 2.6),
   blades: GIM_VARIANTS.map((label) => createGimSprite(BLADE_SIZE, label)),
   bullet: createSeaweedSprite(BULLET_SIZE),
@@ -1333,6 +1393,7 @@ function detonateMine() {
 }
 
 function spawnEnemy() {
+  // default small enemy
   const angle = randRange(0, Math.PI * 2);
   const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
   const pos = vector(
@@ -1340,7 +1401,18 @@ function spawnEnemy() {
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const speed = ENEMY_BASE_SPEED + state.elapsed * ENEMY_SPEED_SCALE * ENEMY_BASE_SPEED;
-  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: 1 });
+  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: 1, size: ENEMY_SIZE, sprite: sprites.enemy });
+}
+
+function spawnBigEnemy() {
+  const angle = randRange(0, Math.PI * 2);
+  const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
+  const pos = vector(
+    state.playerPos.x + Math.cos(angle) * radius,
+    state.playerPos.y + Math.sin(angle) * radius,
+  );
+  const speed = BIG_ENEMY_SPEED + state.elapsed * ENEMY_SPEED_SCALE * BIG_ENEMY_SPEED;
+  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: BIG_ENEMY_HEALTH, size: BIG_ENEMY_SIZE, sprite: sprites.bigEnemy });
 }
 
 function spawnBoss() {
@@ -1611,12 +1683,18 @@ function handleMovement(dt) {
 
   const currentSpawn = Math.max(
     SPAWN_INTERVAL_FLOOR,
-    SPAWN_INTERVAL - state.elapsed * 0.04,
+    SPAWN_INTERVAL - state.elapsed * 0.02,
   );
   if (state.spawnTimer <= 0) {
     if (!state.boss) {
-      const batch = 1 + Math.floor(state.elapsed / 15);
-      for (let i = 0; i < batch; i++) spawnEnemy();
+      const batch = 1 + Math.floor(state.elapsed / 30);
+      for (let i = 0; i < batch; i++) {
+        if (state.elapsed >= BIG_ENEMY_SPAWN_TIME && Math.random() < BIG_ENEMY_SPAWN_CHANCE) {
+          spawnBigEnemy();
+        } else {
+          spawnEnemy();
+        }
+      }
     }
     state.spawnTimer = currentSpawn;
   }
@@ -1754,16 +1832,23 @@ function handleBullets(dt) {
     let consumed = false;
     for (let i = 0; i < state.enemies.length; i++) {
       const enemy = state.enemies[i];
-      if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, ENEMY_SIZE / 2)) {
-        state.enemies.splice(i, 1);
-        onEnemyRemoved(enemy);
-        grantKillReward();
+      if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, (enemy.size || ENEMY_SIZE) / 2)) {
+        // 1 데미지 (보라색 큰 적은 health:4로 시작)
+        enemy.health = (enemy.health || 1) - 1;
+
+        if (enemy.health <= 0) {
+          state.enemies.splice(i, 1);
+          onEnemyRemoved(enemy);
+          grantKillReward();
+          i -= 1; // 배열 보정
+        }
+
+        // 관통 처리 (간장김 보유 시 1회)
         if (bullet.pierce && bullet.pierce > 0) {
-          bullet.pierce -= 1;       // ✅ 관통 1회 소모, 계속 진행
-          i -= 1;                   // 배열 변경 보정
-          continue;                 // 같은 프레임에 다음 적도 관통 가능
+          bullet.pierce -= 1;  // 관통 소모 후 계속 진행
+          continue;            // 같은 프레임에 다음 적도 맞출 수 있게
         } else {
-          consumed = true;          // 관통 없음 → 탄환 소멸
+          consumed = true;     // 관통 없으면 탄환 소멸
           break;
         }
       }
@@ -1822,9 +1907,13 @@ function triggerEmField() {
         const enemy = target.ref;
         const idx = state.enemies.indexOf(enemy);
         if (idx !== -1) {
-          state.enemies.splice(idx, 1);
-          onEnemyRemoved(enemy);
-          grantKillReward();
+          // EM 필드도 1 데미지
+          enemy.health = (enemy.health || 1) - 1;
+          if (enemy.health <= 0) {
+            state.enemies.splice(idx, 1);
+            onEnemyRemoved(enemy);
+            grantKillReward();
+          }
         }
         targetPos = vectorCopy(enemy.pos);
       } else {
@@ -1861,9 +1950,9 @@ function handleEnemies(dt) {
   const nextEnemies = [];
   for (const enemy of state.enemies) {
     const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
-    enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), ENEMY_SIZE);
+    enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || ENEMY_SIZE);
     clampWorldPosition(enemy.pos);
-    if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, ENEMY_SIZE / 2, state.playerPos, PLAYER_SIZE / 2)) {
+    if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, (enemy.size || ENEMY_SIZE) / 2, state.playerPos, PLAYER_SIZE / 2)) {
       state.playerHealth -= 1;
       state.playerInvuln = PLAYER_INVULN_TIME;
       if (state.playerHealth <= 0) {
@@ -1873,16 +1962,19 @@ function handleEnemies(dt) {
     }
 
     let killed = false;
-    if (state.blades.length > 0) {
-      for (const blade of state.blades) {
-        if (circleIntersects(enemy.pos, ENEMY_SIZE / 2, blade.pos, BLADE_SIZE / 2)) {
+  if (state.blades.length > 0) {
+    for (const blade of state.blades) {
+      if (circleIntersects(enemy.pos, (enemy.size || ENEMY_SIZE) / 2, blade.pos, BLADE_SIZE / 2)) {
+        enemy.health = (enemy.health || 1) - 1; // 블레이드도 1 데미지
+        if (enemy.health <= 0) {
           grantKillReward();
           onEnemyRemoved(enemy);
           killed = true;
-          break;
         }
+        break; // 한 프레임에 여러 번 깎이지 않도록
       }
     }
+  }
     if (!killed) nextEnemies.push(enemy);
   }
   state.enemies = nextEnemies;
@@ -1960,7 +2052,9 @@ function render() {
   }
 
   for (const enemy of state.enemies) {
-    drawSprite(sprites.enemy, enemy.pos, ENEMY_SIZE);
+    const spr = enemy.sprite || sprites.enemy;
+    const sz = enemy.size || ENEMY_SIZE;
+    drawSprite(spr, enemy.pos, sz);
   }
 
   if (state.boss) {
@@ -2005,11 +2099,38 @@ function render() {
 
 function drawBackground() {
   const { worldW, worldH, halfW, halfH } = getWorldDims();
+
+  // ===== Stainless (silver) base =====
+  // Subtle radial/linear blend to mimic brushed metal
+  const centerX = halfW;
+  const centerY = halfH * 0.9; // slightly lower center for vignette feel
+
+  // Base fill
+  const baseGrad = ctx.createRadialGradient(centerX, centerY, Math.min(halfW, halfH) * 0.15, centerX, centerY, Math.max(worldW, worldH) * 0.7);
+  baseGrad.addColorStop(0.0, '#f3f5f7');  // bright center
+  baseGrad.addColorStop(0.45, '#e6eaee');
+  baseGrad.addColorStop(1.0, '#d6dbe2');  // outer rim
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, worldW, worldH);
+
+  // very soft vertical sheen
+  const sheen = ctx.createLinearGradient(0, 0, worldW, 0);
+  sheen.addColorStop(0.0, 'rgba(255,255,255,0.08)');
+  sheen.addColorStop(0.5, 'rgba(255,255,255,0.02)');
+  sheen.addColorStop(1.0, 'rgba(255,255,255,0.08)');
+  ctx.fillStyle = sheen;
+  ctx.globalAlpha = 1;
+  ctx.fillRect(0, 0, worldW, worldH);
+
+  // ===== Silver grid =====
   const tile = 180;
   const offsetX = state.playerPos.x % tile;
   const offsetY = state.playerPos.y % tile;
-  ctx.strokeStyle = GRID_COLOR;
+
   ctx.lineWidth = 1;
+
+  // light inner strokes
+  ctx.strokeStyle = GRID_COLOR; // '#c6ccd4'
   for (let x = -tile - offsetX; x < worldW; x += tile) {
     ctx.beginPath();
     ctx.moveTo(x + halfW, 0);
@@ -2022,6 +2143,23 @@ function drawBackground() {
     ctx.lineTo(worldW, y + halfH);
     ctx.stroke();
   }
+
+  // soft highlight on grid intersections (subtle)
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.globalAlpha = 0.35;
+  for (let x = -tile - offsetX; x < worldW; x += tile) {
+    ctx.beginPath();
+    ctx.moveTo(x + halfW + 0.5, 0);
+    ctx.lineTo(x + halfW + 0.5, worldH);
+    ctx.stroke();
+  }
+  for (let y = -tile - offsetY; y < worldH; y += tile) {
+    ctx.beginPath();
+    ctx.moveTo(0, y + halfH + 0.5);
+    ctx.lineTo(worldW, y + halfH + 0.5);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawObstacles() {
