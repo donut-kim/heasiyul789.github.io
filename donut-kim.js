@@ -202,7 +202,7 @@ const BOSS_HIT_SCORE = 5;
 const BOSS_HIT_RADIUS = 18;
 
 const BLADE_RADIUS = 60;
-const BLADE_SIZE = 28;
+const BLADE_SIZE = 56;
 const BLADE_ROTATION_SPEED = 2.4;
 const BLADE_HIT_COOLDOWN = 0.3;
 
@@ -1275,32 +1275,6 @@ function buildResultHtml(details) {
       <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
         ${details.totalScore.toLocaleString()}
       </span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">기본 점수</span>
-      <span class="result-value">${details.baseScore.toString().padStart(5, '0')}</span>
-    </div>`;
-
-  if (details.timeBonus > 0) {
-    html += `
-    <div class="result-block">
-      <span class="result-label">시간 보너스</span>
-      <span class="result-value">+${details.timeBonus}</span>
-    </div>`;
-  }
-
-  html += `
-    <div class="result-block">
-      <span class="result-label">생존 시간</span>
-      <span class="result-value">${formatTime(details.time)}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">도달 스테이지</span>
-      <span class="result-value">${details.stage}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">최종 레벨</span>
-      <span class="result-value">${details.level}</span>
     </div>`;
 
   return html;
@@ -1312,7 +1286,7 @@ const upgradeDescriptions = {
   multi_shot: (next) => `추가 탄환 +${next}`,
   double_shot: () => '90도 방향 추가 발사',
   blade: (next) => `브랜드의 방부제 김들이 도넛을 지켜줍니다. ${next}개`,
-  em_field: () => '도넛을 잘못집어 튀어나오던 슈크림이 현현합니다. (랜덤 효과)',
+  em_field: () => '가장 가까운 적들을 연쇄로 공격하는 슈크림이 발사됩니다. (3연쇄)',
   ganjang_gim: () => '간장에 조려진 김 발사: 탄환 1회 관통(최대 두 마리 적 처치)',
   full_heal: () => '현재 라이프를 모두 회복',
 };
@@ -1351,8 +1325,9 @@ function renderUpgradeOverlay() {
     const card = document.createElement('div');
     card.className = 'upgrade-card';
     card.dataset.index = String(index);
+    const titleStyle = key === 'ganjang_gim' ? 'style="color: #4ade80;"' : '';
     card.innerHTML = `
-      <div class="card-title">${def.title}</div>
+      <div class="card-title" ${titleStyle}>${def.title}</div>
       <div class="card-level">Lv.${next} / ${def.max}</div>
       <div class="card-desc">${(upgradeDescriptions[key] || (() => '효과 없음'))(next)}</div>
       <div class="card-hint">선택키: ${index + 1}</div>
@@ -1386,10 +1361,9 @@ function applyUpgrade(index) {
     case 'em_field':
       if (state.emFieldCount === 0) {
         state.emFieldCount = 1;
-      } else if (Math.random() < 0.5) {
-        state.emFieldCount += 1;
+        state.emTargetsPerField = 3; // 처음 획득 시 3연쇄
       } else {
-        state.emTargetsPerField += 1;
+        state.emFieldCount += 1; // 추가 획득 시 발사 횟수 증가
       }
       state.emCooldown = 0;
       break;
@@ -1410,11 +1384,22 @@ function applyUpgrade(index) {
 let currentPlayerSpeed = PLAYER_SPEED;
 let currentFireInterval = PLAYER_FIRE_INTERVAL;
 let bulletCount = 1;
+let currentBladeRotationSpeed = BLADE_ROTATION_SPEED;
+let currentEmInterval = EM_FIELD_BASE_INTERVAL;
 
 function recomputePlayerStats() {
   currentPlayerSpeed = PLAYER_SPEED * (1 + 0.12 * state.upgradeLevels.speed);
   currentFireInterval = Math.max(0.08, PLAYER_FIRE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
   bulletCount = 1 + state.upgradeLevels.multi_shot;
+
+  // 공속 업그레이드가 블레이드 회전속도에도 영향
+  currentBladeRotationSpeed = BLADE_ROTATION_SPEED * (1 + 0.3 * state.upgradeLevels.attack_speed);
+
+  // 공속 업그레이드가 슈크림 발사 간격에도 영향
+  currentEmInterval = Math.max(
+    EM_FIELD_MIN_INTERVAL,
+    EM_FIELD_BASE_INTERVAL * Math.pow(0.85, state.upgradeLevels.attack_speed)
+  );
 }
 
 function addKillRewardsRaw(count) {
@@ -1947,7 +1932,7 @@ function recomputeBlades(dt) {
   const bladeCount = state.upgradeLevels.blade;
   if (bladeCount > 0) {
     const tau = Math.PI * 2;
-    state.bladeAngle = (state.bladeAngle + dt * BLADE_ROTATION_SPEED) % tau;
+    state.bladeAngle = (state.bladeAngle + dt * currentBladeRotationSpeed) % tau;
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
       const angle = state.bladeAngle + i * step;
@@ -2126,7 +2111,7 @@ function handleBullets(dt) {
 function triggerEmField() {
   const emInterval = Math.max(
     EM_FIELD_MIN_INTERVAL,
-    EM_FIELD_BASE_INTERVAL - 0.4 * (state.emFieldCount - 1),
+    currentEmInterval - 0.4 * (state.emFieldCount - 1),
   );
   state.emCooldown = emInterval;
   const targetsPool = state.enemies.map((enemy) => ({ type: 'enemy', ref: enemy }));
@@ -2138,10 +2123,19 @@ function triggerEmField() {
     if (targetsPool.length === 0) break;
     let last = vectorCopy(state.playerPos);
     const hits = Math.min(state.emTargetsPerField, targetsPool.length);
+
+    // 가장 가까운 적들을 거리 순으로 정렬
+    targetsPool.sort((a, b) => {
+      const posA = a.type === 'enemy' ? a.ref.pos : a.ref.pos;
+      const posB = b.type === 'enemy' ? b.ref.pos : b.ref.pos;
+      const distA = vectorLengthSq(vectorSub(state.playerPos, posA));
+      const distB = vectorLengthSq(vectorSub(state.playerPos, posB));
+      return distA - distB;
+    });
+
     for (let h = 0; h < hits; h++) {
       if (targetsPool.length === 0) break;
-      const index = Math.floor(Math.random() * targetsPool.length);
-      const target = targetsPool.splice(index, 1)[0];
+      const target = targetsPool.splice(0, 1)[0]; // 가장 가까운 적부터 선택
       let targetPos;
       if (target.type === 'enemy') {
         const enemy = target.ref;
@@ -2606,10 +2600,10 @@ function drawEmEffect(effect) {
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
 
-  // 크림빛 그라디언트
+  // 밝은 노란색 그라디언트
   const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-  grad.addColorStop(0, `rgba(250, 238, 200, ${0.55 * alpha})`);
-  grad.addColorStop(1, `rgba(245, 230, 179, ${0.95 * alpha})`);
+  grad.addColorStop(0, `rgba(255, 255, 0, ${0.85 * alpha})`);
+  grad.addColorStop(1, `rgba(255, 215, 0, ${0.95 * alpha})`);
   ctx.strokeStyle = grad;
 
   // 메인 스트로크
