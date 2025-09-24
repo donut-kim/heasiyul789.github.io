@@ -1570,12 +1570,31 @@ function spawnEnemy() {
 }
 
 function spawnDarkBlueEnemy() {
-  const angle = randRange(0, Math.PI * 2);
-  const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
-  const pos = vector(
-    state.playerPos.x + Math.cos(angle) * radius,
-    state.playerPos.y + Math.sin(angle) * radius,
-  );
+  let pos;
+  let attempts = 0;
+  const maxAttempts = 20;
+
+  // 장애물이 없는 위치를 찾을 때까지 반복
+  do {
+    const angle = randRange(0, Math.PI * 2);
+    const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
+    pos = vector(
+      state.playerPos.x + Math.cos(angle) * radius,
+      state.playerPos.y + Math.sin(angle) * radius,
+    );
+    attempts++;
+  } while (collidesWithObstacles(pos.x, pos.y, DARK_BLUE_ENEMY_SIZE) && attempts < maxAttempts);
+
+  // 최대 시도 횟수를 초과하면 기본 위치 사용 (장애물과 겹치더라도)
+  if (attempts >= maxAttempts) {
+    const angle = randRange(0, Math.PI * 2);
+    const radius = SPAWN_RADIUS_MAX;
+    pos = vector(
+      state.playerPos.x + Math.cos(angle) * radius,
+      state.playerPos.y + Math.sin(angle) * radius,
+    );
+  }
+
   const speed = DARK_BLUE_ENEMY_SPEED + state.elapsed * ENEMY_SPEED_SCALE * DARK_BLUE_ENEMY_SPEED;
   state.enemies.push({
     id: enemyIdCounter++,
@@ -1911,8 +1930,8 @@ function handleMovement(dt) {
     if (!state.boss) {
       const batch = 1 + Math.floor(state.elapsed / 30);
       for (let i = 0; i < batch; i++) {
-        // 스테이지 2부터 남색 세균 등장 (30% 확률)
-        if (state.stage >= 2 && Math.random() < 0.3) {
+        // 테스트용: 남색 세균을 시작부터 등장 (30% 확률)
+        if(state.stage >= 2 && Math.random() < 0.3) {
           spawnDarkBlueEnemy();
         } else if (state.elapsed >= BIG_ENEMY_SPAWN_TIME && Math.random() < BIG_ENEMY_SPAWN_CHANCE) {
           spawnBigEnemy();
