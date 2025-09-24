@@ -1,6 +1,49 @@
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
+// ===== Canvas resize & DPR handling =====
+const mediaPortrait = window.matchMedia('(max-width: 820px), (orientation: portrait)');
+const BASE_LANDSCAPE = { w: 960, h: 540 };
+const BASE_PORTRAIT  = { w: 360, h: 640 };
+
+function sizeCanvasToCss() {
+  // 1) CSS로 보이는 크기
+  const rect = canvas.getBoundingClientRect();
+
+  // 2) DPR 반영한 실제 비트맵 크기
+  const dpr = window.devicePixelRatio || 1;
+  const displayW = Math.max(1, Math.round(rect.width  * dpr));
+  const displayH = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== displayW || canvas.height !== displayH) {
+    canvas.width  = displayW;
+    canvas.height = displayH;
+  }
+
+  // 3) 컨텍스트를 DPR에 맞추기
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 4) 게임의 “논리 좌표계”를 세팅(가로/세로 모드별)
+  const target = mediaPortrait.matches ? BASE_PORTRAIT : BASE_LANDSCAPE;
+  const sx = rect.width  / target.w;
+  const sy = rect.height / target.h;
+  const s = Math.min(sx, sy); // 균등 스케일로 왜곡 방지
+  const offsetX = (rect.width  - target.w * s) * 0.5;
+  const offsetY = (rect.height - target.h * s) * 0.5;
+
+  // 렌더 시 참조할 수 있게 전역에 저장
+  window.__renderScale = { s, worldW: target.w, worldH: target.h, offsetX, offsetY };
+  // Helper: current logical world dimensions (portrait/landscape aware)
+  function getWorldDims() {
+    const worldW = (window.__renderScale && window.__renderScale.worldW) || WIDTH;
+    const worldH = (window.__renderScale && window.__renderScale.worldH) || HEIGHT;
+    return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
+  }
+}
+
+window.addEventListener('load', sizeCanvasToCss);
+window.addEventListener('resize', sizeCanvasToCss);
+mediaPortrait.addEventListener?.('change', sizeCanvasToCss);
+
 const sidePanel = document.getElementById('side-panel');
 const statTime = document.getElementById('stat-time');
 const statScore = document.getElementById('stat-score');
@@ -18,6 +61,28 @@ const modalOverlay = document.getElementById('modal-overlay');
 const startOverlay = document.getElementById('start-overlay');
 const nicknameInput = document.getElementById('nickname-input');
 const startButton = document.getElementById('start-button');
+
+// ===== Mobile detection & HUD / Joystick elements =====
+const isMobile = ('ontouchstart' in window) || window.matchMedia('(pointer: coarse)').matches;
+
+// Mobile HUD elements (shown on portrait/mobile)
+const mobileHud = document.getElementById('top-hud');
+const mobileHP = document.getElementById('mobile-hp');
+const mobileScore = document.getElementById('mobile-score');
+const mobileTime = document.getElementById('mobile-time');
+
+// Joystick elements
+const joystick = document.getElementById('joystick');
+const joystickStick = document.getElementById('joystick-stick');
+
+// Joystick state
+const touchInput = {
+  active: false,
+  dir: vector(0, 0),
+  origin: { x: 0, y: 0 },
+};
+
+
 
 const WIDTH = 960;
 const HEIGHT = 540;
@@ -48,10 +113,10 @@ const MAX_SURVIVAL_TIME = 180;
 const LEVEL_BLAST_RADIUS = 140;
 const LEVEL_BLAST_DURATION = 0.4;
 const TOOTHPASTE_DROP_INTERVAL = 10;
-const TOOTHPASTE_DROP_CHANCE = 1.0;
+const TOOTHPASTE_DROP_CHANCE = 0.2;
 const TOOTHPASTE_DROP_MIN_DISTANCE = 50;
 const TOOTHPASTE_DROP_DISTANCE = 200;
-const TOOTHPASTE_PICKUP_RADIUS = 90;
+const TOOTHPASTE_PICKUP_RADIUS = 90; // deprecated: using sprite-overlap collision instead
 const TOOTHPASTE_EFFECT_KILL_COUNT = 50;
 const TOOTHPASTE_FLASH_DURATION = 0.6;
 
@@ -92,16 +157,17 @@ const XP_LEVEL_SCALE = 2.0;
 const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
 
 const UPGRADE_DEFINITIONS = {
-  speed: { title: '속도 증가', max: 5 },
+  speed: { title: '이속 증가', max: 5 },
   attack_speed: { title: '공속 증가', max: 5 },
-  multi_shot: { title: '총알 추가', max: 5 },
+  multi_shot: { title: '김 추가', max: 5 },
   double_shot: { title: '더블 발사', max: 5 },
-  blade: { title: '블레이드', max: 5 },
-  em_field: { title: '전자기장', max: 5 },
+  blade: { title: '김시리즈', max: 5 },
+  em_field: { title: '슈크림', max: 5 },
+  ganjang_gim: { title: '간장김', max: 1 },
   full_heal: { title: '라이프 회복', max: 5 },
 };
 
-const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'blade', 'em_field', 'full_heal'];
+const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'blade', 'em_field', 'ganjang_gim', 'full_heal'];
 
 function makeRng(seed = Date.now()) {
   let s = seed >>> 0;
@@ -195,6 +261,19 @@ function vectorSub(a, b) {
 
 function vectorScale(v, s) {
   return vector(v.x * s, v.y * s);
+}
+
+function vectorClampLength(v, maxLen) {
+  const lenSq = vectorLengthSq(v);
+  if (lenSq === 0) return vector(0, 0);
+  const len = Math.sqrt(lenSq);
+  const k = Math.min(1, maxLen / len);
+  return vector(v.x * k, v.y * k);
+}
+
+function getElementCenter(el) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
 
 function rectCollide(a, b) {
@@ -864,6 +943,7 @@ const state = {
   toothpasteFlashTimer: 0,
   pendingLevelBlast: 0,
   toothpasteGlowPhase: 0,
+  hasGanjangGim: false,
 };
 
 const keys = new Set();
@@ -933,6 +1013,7 @@ function resetGameplayState() {
   state.toothpasteFlashTimer = 0;
   state.pendingLevelBlast = 0;
   state.toothpasteGlowPhase = 0;
+  state.hasGanjangGim = false; // 간장김 스킬은 1회용 - 새 게임에서 해제
   keys.clear();
   recomputePlayerStats();
   ensureChunk(0, 0);
@@ -972,23 +1053,12 @@ function attemptStart() {
 }
 
 function buildResultHtml(details) {
-  const timeText = formatTime(state.elapsed);
   return `
-    <div class="result-block">
-      <span class="result-label">생존 시간</span>
-      <span class="result-value">${timeText}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">획득 점수</span>
-      <span class="result-value">${state.score.toLocaleString()} 점</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">보스 클리어</span>
-      <span class="result-value">${details.bossCleared ? '성공' : '실패'}</span>
-    </div>
-    <div class="result-block">
-      <span class="result-label">최종 점수</span>
-      <span class="result-value">${details.total}</span>
+    <div class="result-block" style="background: rgba(18,26,38,0.0); border: none; box-shadow: none;">
+      <span class="result-label" style="display:block; font-size:14px; color:#9fb4d8; margin-bottom:8px;">최종 점수</span>
+      <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
+        ${details.total.toLocaleString()}
+      </span>
     </div>
   `;
 }
@@ -998,18 +1068,28 @@ const upgradeDescriptions = {
   attack_speed: (next) => `공격 간격 -${next * 10}%`,
   multi_shot: (next) => `추가 탄환 +${next}`,
   double_shot: () => '90도 방향 추가 발사',
-  blade: (next) => `회전 블레이드 ${next}개`,
-  em_field: () => '전자기장 강화 (랜덤 효과)',
+  blade: (next) => `브랜드의 방부제 김들이 도넛을 지켜줍니다. ${next}개`,
+  em_field: () => '도넛을 잘못집어 튀어나오던 슈크림이 현현합니다. (랜덤 효과)',
+  ganjang_gim: () => '간장에 조려진 김 발사: 탄환 1회 관통(최대 두 마리 적 처치)',
   full_heal: () => '현재 라이프를 모두 회복',
 };
 
 function rollUpgradeCards() {
+  // 기본 풀: 간장김은 평소엔 제외 (확률로만 등장)
   const pool = Object.entries(UPGRADE_DEFINITIONS)
-    .filter(([key, def]) => state.upgradeLevels[key] < def.max)
+    .filter(([key, def]) => key !== 'ganjang_gim' && state.upgradeLevels[key] < def.max)
     .map(([key]) => key);
   if (pool.length === 0) return [];
   const shuffled = pool.sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 3).map((key) => ({ key }));
+  const cards = shuffled.slice(0, 3).map((key) => ({ key }));
+
+  // 5% 확률로 간장김 카드 주입 (아직 못 얻었을 때만)
+  if (!state.hasGanjangGim && state.upgradeLevels.ganjang_gim === 0 && Math.random() < 0.05) {
+    const replaceIndex = Math.floor(Math.random() * cards.length);
+    cards[replaceIndex] = { key: 'ganjang_gim' };
+  }
+
+  return cards;
 }
 
 function openUpgradeSelection() {
@@ -1054,6 +1134,9 @@ function applyUpgrade(index) {
 
   state.upgradeLevels[key] = current + 1;
   switch (key) {
+    case 'ganjang_gim':
+      state.hasGanjangGim = true; // 1회용 - 얻으면 다시 나오지 않음
+      break;
     case 'full_heal':
       state.playerHealth = PLAYER_MAX_HEALTH;
       break;
@@ -1374,6 +1457,64 @@ function collidesWithObstacles(x, y, size) {
 
 let lastTimestamp = performance.now();
 
+// ===== Joystick events (mobile only) =====
+if (isMobile && joystick) {
+  const maxRadius = 56; // px movement for stick inside base
+
+  const setStick = (clientX, clientY) => {
+    const center = getElementCenter(joystick);
+    const dx = clientX - center.x;
+    const dy = clientY - center.y;
+    const v = vectorClampLength(vector(dx, dy), maxRadius);
+    // visual
+    joystickStick.style.transform = `translate(${v.x}px, ${v.y}px)`;
+    // normalized dir
+    touchInput.dir = vectorNormalize(v);
+  };
+
+  const start = (x, y) => {
+    touchInput.active = true;
+    setStick(x, y);
+  };
+  const move = (x, y) => {
+    if (!touchInput.active) return;
+    setStick(x, y);
+  };
+  const end = () => {
+    touchInput.active = false;
+    touchInput.dir = vector(0, 0);
+    joystickStick.style.transform = 'translate(0px, 0px)';
+  };
+
+  joystick.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    start(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  joystick.addEventListener('touchmove', (e) => {
+    const t = e.touches[0];
+    move(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  joystick.addEventListener('touchend', () => end());
+  joystick.addEventListener('touchcancel', () => end());
+
+  // Optional mouse support for desktop testing
+  joystick.addEventListener('mousedown', (e) => {
+    start(e.clientX, e.clientY);
+    const onMove = (me) => move(me.clientX, me.clientY);
+    const onUp = () => {
+      end();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+}
+
 function update(dt) {
   if (state.paused) return;
   const activePlay = !state.selectingUpgrade && !state.victory && !state.gameOver;
@@ -1430,12 +1571,19 @@ function update(dt) {
 
 function handleMovement(dt) {
   let move = vector(0, 0);
-  if (keys.has('KeyW') || keys.has('ArrowUp')) move.y -= 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) move.y += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) move.x -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) move.x += 1;
-  if (vectorLengthSq(move) > 0) {
-    move = vectorScale(vectorNormalize(move), currentPlayerSpeed * dt);
+  if (isMobile && touchInput.active) {
+    // use joystick direction
+    if (vectorLengthSq(touchInput.dir) > 0) {
+      move = vectorScale(touchInput.dir, currentPlayerSpeed * dt);
+    }
+  } else {
+    if (keys.has('KeyW') || keys.has('ArrowUp')) move.y -= 1;
+    if (keys.has('KeyS') || keys.has('ArrowDown')) move.y += 1;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) move.x -= 1;
+    if (keys.has('KeyD') || keys.has('ArrowRight')) move.x += 1;
+    if (vectorLengthSq(move) > 0) {
+      move = vectorScale(vectorNormalize(move), currentPlayerSpeed * dt);
+    }
   }
   state.playerPos = moveWithCollision(state.playerPos, move, PLAYER_SIZE);
   clampWorldPosition(state.playerPos);
@@ -1445,12 +1593,13 @@ function handleMovement(dt) {
     const distSq = vectorLengthSq(vectorSub(state.playerPos, state.mine.pos));
     if (distSq <= MINE_TRIGGER_RADIUS * MINE_TRIGGER_RADIUS) detonateMine();
   }
+  // Toothpaste pickup: sprite-overlap (circle vs circle) using actual sprite radii
   if (state.toothpasteItems.length > 0) {
-    const pickupRadiusSq = TOOTHPASTE_PICKUP_RADIUS * TOOTHPASTE_PICKUP_RADIUS;
+    const playerRadius = PLAYER_SIZE / 2;   // 20px
+    const itemRadius = 48 / 2;              // 24px (createToothpasteSprite(48))
     for (let i = 0; i < state.toothpasteItems.length; i++) {
       const item = state.toothpasteItems[i];
-      const distSq = vectorLengthSq(vectorSub(state.playerPos, item.pos));
-      if (distSq <= pickupRadiusSq) {
+      if (circleIntersects(state.playerPos, playerRadius, item.pos, itemRadius)) {
         triggerToothpastePickup(i);
         break;
       }
@@ -1501,6 +1650,7 @@ function spawnProjectile(direction) {
     pos: vectorCopy(state.playerPos),
     dir: norm,
     lifetime: BULLET_LIFETIME,
+    pierce: state.hasGanjangGim ? 1 : 0, // ✅ 간장김 보유 시 1회 관통
   });
 }
 
@@ -1554,14 +1704,25 @@ function handleShooting(dt) {
 
     const doubleShotLevel = state.upgradeLevels.double_shot;
     for (const dir of baseDirections) {
-      spawnProjectile(dir);
-      if (doubleShotLevel > 0) {
-        const perp = rotate90(dir);
-        const perpNeg = vector(-perp.x, -perp.y);
-        for (let i = 0; i < doubleShotLevel; i++) {
-          spawnProjectile(perp);
-          spawnProjectile(perpNeg);
-        }
+      const baseAngle = Math.atan2(dir.y, dir.x);
+
+      if (doubleShotLevel <= 0) {
+        // 기본 한 발
+        spawnProjectile(dir);
+        continue;
+      }
+
+      // 레벨 N => N+1 발
+      const count = doubleShotLevel + 1;
+
+      // 각도 간격: 레벨1은 180°, 그 이상은 360°/count
+      const step = (count === 2) ? Math.PI : (Math.PI * 2) / count;
+
+      for (let i = 0; i < count; i++) {
+        const angle = baseAngle + i * step;
+        const vx = Math.cos(angle);
+        const vy = Math.sin(angle);
+        spawnProjectile(vector(vx, vy));
       }
     }
 
@@ -1587,18 +1748,24 @@ function handleBullets(dt) {
       continue;
     }
 
-    let hit = false;
+    let consumed = false;
     for (let i = 0; i < state.enemies.length; i++) {
       const enemy = state.enemies[i];
       if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, ENEMY_SIZE / 2)) {
         state.enemies.splice(i, 1);
         onEnemyRemoved(enemy);
         grantKillReward();
-        hit = true;
-        break;
+        if (bullet.pierce && bullet.pierce > 0) {
+          bullet.pierce -= 1;       // ✅ 관통 1회 소모, 계속 진행
+          i -= 1;                   // 배열 변경 보정
+          continue;                 // 같은 프레임에 다음 적도 관통 가능
+        } else {
+          consumed = true;          // 관통 없음 → 탄환 소멸
+          break;
+        }
       }
     }
-    if (hit) continue;
+    if (consumed) continue;
     if (state.boss) {
       if (circleIntersects(bullet.pos, bulletRadius, state.boss.pos, BOSS_RADIUS)) {
         state.boss.health -= 1;
@@ -1608,7 +1775,11 @@ function handleBullets(dt) {
           state.bossWarningTimer = 0;
           handleVictory();
         }
-        continue;
+        if (bullet.pierce && bullet.pierce > 0) {
+          bullet.pierce -= 1;   // 관통 소모 후 계속 진행
+        } else {
+          continue;             // 관통 없으면 소멸
+        }
       }
     }
     nextBullets.push(bullet);
@@ -1744,18 +1915,33 @@ function handleEnemies(dt) {
   }
 }
 
+function getWorldDims() {
+  const worldW = (window.__renderScale && window.__renderScale.worldW) || WIDTH;
+  const worldH = (window.__renderScale && window.__renderScale.worldH) || HEIGHT;
+  return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
+}
+
 function worldToScreen(pos) {
+  const { halfW, halfH } = getWorldDims();
   return {
-    x: Math.round(pos.x - state.playerPos.x + HALF_WIDTH),
-    y: Math.round(pos.y - state.playerPos.y + HALF_HEIGHT),
+    x: Math.round(pos.x - state.playerPos.x + halfW),
+    y: Math.round(pos.y - state.playerPos.y + halfH),
   };
 }
 
 function render() {
   ctx.save();
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  // Clear the full canvas (DPR-aware)
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = BACKGROUND_COLOR;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  //균등 스케일 + 중앙 정렬 적용
+  if (window.__renderScale) {
+    const { s, offsetX, offsetY } = window.__renderScale;
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(s, s);
+  }
 
   drawBackground();
   drawObstacles();
@@ -1815,21 +2001,22 @@ function render() {
 }
 
 function drawBackground() {
+  const { worldW, worldH, halfW, halfH } = getWorldDims();
   const tile = 180;
   const offsetX = state.playerPos.x % tile;
   const offsetY = state.playerPos.y % tile;
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = 1;
-  for (let x = -tile - offsetX; x < WIDTH; x += tile) {
+  for (let x = -tile - offsetX; x < worldW; x += tile) {
     ctx.beginPath();
-    ctx.moveTo(x + HALF_WIDTH, 0);
-    ctx.lineTo(x + HALF_WIDTH, HEIGHT);
+    ctx.moveTo(x + halfW, 0);
+    ctx.lineTo(x + halfW, worldH);
     ctx.stroke();
   }
-  for (let y = -tile - offsetY; y < HEIGHT; y += tile) {
+  for (let y = -tile - offsetY; y < worldH; y += tile) {
     ctx.beginPath();
-    ctx.moveTo(0, y + HALF_HEIGHT);
-    ctx.lineTo(WIDTH, y + HALF_HEIGHT);
+    ctx.moveTo(0, y + halfH);
+    ctx.lineTo(worldW, y + halfH);
     ctx.stroke();
   }
 }
@@ -1956,8 +2143,9 @@ function drawSprite(sprite, worldPos, size) {
 }
 
 function drawPlayer() {
-  const screenX = HALF_WIDTH;
-  const screenY = HALF_HEIGHT;
+  const { halfW, halfH } = getWorldDims();
+  const screenX = halfW;
+  const screenY = halfH;
   if (state.playerInvuln > 0) {
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
     ctx.globalAlpha = clamp(alpha, 0.2, 1);
@@ -1969,16 +2157,41 @@ function drawPlayer() {
 }
 
 function drawEmEffect(effect) {
-  const { start, end, timer } = effect;
-  const alpha = clamp(timer / EM_EFFECT_LIFETIME, 0, 1);
-  ctx.strokeStyle = `rgba(120,220,255,${alpha})`;
-  ctx.lineWidth = 3;
-  const startScreen = worldToScreen(start);
-  const endScreen = worldToScreen(end);
+  // 슈크림 색상(크림빛)으로 부드러운 광선 효과
+  const a = worldToScreen(effect.start);
+  const b = worldToScreen(effect.end);
+  const lifeRatio = clamp(effect.timer / EM_EFFECT_LIFETIME, 0, 1);
+  const alpha = 0.25 + 0.75 * lifeRatio; // 생성 직후 더 밝고, 사라질수록 어둡게
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  // 크림빛 그라디언트
+  const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+  grad.addColorStop(0, `rgba(250, 238, 200, ${0.55 * alpha})`);
+  grad.addColorStop(1, `rgba(245, 230, 179, ${0.95 * alpha})`);
+  ctx.strokeStyle = grad;
+
+  // 메인 스트로크
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 6;
   ctx.beginPath();
-  ctx.moveTo(startScreen.x, startScreen.y);
-  ctx.lineTo(endScreen.x, endScreen.y);
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
   ctx.stroke();
+
+  // 외곽 글로우
+  ctx.globalAlpha = 0.20 * alpha;
+  ctx.lineWidth = 12;
+  ctx.stroke();
+
+  // 소프트 오라
+  ctx.globalAlpha = 0.08 * alpha;
+  ctx.lineWidth = 24;
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawBulletSprite(bullet) {
@@ -2080,6 +2293,14 @@ function updateHud() {
   statScore.textContent = state.score.toString().padStart(5, '0');
   statHP.textContent = `${Math.max(0, state.playerHealth)} / ${PLAYER_MAX_HEALTH}`;
   statLevel.textContent = state.level;
+
+  // Mirror to mobile top HUD if available
+  if (mobileHud) {
+    if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${PLAYER_MAX_HEALTH}`;
+    if (mobileScore) mobileScore.textContent = state.score.toString().padStart(5, '0');
+    if (mobileTime) mobileTime.textContent = formatTime(state.elapsed);
+  }
+
 
   if (state.boss) {
     statBoss.hidden = false;
