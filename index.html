@@ -410,6 +410,66 @@
         transform: translateY(-2px);
         box-shadow: 0 24px 38px rgba(255, 144, 104, 0.5);
       }
+
+      /* 캐릭터 선택 스타일 */
+      .character-section {
+        margin: 16px 0;
+      }
+      .character-section label {
+        display: block;
+        font-size: 13px;
+        color: #8ea5c8;
+        text-align: left;
+        margin-bottom: 8px;
+      }
+      .character-options {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+      }
+      .character-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 12px;
+        border: 1px solid rgba(120, 150, 190, 0.3);
+        border-radius: 12px;
+        background: rgba(12, 16, 24, 0.5);
+        cursor: pointer;
+        transition: all 0.2s;
+        min-width: 100px;
+      }
+      .character-option:hover {
+        border-color: #6ed6ff;
+        background: rgba(12, 16, 24, 0.7);
+      }
+      .character-option.selected {
+        border-color: #6ed6ff;
+        background: rgba(110, 214, 255, 0.1);
+        box-shadow: 0 0 15px rgba(110, 214, 255, 0.2);
+      }
+      .character-preview {
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        width: 60px;
+        height: 60px;
+        display: block;
+      }
+      .character-name {
+        font-size: 12px;
+        color: #c2d4f0;
+        font-weight: 500;
+        text-align: center;
+      }
+      .nickname-section {
+        margin: 16px 0;
+      }
+      .nickname-section label {
+        font-size: 13px;
+        color: #8ea5c8;
+        text-align: left;
+      }
       .page-wrap {
         display: flex;
         align-items: flex-start;
@@ -635,9 +695,29 @@
       <div id="start-overlay" class="active">
         <div class="start-card">
           <h1>도넛라이크</h1>
-          <p>김도넛과 함께하는 서바이벌 게임! 닉네임을 입력하고 시작하세요!</p>
-          <label for="nickname-input">닉네임 (2~9자)</label>
-          <input id="nickname-input" type="text" maxlength="12" autocomplete="off" placeholder="예: SweetDonut" />
+          <p>김도넛과 함께하는 서바이벌 게임! 캐릭터와 닉네임을 선택하고 시작하세요!</p>
+
+          <!-- 캐릭터 선택 -->
+          <div class="character-section">
+            <label>캐릭터 선택</label>
+            <div class="character-options">
+              <div class="character-option selected" data-character="signature_knotted">
+                <canvas class="character-preview" width="60" height="60"></canvas>
+                <span class="character-name">스프링클 도넛</span>
+              </div>
+              <div class="character-option" data-character="glazed_ring">
+                <canvas class="character-preview" width="60" height="60"></canvas>
+                <span class="character-name">글레이즈드 도넛</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 닉네임 입력 -->
+          <div class="nickname-section">
+            <label for="nickname-input">닉네임 (2~9자)</label>
+            <input id="nickname-input" type="text" maxlength="12" autocomplete="off" placeholder="예: SweetDonut" />
+          </div>
+
           <button id="start-button" type="button" disabled>게임 시작</button>
         </div>
       </div>

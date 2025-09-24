@@ -74,11 +74,26 @@ export function createDonutSprite(size) {
   ict.arc(center, center, radius, 0, Math.PI * 2);
   ict.fill();
 
-  // Hole
+  // Hole filled with yellow choux cream
   if (style.holeRadius > 0) {
-    ict.fillStyle = style.holeColor;
+    // 노란색 슈크림으로 구멍 채우기
+    const creamGradient = ict.createRadialGradient(
+      center, center, 0,
+      center, center, radius * style.holeRadius
+    );
+    creamGradient.addColorStop(0, '#fff2a6');
+    creamGradient.addColorStop(0.7, '#ffeb3b');
+    creamGradient.addColorStop(1, '#ffd600');
+
+    ict.fillStyle = creamGradient;
     ict.beginPath();
     ict.arc(center, center, radius * style.holeRadius, 0, Math.PI * 2);
+    ict.fill();
+
+    // 슈크림 하이라이트
+    ict.fillStyle = 'rgba(255,255,255,0.4)';
+    ict.beginPath();
+    ict.arc(center - radius * style.holeRadius * 0.3, center - radius * style.holeRadius * 0.3, radius * style.holeRadius * 0.4, 0, Math.PI * 2);
     ict.fill();
   }
 
@@ -131,6 +146,75 @@ export function createDonutSprite(size) {
 
       ict.fillStyle = style.sprinkleColors[Math.floor(Math.random() * style.sprinkleColors.length)];
       ict.fillRect(x - 1, y - 3, 2, 6);
+    }
+  }
+
+  return off;
+}
+
+export function createGlazedDonutSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const radius = center - 2;
+  const style = DONUT_STYLES.glazed_ring;
+
+  // Main dough with gradient
+  const doughGradient = ict.createRadialGradient(center, center, radius * 0.3, center, center, radius);
+  doughGradient.addColorStop(0, style.doughInner);
+  doughGradient.addColorStop(1, style.doughOuter);
+
+  ict.fillStyle = doughGradient;
+  ict.beginPath();
+  ict.arc(center, center, radius, 0, Math.PI * 2);
+  ict.fill();
+
+  // Hole
+  if (style.holeRadius > 0) {
+    ict.fillStyle = style.holeColor;
+    ict.beginPath();
+    ict.arc(center, center, radius * style.holeRadius, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // White glaze icing
+  if (style.icingRadius > 0 && style.icingColor !== 'transparent') {
+    ict.fillStyle = style.icingColor;
+    ict.beginPath();
+    ict.arc(center, center, radius * style.icingRadius, 0, Math.PI * 2);
+    ict.fill();
+
+    if (style.holeRadius > 0) {
+      ict.globalCompositeOperation = 'destination-out';
+      ict.beginPath();
+      ict.arc(center, center, radius * style.holeRadius, 0, Math.PI * 2);
+      ict.fill();
+      ict.globalCompositeOperation = 'source-over';
+    }
+
+    // Glaze highlight
+    if (style.icingHighlight) {
+      const highlightGradient = ict.createRadialGradient(
+        center - radius * 0.2, center - radius * 0.2, 0,
+        center - radius * 0.2, center - radius * 0.2, radius * 0.6
+      );
+      highlightGradient.addColorStop(0, style.icingHighlight);
+      highlightGradient.addColorStop(1, 'rgba(255,255,255,0)');
+
+      ict.fillStyle = highlightGradient;
+      ict.beginPath();
+      ict.arc(center, center, radius * style.icingRadius, 0, Math.PI * 2);
+      ict.fill();
+
+      if (style.holeRadius > 0) {
+        ict.globalCompositeOperation = 'destination-out';
+        ict.beginPath();
+        ict.arc(center, center, radius * style.holeRadius, 0, Math.PI * 2);
+        ict.fill();
+        ict.globalCompositeOperation = 'source-over';
+      }
     }
   }
 
@@ -367,6 +451,7 @@ export function createClampBossSprite(size) {
 // Create sprites object
 export const sprites = {
   player: createDonutSprite(PLAYER_SIZE),
+  glazedDonut: createGlazedDonutSprite(PLAYER_SIZE),
   enemy: createBacteriaSprite(ENEMY_SIZE),
   bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
   boss: createClampBossSprite(BOSS_RADIUS * 2.6),

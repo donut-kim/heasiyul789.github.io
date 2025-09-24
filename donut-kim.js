@@ -231,10 +231,11 @@ const UPGRADE_DEFINITIONS = {
   blade: { title: '김시리즈', max: 5 },
   em_field: { title: '슈크림', max: 5 },
   ganjang_gim: { title: '간장김', max: 1 },
+  kim_bugak: { title: '김부각', max: 1 },
   full_heal: { title: '라이프 회복', max: 5 },
 };
 
-const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'blade', 'em_field', 'ganjang_gim', 'full_heal'];
+const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'full_heal'];
 
 function makeRng(seed = Date.now()) {
   let s = seed >>> 0;
@@ -370,9 +371,9 @@ function createDonutSprite(size) {
   const ict = off.getContext('2d');
   const center = size / 2;
   const outer = size / 2 - 1;
-  const inner = size / 3;
 
-  const gradient = ict.createRadialGradient(center, center, inner * 0.6, center, center, outer);
+  // 원래 도넛 베이스 (꽉 찬 원형)
+  const gradient = ict.createRadialGradient(center, center, outer * 0.3, center, center, outer);
   gradient.addColorStop(0, '#7b3f11');
   gradient.addColorStop(0.6, '#582b08');
   gradient.addColorStop(1, '#2f1404');
@@ -381,17 +382,13 @@ function createDonutSprite(size) {
   ict.arc(center, center, outer, 0, Math.PI * 2);
   ict.fill();
 
-  ict.globalCompositeOperation = 'destination-out';
-  ict.beginPath();
-  ict.arc(center + 2, center - 2, inner, 0, Math.PI * 2);
-  ict.fill();
-  ict.globalCompositeOperation = 'source-over';
-
+  // 원래 하이라이트
   ict.fillStyle = 'rgba(255,245,200,0.18)';
   ict.beginPath();
   ict.ellipse(center - outer * 0.28, center - outer * 0.32, outer * 0.45, outer * 0.28, -0.55, 0, Math.PI * 2);
   ict.fill();
 
+  // 원래 스프링클
   const sprinkleColors = ['#ffe3a3', '#ff92c2', '#88d8ff', '#f2f2f2'];
   const sprinkleCount = 14;
   for (let i = 0; i < sprinkleCount; i++) {
@@ -406,6 +403,49 @@ function createDonutSprite(size) {
     ict.fillRect(-1.2, -4, 2.4, 8);
     ict.restore();
   }
+
+  return off;
+}
+
+function createGlazedDonutSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const outer = size / 2 - 1;
+
+  // 도넛 베이스 (꽉 찬 원형)
+  const doughGradient = ict.createRadialGradient(center, center, outer * 0.2, center, center, outer);
+  doughGradient.addColorStop(0, '#f2d794');
+  doughGradient.addColorStop(0.6, '#e8c799');
+  doughGradient.addColorStop(1, '#ba9147');
+  ict.fillStyle = doughGradient;
+  ict.beginPath();
+  ict.arc(center, center, outer, 0, Math.PI * 2);
+  ict.fill();
+
+  // 흰색 글레이즈 (꽉 찬 원형)
+  const glazeGradient = ict.createRadialGradient(center, center, 0, center, center, outer * 0.85);
+  glazeGradient.addColorStop(0, '#ffffff');
+  glazeGradient.addColorStop(0.8, '#f8f8f8');
+  glazeGradient.addColorStop(1, '#e8e8e8');
+  ict.fillStyle = glazeGradient;
+  ict.beginPath();
+  ict.arc(center, center, outer * 0.85, 0, Math.PI * 2);
+  ict.fill();
+
+  // 글레이즈 하이라이트 (더 밝은 반짝임)
+  ict.fillStyle = 'rgba(255,255,255,0.8)';
+  ict.beginPath();
+  ict.ellipse(center - outer * 0.25, center - outer * 0.25, outer * 0.35, outer * 0.22, -0.55, 0, Math.PI * 2);
+  ict.fill();
+
+  // 작은 하이라이트
+  ict.fillStyle = 'rgba(255,255,255,0.6)';
+  ict.beginPath();
+  ict.ellipse(center + outer * 0.2, center + outer * 0.15, outer * 0.15, outer * 0.1, 0.8, 0, Math.PI * 2);
+  ict.fill();
 
   return off;
 }
@@ -433,6 +473,82 @@ function createSeaweedSprite(size) {
   ict.moveTo(-width / 3, -height / 2 + 6);
   ict.lineTo(width / 3, height / 2 - 6);
   ict.stroke();
+  return off;
+}
+
+function createKimBugakSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size * 1.6;
+  const ict = off.getContext('2d');
+  const width = size * 0.9;
+  const height = off.height;
+  ict.translate(off.width / 2, off.height / 2);
+  ict.rotate(-Math.PI / 18);
+
+  // 김부각 베이스 색깔 (더 진한 갈색/검정)
+  ict.fillStyle = '#2a1f0a';
+  ict.fillRect(-width / 2, -height / 2, width, height);
+
+  const gradient = ict.createLinearGradient(-width / 2, -height / 2, width / 2, height / 2);
+  gradient.addColorStop(0, '#3d2e15');
+  gradient.addColorStop(0.5, '#2a1f0a');
+  gradient.addColorStop(1, '#1a1204');
+  ict.fillStyle = gradient;
+  ict.fillRect(-width / 2 + 1, -height / 2 + 1, width - 2, height - 2);
+
+  // 튀김가루 효과 (흰색 점들과 가루)
+  // 큰 튀김가루 덩어리들
+  ict.fillStyle = 'rgba(255,255,255,0.9)';
+  for (let i = 0; i < 18; i++) {
+    const x = (-width / 2) + Math.random() * width;
+    const y = (-height / 2) + Math.random() * height;
+    const dotSize = 1.2 + Math.random() * 1.8;
+    ict.beginPath();
+    ict.arc(x, y, dotSize, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // 중간 크기 튀김가루
+  ict.fillStyle = 'rgba(255,255,255,0.7)';
+  for (let i = 0; i < 25; i++) {
+    const x = (-width / 2) + Math.random() * width;
+    const y = (-height / 2) + Math.random() * height;
+    const dotSize = 0.6 + Math.random() * 1.0;
+    ict.beginPath();
+    ict.arc(x, y, dotSize, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // 작은 가루 효과
+  ict.fillStyle = 'rgba(255,255,255,0.5)';
+  for (let i = 0; i < 35; i++) {
+    const x = (-width / 2) + Math.random() * width;
+    const y = (-height / 2) + Math.random() * height;
+    const dotSize = 0.3 + Math.random() * 0.6;
+    ict.beginPath();
+    ict.arc(x, y, dotSize, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // 불규칙한 가루 덩어리들
+  ict.fillStyle = 'rgba(255,255,255,0.6)';
+  for (let i = 0; i < 8; i++) {
+    const x = (-width / 2) + Math.random() * width;
+    const y = (-height / 2) + Math.random() * height;
+    const w = 2 + Math.random() * 3;
+    const h = 1 + Math.random() * 2;
+    ict.fillRect(x - w/2, y - h/2, w, h);
+  }
+
+  // 외곽선
+  ict.strokeStyle = 'rgba(255,255,255,0.3)';
+  ict.lineWidth = 2;
+  ict.beginPath();
+  ict.moveTo(-width / 3, -height / 2 + 6);
+  ict.lineTo(width / 3, height / 2 - 6);
+  ict.stroke();
+
   return off;
 }
 
@@ -915,12 +1031,14 @@ const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '들�
 
 const sprites = {
   player: createDonutSprite(PLAYER_SIZE),
+  glazedDonut: createGlazedDonutSprite(PLAYER_SIZE),
   enemy: createBacteriaSprite(ENEMY_SIZE),
   bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
   darkBlueEnemy: createBacteriaSpriteDarkBlue(DARK_BLUE_ENEMY_SIZE),
   boss: createClampBossSprite(BOSS_RADIUS * 2.6),
   blades: GIM_VARIANTS.map((label) => createGimSprite(BLADE_SIZE, label)),
   bullet: createSeaweedSprite(BULLET_SIZE),
+  kimBugakBullet: createKimBugakSprite(Math.round(BULLET_SIZE * 2)),
   enemyProjectile: createEnemyProjectileSprite(DARK_BLUE_PROJECTILE_SIZE),
   mine: createMineSprite(MINE_SIZE),
   toothpaste: createToothpasteSprite(48),
@@ -1117,6 +1235,7 @@ const state = {
   paused: true,
   started: false,
   nickname: '',
+  selectedCharacter: 'signature_knotted', // 'signature_knotted' or 'glazed_ring'
   lastEnemyTargetId: null,
   bladeAngle: 0,
   blades: [],
@@ -1223,6 +1342,7 @@ function resetGameplayState() {
   state.pendingLevelBlast = 0;
   state.toothpasteGlowPhase = 0;
   state.hasGanjangGim = false; // 간장김 스킬은 1회용 - 새 게임에서 해제
+  state.hasKimBugak = false; // 김부각 스킬은 1회용 - 새 게임에서 해제
   state.hpBarTimer = 0;
   state.lastPlayerHealth = PLAYER_MAX_HEALTH;
   state.joystickCenter = null;
@@ -1288,13 +1408,18 @@ const upgradeDescriptions = {
   blade: (next) => `브랜드의 방부제 김들이 도넛을 지켜줍니다. ${next}개`,
   em_field: () => '가장 가까운 적들을 연쇄로 공격하는 슈크림이 발사됩니다. (3연쇄)',
   ganjang_gim: () => '간장에 조려진 김 발사: 탄환 1회 관통(최대 두 마리 적 처치)',
+  kim_bugak: () => '기본발사가 김부각으로 변경됩니다. 크기가 조금 더 커지고 장애물을 통과할 수 있습니다.',
   full_heal: () => '현재 라이프를 모두 회복',
 };
 
 function rollUpgradeCards() {
-  // 기본 풀: 간장김은 평소엔 제외 (확률로만 등장)
+  // 기본 풀: 특별 스킬들은 평소엔 제외하고 최대치 달성한 스킬도 제외
   const pool = Object.entries(UPGRADE_DEFINITIONS)
-    .filter(([key, def]) => key !== 'ganjang_gim' && state.upgradeLevels[key] < def.max)
+    .filter(([key, def]) =>
+      key !== 'ganjang_gim' &&
+      key !== 'kim_bugak' &&
+      state.upgradeLevels[key] < def.max
+    )
     .map(([key]) => key);
   if (pool.length === 0) return [];
   const shuffled = pool.sort(() => Math.random() - 0.5);
@@ -1304,6 +1429,12 @@ function rollUpgradeCards() {
   if (!state.hasGanjangGim && state.upgradeLevels.ganjang_gim === 0 && Math.random() < 0.05) {
     const replaceIndex = Math.floor(Math.random() * cards.length);
     cards[replaceIndex] = { key: 'ganjang_gim' };
+  }
+
+  // 5% 확률로 김부각 카드 주입 (아직 못 얻었을 때만)
+  if (!state.hasKimBugak && state.upgradeLevels.kim_bugak === 0 && Math.random() < 0.02) {
+    const replaceIndex = Math.floor(Math.random() * cards.length);
+    cards[replaceIndex] = { key: 'kim_bugak' };
   }
 
   return cards;
@@ -1325,7 +1456,7 @@ function renderUpgradeOverlay() {
     const card = document.createElement('div');
     card.className = 'upgrade-card';
     card.dataset.index = String(index);
-    const titleStyle = key === 'ganjang_gim' ? 'style="color: #4ade80;"' : '';
+    const titleStyle = (key === 'ganjang_gim' || key === 'kim_bugak') ? 'style="color: #4ade80;"' : '';
     card.innerHTML = `
       <div class="card-title" ${titleStyle}>${def.title}</div>
       <div class="card-level">Lv.${next} / ${def.max}</div>
@@ -1354,6 +1485,9 @@ function applyUpgrade(index) {
   switch (key) {
     case 'ganjang_gim':
       state.hasGanjangGim = true; // 1회용 - 얻으면 다시 나오지 않음
+      break;
+    case 'kim_bugak':
+      state.hasKimBugak = true; // 1회용 - 얻으면 다시 나오지 않음
       break;
     case 'full_heal':
       state.playerHealth = PLAYER_MAX_HEALTH;
@@ -1734,6 +1868,7 @@ function collidesWithObstacles(x, y, size) {
   return collidesWithObstacleCircle(vector(x, y), size / 2);
 }
 
+
 let lastTimestamp = performance.now();
 
 // ===== Dynamic Joystick events (mobile only) =====
@@ -1971,11 +2106,17 @@ function rotate90(vec) {
 function spawnProjectile(direction) {
   const norm = vectorNormalize(direction);
   if (vectorLengthSq(norm) === 0) return;
+  const bulletSize = state.hasKimBugak ? Math.round(BULLET_SIZE * 2) : BULLET_SIZE;
+  const bulletSprite = state.hasKimBugak ? sprites.kimBugakBullet : sprites.bullet;
+
   state.bullets.push({
     pos: vectorCopy(state.playerPos),
     dir: norm,
     lifetime: BULLET_LIFETIME,
-    pierce: state.hasGanjangGim ? 1 : 0, // ✅ 간장김 보유 시 1회 관통
+    pierce: state.hasGanjangGim ? 1 : 0,
+    penetratesObstacles: state.hasKimBugak,
+    size: bulletSize,
+    sprite: bulletSprite
   });
 }
 
@@ -2067,11 +2208,23 @@ function handleBullets(dt) {
   for (const bullet of state.bullets) {
     bullet.lifetime -= dt;
     if (bullet.lifetime <= 0) continue;
-    bullet.pos = vectorAdd(bullet.pos, vectorScale(bullet.dir, BULLET_SPEED * dt));
-    const bulletRadius = BULLET_SIZE / 2;
-    if (collidesWithObstacleCircle(bullet.pos, bulletRadius)) {
-      continue;
+
+    const movement = vectorScale(bullet.dir, BULLET_SPEED * dt);
+    const bulletRadius = (bullet.size || BULLET_SIZE) / 2;
+
+    // 김부각 탄환은 장애물을 통과
+    if (bullet.penetratesObstacles) {
+      bullet.pos = vectorAdd(bullet.pos, movement);
+    } else {
+      // 일반 탄환은 이동 전에 충돌 체크
+      const newPos = vectorAdd(bullet.pos, movement);
+      if (collidesWithObstacleCircle(newPos, bulletRadius)) {
+        continue; // 탄환이 장애물과 충돌하면 제거 (nextBullets에 추가하지 않음)
+      }
+      bullet.pos = newPos;
     }
+
+    clampWorldPosition(bullet.pos);
 
     let consumed = false;
     for (let i = 0; i < state.enemies.length; i++) {
@@ -2097,8 +2250,7 @@ function handleBullets(dt) {
         }
       }
     }
-    if (consumed) continue;
-    if (state.boss) {
+    if (!consumed && state.boss) {
       if (circleIntersects(bullet.pos, bulletRadius, state.boss.pos, BOSS_RADIUS)) {
         state.boss.health -= 1;
         state.score += BOSS_HIT_SCORE;
@@ -2114,7 +2266,7 @@ function handleBullets(dt) {
         }
       }
     }
-    nextBullets.push(bullet);
+    if (!consumed) nextBullets.push(bullet);
   }
   state.bullets = nextBullets;
 
@@ -2325,6 +2477,7 @@ function worldToScreen(pos) {
   };
 }
 
+
 function render() {
   ctx.save();
   // Clear the full canvas (DPR-aware)
@@ -2338,6 +2491,7 @@ function render() {
     ctx.translate(offsetX, offsetY);
     ctx.scale(s, s);
   }
+
 
   drawBackground();
   drawObstacles();
@@ -2594,18 +2748,22 @@ function drawPlayer() {
   const { halfW, halfH } = getWorldDims();
   const screenX = halfW;
   const screenY = halfH;
+
+  // 선택된 캐릭터에 따라 스프라이트 선택
+  const playerSprite = state.selectedCharacter === 'glazed_ring' ? sprites.glazedDonut : sprites.player;
+
   if (state.playerInvuln > 0) {
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
     ctx.globalAlpha = clamp(alpha, 0.2, 1);
-    ctx.drawImage(sprites.player, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.drawImage(playerSprite, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
     ctx.globalAlpha = 1;
   } else if (state.playerHealth <= 2) {
     const alpha = 0.3 + 0.7 * Math.sin(performance.now() * 0.008);
     ctx.globalAlpha = clamp(alpha, 0.3, 1);
-    ctx.drawImage(sprites.player, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.drawImage(playerSprite, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
     ctx.globalAlpha = 1;
   } else {
-    ctx.drawImage(sprites.player, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.drawImage(playerSprite, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
   }
 }
 
@@ -2650,12 +2808,15 @@ function drawEmEffect(effect) {
 function drawBulletSprite(bullet) {
   const screen = worldToScreen(bullet.pos);
   const angle = Math.atan2(bullet.dir.y, bullet.dir.x);
-  const width = BULLET_SIZE * 0.9;
-  const height = BULLET_SIZE * 1.6;
+  const bulletSprite = bullet.sprite || sprites.bullet;
+  const bulletSize = bullet.size || BULLET_SIZE;
+  const width = bulletSize * 0.9;
+  const height = bulletSize * 1.6;
+
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.rotate(angle);
-  ctx.drawImage(sprites.bullet, -width / 2, -height / 2, width, height);
+  ctx.drawImage(bulletSprite, -width / 2, -height / 2, width, height);
   ctx.restore();
 }
 
@@ -2931,6 +3092,43 @@ nicknameInput.addEventListener('keydown', (event) => {
   }
 });
 startButton.addEventListener('click', attemptStart);
+
+// 캐릭터 선택 기능 초기화
+function initCharacterSelection() {
+  const characterOptions = document.querySelectorAll('.character-option');
+  const characterPreviews = document.querySelectorAll('.character-preview');
+
+  // 캐릭터 미리보기 캔버스에 스프라이트 그리기
+  characterPreviews.forEach((canvas, index) => {
+    const ctx = canvas.getContext('2d');
+    const sprite = index === 0 ? sprites.player : sprites.glazedDonut;
+    if (sprite) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 스프라이트를 캔버스 중앙에 적절한 크기로 그리기
+      const spriteSize = Math.min(canvas.width, canvas.height) * 0.8; // 캔버스의 80% 크기
+      const x = (canvas.width - spriteSize) / 2;
+      const y = (canvas.height - spriteSize) / 2;
+
+      ctx.drawImage(sprite, x, y, spriteSize, spriteSize);
+    }
+  });
+
+  // 캐릭터 옵션 클릭 이벤트
+  characterOptions.forEach(option => {
+    option.addEventListener('click', () => {
+      // 모든 옵션에서 selected 클래스 제거
+      characterOptions.forEach(opt => opt.classList.remove('selected'));
+      // 클릭된 옵션에 selected 클래스 추가
+      option.classList.add('selected');
+      // 선택된 캐릭터 상태 업데이트
+      state.selectedCharacter = option.dataset.character;
+    });
+  });
+}
+
+// 초기화
+initCharacterSelection();
 updateStartButtonState();
 nicknameInput.focus();
 init();
