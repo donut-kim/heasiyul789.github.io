@@ -1029,7 +1029,7 @@ function restartGame() {
 
 function isNicknameValid(name) {
   const trimmed = name.trim();
-  return trimmed.length >= 4 && trimmed.length <= 9;
+  return trimmed.length >= 2 && trimmed.length <= 9;
 }
 
 function updateStartButtonState() {
@@ -1045,7 +1045,10 @@ function startGame() {
 
 function attemptStart() {
   const trimmed = nicknameInput.value.trim();
-  if (!isNicknameValid(trimmed)) return;
+  if (!isNicknameValid(trimmed)) {
+    showModal('닉네임 오류', '닉네임은 2글자 이상이어야 합니다.', { showRestart: false });
+    return;
+  }
   state.nickname = trimmed;
   startOverlay.classList.remove('active');
   nicknameInput.blur();
