@@ -1247,7 +1247,7 @@ function rollUpgradeCards() {
     cards[replaceIndex] = { key: 'sprinkle' };
   }
 
-  if (state.upgradeLevels.deulgireum_rapid < constants.UPGRADE_DEFINITIONS.deulgireum_rapid.max && Math.random() < 1.05) {
+  if (state.upgradeLevels.deulgireum_rapid < constants.UPGRADE_DEFINITIONS.deulgireum_rapid.max && Math.random() < 0.05) {
     const replaceIndex = Math.floor(Math.random() * cards.length);
     cards[replaceIndex] = { key: 'deulgireum_rapid' };
   }
