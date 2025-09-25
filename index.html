@@ -737,6 +737,19 @@
     <script>
         (adsbygoogle = window.adsbygoogle || []).push({});
     </script>
-    <script src="donut-kim.js" type="module"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+      import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+      // Firebase를 전역에서 사용할 수 있도록 설정
+      window.firebase = {
+        initializeApp,
+        getFirestore
+      };
+    </script>
+
+    <script src="js/main.js" type="module"></script>
   </body>
 </html>

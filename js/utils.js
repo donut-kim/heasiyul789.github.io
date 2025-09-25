@@ -42,6 +42,7 @@ export function vectorCopy(v) {
   return { x: v.x, y: v.y };
 }
 
+
 // Math utilities
 export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -66,9 +67,13 @@ export function circleIntersects(posA, radiusA, posB, radiusB) {
 
 // UI utilities
 export function formatTime(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}분${secs.toString().padStart(2, '0')}초`;
+  const total = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (mins > 0) {
+    return secs > 0 ? `${mins}분 ${secs}초` : `${mins}분`;
+  }
+  return `${secs}초`;
 }
 
 export function getElementCenter(element) {
@@ -87,4 +92,51 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+// 난수 생성기
+export function makeRng(seed = Date.now()) {
+  let s = seed >>> 0;
+  return function rng() {
+    s += 0x6d2b79f5;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// 거리 계산
+export function distance(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// 각도 관련
+export function angleTowards(from, to) {
+  return Math.atan2(to.y - from.y, to.x - from.x);
+}
+
+export function angleDifference(a, b) {
+  let diff = b - a;
+  while (diff > Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  return diff;
+}
+
+// 배열 유틸리티
+export function shuffleArray(array) {
+  const rng = makeRng();
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+export function removeFromArray(array, item) {
+  const index = array.indexOf(item);
+  if (index > -1) {
+    array.splice(index, 1);
+  }
 }

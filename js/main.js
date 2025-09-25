@@ -1,3 +1,55 @@
+// 모듈 imports
+import * as constants from './constants.js';
+import {
+  state,
+  resetGameplayState,
+  calculateTotalScore,
+  computeFinalScoreDetails,
+  xpRequired,
+  keys,
+  processingLevelChain,
+  setProcessingLevelChain
+} from './gameState.js';
+import {
+  showModal,
+  hideModal,
+  showRankingModal,
+  closeRankingAndGoToStart,
+  buildResultHtml,
+  initializeUIElements,
+  isNicknameValid,
+  updateStartButtonState,
+  modalOverlay,
+  startOverlay,
+  nicknameInput,
+  startButton
+} from './ui.js';
+import { checkAndSaveRanking } from './ranking.js';
+import { initializeDB } from './db.js';
+import {
+  vector,
+  vectorAdd,
+  vectorSub,
+  vectorScale,
+  vectorLength,
+  vectorLengthSq,
+  vectorNormalize,
+  vectorCopy,
+  vectorClampLength,
+  clamp,
+  randRange,
+  randInt,
+  lerp,
+  circleIntersects,
+  formatTime,
+  makeRng,
+  angleTowards,
+  angleDifference,
+  distance,
+  getElementCenter,
+  roundRect
+} from './utils.js';
+
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -32,12 +84,7 @@ function sizeCanvasToCss() {
 
   // 렌더 시 참조할 수 있게 전역에 저장
   window.__renderScale = { s, worldW: target.w, worldH: target.h, offsetX, offsetY };
-  // Helper: current logical world dimensions (portrait/landscape aware)
-  function getWorldDims() {
-    const worldW = (window.__renderScale && window.__renderScale.worldW) || WIDTH;
-    const worldH = (window.__renderScale && window.__renderScale.worldH) || HEIGHT;
-    return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
-  }
+  // Helper: getWorldDims 함수는 전역에서 정의됨
 }
 
 window.addEventListener('load', sizeCanvasToCss);
@@ -57,10 +104,6 @@ const xpLevelText = document.getElementById('xp-level-text');
 const xpProgressText = document.getElementById('xp-progress-text');
 const upgradeOverlay = document.getElementById('upgrade-overlay');
 const upgradeCardsWrapper = document.getElementById('upgrade-cards');
-const modalOverlay = document.getElementById('modal-overlay');
-const startOverlay = document.getElementById('start-overlay');
-const nicknameInput = document.getElementById('nickname-input');
-const startButton = document.getElementById('start-button');
 
 // ===== Mobile detection & HUD / Joystick elements =====
 const isMobile = ('ontouchstart' in window) || window.matchMedia('(pointer: coarse)').matches;
@@ -84,41 +127,7 @@ const touchInput = {
 
 
 
-const WIDTH = 960;
-const HEIGHT = 540;
-const HALF_WIDTH = WIDTH / 2;
-const HALF_HEIGHT = HEIGHT / 2;
-
-const PLAYER_SIZE = 40;
-const PLAYER_SPEED = 230;
-const PLAYER_MAX_HEALTH = 5;
-const PLAYER_FIRE_INTERVAL = 0.42;
-const PLAYER_INVULN_TIME = 1.0;
-
-const BULLET_SIZE = 12;
-const BULLET_SPEED = 520;
-const BULLET_LIFETIME = 1.8;
-
-const ENEMY_SIZE = 20;
-const ENEMY_BASE_SPEED = 48;
-const ENEMY_SPEED_SCALE = 0.02;
-
-const SPAWN_INTERVAL = 2.0;
-const SPAWN_INTERVAL_FLOOR = 0.7;
-// ==== Big Enemy constants ====
-const BIG_ENEMY_SIZE = ENEMY_SIZE * 2; // 40
-const BIG_ENEMY_HEALTH = 4;
-const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.8; // slightly slower than small ones
-const BIG_ENEMY_SPAWN_TIME = 90; // seconds (1m 30s)
-const BIG_ENEMY_SPAWN_CHANCE = 0.35; // 35% of spawns after threshold
-
-// Dark Blue Enemy (Stage 2+)
-const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2; // 48
-const DARK_BLUE_ENEMY_HEALTH = 8;
-const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7; // 30% slower than normal
-const DARK_BLUE_ENEMY_FIRE_INTERVAL = 2.5; // shoots every 2.5 seconds
-const DARK_BLUE_PROJECTILE_SIZE = 16;
-const DARK_BLUE_PROJECTILE_SPEED = 200;
+// 모든 게임 상수들은 constants.js에서 import
 function createBacteriaSpritePurple(size) {
   const off = document.createElement('canvas');
   off.width = size;
@@ -172,169 +181,16 @@ function createBacteriaSpritePurple(size) {
 
   return off;
 }
-const SPAWN_RADIUS_MIN = 420;
-const SPAWN_RADIUS_MAX = 680;
+// constants.UPGRADE_DEFINITIONS와 upgradeDisplayOrder는 constants.js에서 import
 
-const WORLD_BOUNDS = 2200;
-const MAX_SURVIVAL_TIME = 180;
-const LEVEL_BLAST_RADIUS = 140;
-const LEVEL_BLAST_DURATION = 0.4;
-const TOOTHPASTE_DROP_INTERVAL = 10;
-const TOOTHPASTE_DROP_CHANCE = 0.2;
-const TOOTHPASTE_DROP_MIN_DISTANCE = 50;
-const TOOTHPASTE_DROP_DISTANCE = 200;
-const TOOTHPASTE_PICKUP_RADIUS = 90; // deprecated: using sprite-overlap collision instead
-const TOOTHPASTE_EFFECT_KILL_COUNT = 50;
-const TOOTHPASTE_FLASH_DURATION = 0.6;
-
-const BOSS_SPAWN_TIME = 180.0;
-const BOSS_HEALTH = 200;
-const BOSS_SPEED = 130;
-const BOSS_CHARGE_SPEED = 480;
-const BOSS_CHARGE_PREP = 1.0;
-const BOSS_CHARGE_COOLDOWN = 6.0;
-const BOSS_RADIUS = 60;
-const BOSS_ATTACK_INTERVAL = 10;
-const BOSS_ATTACK_CHANCE = 0.5;
-const BOSS_WINDUP_TIME = 2.0;
-const BOSS_IDLE_SPEED = 200;
-const BOSS_HIT_SCORE = 5;
-const BOSS_HIT_RADIUS = 18;
-
-const BLADE_RADIUS = 60;
-const BLADE_SIZE = 56;
-const BLADE_ROTATION_SPEED = 2.4;
-const BLADE_HIT_COOLDOWN = 0.3;
-
-const EM_FIELD_BASE_INTERVAL = 4.0;
-const EM_FIELD_MIN_INTERVAL = 1.5;
-const EM_EFFECT_LIFETIME = 0.22;
-
-const MINE_SIZE = 48;
-const MINE_TRIGGER_RADIUS = 60;
-const MINE_FLASH_DURATION = 0.6;
-
-const BACKGROUND_COLOR = '#101218';
-const GRID_COLOR = '#c6ccd4'; // stainless-like grid color
-
-const XP_PER_KILL = 20;
-const BASE_XP_TO_LEVEL = 200;
-const XP_LEVEL_SCALE = 2.0;
-
-const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
-
-const UPGRADE_DEFINITIONS = {
-  speed: { title: '이속 증가', max: 5 },
-  attack_speed: { title: '공속 증가', max: 5 },
-  multi_shot: { title: '김 추가', max: 5 },
-  double_shot: { title: '더블 발사', max: 5 },
-  blade: { title: '김시리즈', max: 5 },
-  em_field: { title: '슈크림', max: 5 },
-  ganjang_gim: { title: '간장김', max: 1 },
-  kim_bugak: { title: '김부각', max: 1 },
-  full_heal: { title: '라이프 회복', max: 5 },
-};
-
-const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'full_heal'];
-
-function makeRng(seed = Date.now()) {
-  let s = seed >>> 0;
-  return function rng() {
-    s += 0x6d2b79f5;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+// utils.js에서 import한 함수들을 사용
 const rng = makeRng(1337);
 
-function randRange(min, max) {
-  return rng() * (max - min) + min;
-}
+// computeFinalScoreDetails 함수는 gameState.js에서 import
 
-function randInt(min, max) {
-  return Math.floor(randRange(min, max));
-}
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+// vector 관련 함수들은 utils.js에서 import
 
-function formatTime(seconds) {
-  const total = Math.max(0, Math.floor(seconds));
-  const mins = Math.floor(total / 60);
-  const secs = total % 60;
-  if (mins > 0) {
-    return secs > 0 ? `${mins}분 ${secs}초` : `${mins}분`;
-  }
-  return `${secs}초`;
-}
-
-function computeFinalScoreDetails() {
-  const totalScore = calculateTotalScore();
-  const baseScore = state.score;
-  const timeBonus = state.elapsed > 180 ? Math.floor(state.elapsed - 180) : 0;
-
-  return {
-    totalScore,
-    baseScore,
-    timeBonus,
-    time: state.elapsed,
-    stage: state.stage,
-    level: state.level,
-    total: totalScore, // 기존 코드 호환성을 위해 추가
-    bossCleared: state.victory,
-  };
-}
-
-function xpRequired(level) {
-  return Math.floor(BASE_XP_TO_LEVEL * Math.pow(XP_LEVEL_SCALE, level - 1));
-}
-
-function vector(x = 0, y = 0) {
-  return { x, y };
-}
-
-function vectorCopy(v) {
-  return { x: v.x, y: v.y };
-}
-
-function vectorLengthSq(v) {
-  return v.x * v.x + v.y * v.y;
-}
-
-function vectorNormalize(v) {
-  const lenSq = vectorLengthSq(v);
-  if (lenSq === 0) return vector(0, 0);
-  const len = Math.sqrt(lenSq);
-  return vector(v.x / len, v.y / len);
-}
-
-function vectorAdd(a, b) {
-  return vector(a.x + b.x, a.y + b.y);
-}
-
-function vectorSub(a, b) {
-  return vector(a.x - b.x, a.y - b.y);
-}
-
-function vectorScale(v, s) {
-  return vector(v.x * s, v.y * s);
-}
-
-function vectorClampLength(v, maxLen) {
-  const lenSq = vectorLengthSq(v);
-  if (lenSq === 0) return vector(0, 0);
-  const len = Math.sqrt(lenSq);
-  const k = Math.min(1, maxLen / len);
-  return vector(v.x * k, v.y * k);
-}
-
-function getElementCenter(el) {
-  const r = el.getBoundingClientRect();
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-}
 
 function rectCollide(a, b) {
   return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
@@ -717,20 +573,6 @@ function createGimSprite(size, label) {
   return off;
 }
 
-function roundRect(context, x, y, w, h, r) {
-  const radius = Math.min(r, w / 2, h / 2);
-  context.beginPath();
-  context.moveTo(x + radius, y);
-  context.lineTo(x + w - radius, y);
-  context.quadraticCurveTo(x + w, y, x + w, y + radius);
-  context.lineTo(x + w, y + h - radius);
-  context.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-  context.lineTo(x + radius, y + h);
-  context.quadraticCurveTo(x, y + h, x, y + h - radius);
-  context.lineTo(x, y + radius);
-  context.quadraticCurveTo(x, y, x + radius, y);
-  context.closePath();
-}
 
 function createBacteriaSprite(size) {
   const off = document.createElement('canvas');
@@ -1027,24 +869,22 @@ function createEnemyProjectileSprite(size) {
   return off;
 }
 
-const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '들기름김'];
 
 const sprites = {
-  player: createDonutSprite(PLAYER_SIZE),
-  glazedDonut: createGlazedDonutSprite(PLAYER_SIZE),
-  enemy: createBacteriaSprite(ENEMY_SIZE),
-  bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
-  darkBlueEnemy: createBacteriaSpriteDarkBlue(DARK_BLUE_ENEMY_SIZE),
-  boss: createClampBossSprite(BOSS_RADIUS * 2.6),
-  blades: GIM_VARIANTS.map((label) => createGimSprite(BLADE_SIZE, label)),
-  bullet: createSeaweedSprite(BULLET_SIZE),
-  kimBugakBullet: createKimBugakSprite(Math.round(BULLET_SIZE * 2)),
-  enemyProjectile: createEnemyProjectileSprite(DARK_BLUE_PROJECTILE_SIZE),
-  mine: createMineSprite(MINE_SIZE),
+  player: createDonutSprite(constants.PLAYER_SIZE),
+  glazedDonut: createGlazedDonutSprite(constants.PLAYER_SIZE),
+  enemy: createBacteriaSprite(constants.ENEMY_SIZE),
+  bigEnemy: createBacteriaSpritePurple(constants.BIG_ENEMY_SIZE),
+  darkBlueEnemy: createBacteriaSpriteDarkBlue(constants.DARK_BLUE_ENEMY_SIZE),
+  boss: createClampBossSprite(constants.BOSS_RADIUS * 2.6),
+  blades: constants.GIM_VARIANTS.map((label) => createGimSprite(constants.BLADE_SIZE, label)),
+  bullet: createSeaweedSprite(constants.BULLET_SIZE),
+  kimBugakBullet: createKimBugakSprite(Math.round(constants.BULLET_SIZE * 2)),
+  enemyProjectile: createEnemyProjectileSprite(constants.DARK_BLUE_PROJECTILE_SIZE),
+  mine: createMineSprite(constants.MINE_SIZE),
   toothpaste: createToothpasteSprite(48),
 };
 
-const DONUT_TYPES = ['boston_creme', 'cocoa_frosted', 'bavarian_filled', 'glazed_ring', 'signature_knotted'];
 const DONUT_STYLES = {
   boston_creme: {
     doughInner: '#f3c98c',
@@ -1110,7 +950,6 @@ const baseObstacleTemplates = [
   { x: 260, y: -20, w: 140, h: 140 },
   { x: 0, y: -360, w: 240, h: 50 },
 ];
-const CHUNK_SIZE = 600;
 const generatedChunks = new Set();
 const obstacles = [];
 let enemyIdCounter = 1;
@@ -1120,7 +959,7 @@ function chunkKey(cx, cy) {
 }
 
 function createDonutObstacle(base, forcedType) {
-  const type = forcedType || DONUT_TYPES[Math.floor(Math.random() * DONUT_TYPES.length)];
+  const type = forcedType || constants.DONUT_TYPES[Math.floor(Math.random() * constants.DONUT_TYPES.length)];
   const style = DONUT_STYLES[type] || DONUT_STYLES.boston_creme;
   const center = vector(base.x + base.w / 2, base.y + base.h / 2);
   const radius = Math.max(base.w, base.h) / 2;
@@ -1171,25 +1010,25 @@ function ensureChunk(cx, cy) {
 
   if (cx === 0 && cy === 0) {
     baseObstacleTemplates.forEach((tpl, index) => {
-      const type = DONUT_TYPES[index % DONUT_TYPES.length];
+      const type = constants.DONUT_TYPES[index % constants.DONUT_TYPES.length];
       obstacles.push(createDonutObstacle(tpl, type));
     });
     return;
   }
 
-  const minX = cx * CHUNK_SIZE;
-  const maxX = minX + CHUNK_SIZE;
-  const minY = cy * CHUNK_SIZE;
-  const maxY = minY + CHUNK_SIZE;
+  const minX = cx * constants.CHUNK_SIZE;
+  const maxX = minX + constants.CHUNK_SIZE;
+  const minY = cy * constants.CHUNK_SIZE;
+  const maxY = minY + constants.CHUNK_SIZE;
 
   const count = randInt(4, 9);
   for (let i = 0; i < count; i++) {
     const width = randInt(80, 160);
     const height = randInt(60, 140);
-    const xMin = clamp(minX + 40, -WORLD_BOUNDS + 40, WORLD_BOUNDS - width - 40);
-    const xMax = clamp(maxX - width - 40, -WORLD_BOUNDS + 40, WORLD_BOUNDS - width - 40);
-    const yMin = clamp(minY + 40, -WORLD_BOUNDS + 40, WORLD_BOUNDS - height - 40);
-    const yMax = clamp(maxY - height - 40, -WORLD_BOUNDS + 40, WORLD_BOUNDS - height - 40);
+    const xMin = clamp(minX + 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - width - 40);
+    const xMax = clamp(maxX - width - 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - width - 40);
+    const yMin = clamp(minY + 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - height - 40);
+    const yMax = clamp(maxY - height - 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - height - 40);
     if (xMax <= xMin || yMax <= yMin) continue;
     const x = randInt(xMin, xMax);
     const y = randInt(yMin, yMax);
@@ -1198,8 +1037,8 @@ function ensureChunk(cx, cy) {
 }
 
 function ensureChunksAroundPlayer() {
-  const cx = Math.floor(state.playerPos.x / CHUNK_SIZE);
-  const cy = Math.floor(state.playerPos.y / CHUNK_SIZE);
+  const cx = Math.floor(state.playerPos.x / constants.CHUNK_SIZE);
+  const cy = Math.floor(state.playerPos.y / constants.CHUNK_SIZE);
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       ensureChunk(cx + dx, cy + dy);
@@ -1207,60 +1046,7 @@ function ensureChunksAroundPlayer() {
   }
 }
 
-const state = {
-  playerPos: vector(0, 0),
-  playerHealth: PLAYER_MAX_HEALTH,
-  playerInvuln: 0,
-  score: 0,
-  elapsed: 0,
-  stage: 1,
-  fireTimer: 0,
-  spawnTimer: SPAWN_INTERVAL,
-  autoAimAngle: 0,
-  bullets: [],
-  enemyProjectiles: [],
-  enemies: [],
-  boss: null,
-  bossWarningTimer: 0,
-  mine: { pos: vector(0, 0), active: true },
-  mineFlashTimer: 0,
-  level: 1,
-  xp: 0,
-  xpToNext: xpRequired(1),
-  upgradeLevels: Object.fromEntries(Object.keys(UPGRADE_DEFINITIONS).map((k) => [k, 0])),
-  selectingUpgrade: false,
-  upgradeChoices: [],
-  victory: false,
-  gameOver: false,
-  paused: true,
-  started: false,
-  nickname: '',
-  selectedCharacter: 'signature_knotted', // 'signature_knotted' or 'glazed_ring'
-  lastEnemyTargetId: null,
-  bladeAngle: 0,
-  blades: [],
-  bladeCooldowns: new Map(),
-  emFieldCount: 0,
-  emTargetsPerField: 1,
-  emCooldown: EM_FIELD_BASE_INTERVAL,
-  emEffects: [],
-  scoreBenchmark: 900,
-  levelBlastTimer: 0,
-  toothpasteItems: [],
-  toothpasteTimer: TOOTHPASTE_DROP_INTERVAL,
-  toothpasteFlashTimer: 0,
-  pendingLevelBlast: 0,
-  toothpasteGlowPhase: 0,
-  hasGanjangGim: false,
-  hpBarTimer: 0,
-  lastPlayerHealth: PLAYER_MAX_HEALTH,
-  joystickCenter: null,
-  joystickActive: false,
-  gameStartTime: null,
-};
-
-const keys = new Set();
-let processingLevelChain = false;
+// state, keys, processingLevelChain은 gameState.js에서 import
 
 function handleVictory() {
   if (state.victory) return;
@@ -1288,79 +1074,10 @@ function handleVictory() {
 }
 
 // 랭킹 시스템
-function saveRankingData(nickname, character, stage, survivalTime, finalScore) {
-  try {
-    const rankingData = `${nickname}|${character}|${stage}|${survivalTime}|${finalScore}`;
-    const encodedData = encodeURIComponent(rankingData);
 
-    // 기존 랭킹 데이터 불러오기
-    const existingData = localStorage.getItem('donut_rankings') || '';
-    const newData = existingData ? `${existingData},${encodedData}` : encodedData;
+// checkAndSaveRanking 함수는 ranking.js에서 import
 
-    localStorage.setItem('donut_rankings', newData);
-  } catch (e) {
-    console.error('랭킹 데이터 저장 실패:', e);
-  }
-}
-
-function loadRankingData() {
-  try {
-    const data = localStorage.getItem('donut_rankings') || '';
-    if (!data) return [];
-
-    return data.split(',')
-      .map(encoded => {
-        try {
-          const decoded = decodeURIComponent(encoded);
-          const [nickname, character, stage, survivalTime, finalScore] = decoded.split('|');
-          return {
-            nickname,
-            character,
-            stage: parseInt(stage),
-            survivalTime: parseFloat(survivalTime),
-            finalScore: parseInt(finalScore)
-          };
-        } catch (e) {
-          return null;
-        }
-      })
-      .filter(item => item !== null)
-      .sort((a, b) => b.finalScore - a.finalScore)
-      .slice(0, 10); // 상위 10개만
-  } catch (e) {
-    console.error('랭킹 데이터 로드 실패:', e);
-    return [];
-  }
-}
-
-function checkAndSaveRanking() {
-  const survivalTime = state.elapsed;
-  const stage = state.stage;
-
-  // 랭킹 등록 조건: 1스테이지 1분30초 이상 또는 2스테이지 이상
-  const shouldSave = (stage === 1 && survivalTime >= 90) || stage >= 2;
-
-  if (shouldSave) {
-    const details = computeFinalScoreDetails();
-    saveRankingData(
-      state.nickname,
-      state.selectedCharacter,
-      stage,
-      survivalTime,
-      details.totalScore
-    );
-  }
-}
-
-function formatSurvivalTime(seconds) {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-}
-
-function getCharacterDisplayName(character) {
-  return character === 'signature_knotted' ? '김도넛' : '글레이즈 도넛';
-}
+// formatSurvivalTime, getCharacterDisplayName 함수들은 ranking.js에서 import
 
 function handleGameOver() {
   if (state.gameOver) return;
@@ -1369,7 +1086,7 @@ function handleGameOver() {
   const details = computeFinalScoreDetails();
 
   // 랭킹 등록 조건 확인 및 저장
-  checkAndSaveRanking();
+  checkAndSaveRanking(state, computeFinalScoreDetails);
 
   showModal('GAME OVER', '', {
     showRestart: true,
@@ -1378,63 +1095,6 @@ function handleGameOver() {
   });
 }
 
-function resetGameplayState() {
-  state.playerPos = vector(0, 0);
-  state.playerHealth = PLAYER_MAX_HEALTH;
-  state.playerInvuln = 0;
-  state.score = 0;
-  state.elapsed = 0;
-  state.fireTimer = 0;
-  state.spawnTimer = SPAWN_INTERVAL;
-  state.autoAimAngle = 0;
-  state.bullets = [];
-  state.enemyProjectiles = [];
-  state.enemies = [];
-  state.stage = 1;
-  state.boss = null;
-  state.bossWarningTimer = 0;
-  state.mine = { pos: vector(0, 0), active: true };
-  state.mineFlashTimer = 0;
-  state.level = 1;
-  state.xp = 0;
-  state.xpToNext = xpRequired(1);
-  Object.keys(state.upgradeLevels).forEach((key) => {
-    state.upgradeLevels[key] = 0;
-  });
-  state.selectingUpgrade = false;
-  state.upgradeChoices = [];
-  state.lastEnemyTargetId = null;
-  closeUpgradeOverlay();
-  state.victory = false;
-  state.gameOver = false;
-  state.paused = false;
-  state.bladeAngle = 0;
-  state.blades = [];
-  state.bladeCooldowns.clear();
-  state.emFieldCount = 0;
-  state.emTargetsPerField = 1;
-  state.emCooldown = EM_FIELD_BASE_INTERVAL;
-  state.emEffects = [];
-  state.scoreBenchmark = 700 + Math.floor(Math.random() * 400);
-  state.levelBlastTimer = 0;
-  state.toothpasteItems = [];
-  state.toothpasteTimer = TOOTHPASTE_DROP_INTERVAL;
-  state.toothpasteFlashTimer = 0;
-  state.pendingLevelBlast = 0;
-  state.toothpasteGlowPhase = 0;
-  state.hasGanjangGim = false; // 간장김 스킬은 1회용 - 새 게임에서 해제
-  state.hasKimBugak = false; // 김부각 스킬은 1회용 - 새 게임에서 해제
-  state.hpBarTimer = 0;
-  state.lastPlayerHealth = PLAYER_MAX_HEALTH;
-  state.joystickCenter = null;
-  state.joystickActive = false;
-  state.gameStartTime = null;
-  keys.clear();
-  recomputePlayerStats();
-  ensureChunk(0, 0);
-  ensureChunksAroundPlayer();
-  lastTimestamp = performance.now();
-}
 
 function restartGame() {
   hideModal();
@@ -1442,14 +1102,6 @@ function restartGame() {
   startGame();
 }
 
-function isNicknameValid(name) {
-  const trimmed = name.trim();
-  return trimmed.length >= 2 && trimmed.length <= 9;
-}
-
-function updateStartButtonState() {
-  startButton.disabled = !isNicknameValid(nicknameInput.value);
-}
 
 function startGame() {
   resetGameplayState();
@@ -1471,17 +1123,6 @@ function attemptStart() {
   startGame();
 }
 
-function buildResultHtml(details) {
-  let html = `
-    <div class="result-block" style="background: rgba(18,26,38,0.0); border: none; box-shadow: none;">
-      <span class="result-label" style="display:block; font-size:14px; color:#9fb4d8; margin-bottom:8px;">최종 점수</span>
-      <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
-        ${details.totalScore.toLocaleString()}
-      </span>
-    </div>`;
-
-  return html;
-}
 
 const upgradeDescriptions = {
   speed: (next) => `이동 속도 +${next * 12}%`,
@@ -1497,7 +1138,7 @@ const upgradeDescriptions = {
 
 function rollUpgradeCards() {
   // 기본 풀: 특별 스킬들은 평소엔 제외하고 최대치 달성한 스킬도 제외
-  const pool = Object.entries(UPGRADE_DEFINITIONS)
+  const pool = Object.entries(constants.UPGRADE_DEFINITIONS)
     .filter(([key, def]) =>
       key !== 'ganjang_gim' &&
       key !== 'kim_bugak' &&
@@ -1533,7 +1174,7 @@ function openUpgradeSelection() {
 function renderUpgradeOverlay() {
   upgradeCardsWrapper.innerHTML = '';
   state.upgradeChoices.forEach(({ key }, index) => {
-    const def = UPGRADE_DEFINITIONS[key];
+    const def = constants.UPGRADE_DEFINITIONS[key];
     const current = state.upgradeLevels[key];
     const next = current + 1;
     const card = document.createElement('div');
@@ -1561,7 +1202,7 @@ function applyUpgrade(index) {
   if (!choice) return;
   const key = choice.key;
   const current = state.upgradeLevels[key];
-  const max = UPGRADE_DEFINITIONS[key].max;
+  const max = constants.UPGRADE_DEFINITIONS[key].max;
   if (current >= max) return;
 
   state.upgradeLevels[key] = current + 1;
@@ -1573,7 +1214,7 @@ function applyUpgrade(index) {
       state.hasKimBugak = true; // 1회용 - 얻으면 다시 나오지 않음
       break;
     case 'full_heal':
-      state.playerHealth = PLAYER_MAX_HEALTH;
+      state.playerHealth = constants.PLAYER_MAX_HEALTH;
       break;
     case 'em_field':
       if (state.emFieldCount === 0) {
@@ -1598,35 +1239,35 @@ function applyUpgrade(index) {
   resolvePendingLevelBlast();
 }
 
-let currentPlayerSpeed = PLAYER_SPEED;
-let currentFireInterval = PLAYER_FIRE_INTERVAL;
+let currentPlayerSpeed = constants.PLAYER_SPEED;
+let currentFireInterval = constants.PLAYER_FIRE_INTERVAL;
 let bulletCount = 1;
-let currentBladeRotationSpeed = BLADE_ROTATION_SPEED;
-let currentEmInterval = EM_FIELD_BASE_INTERVAL;
+let currentBladeRotationSpeed = constants.BLADE_ROTATION_SPEED;
+let currentEmInterval = constants.EM_FIELD_BASE_INTERVAL;
 
 function recomputePlayerStats() {
-  currentPlayerSpeed = PLAYER_SPEED * (1 + 0.12 * state.upgradeLevels.speed);
-  currentFireInterval = Math.max(0.08, PLAYER_FIRE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
+  currentPlayerSpeed = constants.PLAYER_SPEED * (1 + 0.12 * state.upgradeLevels.speed);
+  currentFireInterval = Math.max(0.08, constants.PLAYER_FIRE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
   bulletCount = 1 + state.upgradeLevels.multi_shot;
 
   // 공속 업그레이드가 블레이드 회전속도에도 영향
-  currentBladeRotationSpeed = BLADE_ROTATION_SPEED * (1 + 0.3 * state.upgradeLevels.attack_speed);
+  currentBladeRotationSpeed = constants.BLADE_ROTATION_SPEED * (1 + 0.3 * state.upgradeLevels.attack_speed);
 
   // 공속 업그레이드가 슈크림 발사 간격에도 영향
   currentEmInterval = Math.max(
-    EM_FIELD_MIN_INTERVAL,
-    EM_FIELD_BASE_INTERVAL * Math.pow(0.85, state.upgradeLevels.attack_speed)
+    constants.EM_FIELD_MIN_INTERVAL,
+    constants.EM_FIELD_BASE_INTERVAL * Math.pow(0.85, state.upgradeLevels.attack_speed)
   );
 }
 
 function addKillRewardsRaw(count) {
   if (count <= 0) return;
   state.score += 10 * count;
-  state.xp += XP_PER_KILL * count;
+  state.xp += constants.XP_PER_KILL * count;
 }
 
 function triggerLevelBlast() {
-  const radiusSq = LEVEL_BLAST_RADIUS * LEVEL_BLAST_RADIUS;
+  const radiusSq = constants.LEVEL_BLAST_RADIUS * constants.LEVEL_BLAST_RADIUS;
   let removed = 0;
   const survivors = [];
   for (const enemy of state.enemies) {
@@ -1639,14 +1280,14 @@ function triggerLevelBlast() {
     }
   }
   state.enemies = survivors;
-  state.levelBlastTimer = LEVEL_BLAST_DURATION;
+  state.levelBlastTimer = constants.LEVEL_BLAST_DURATION;
   if (removed > 0) {
     addKillRewardsRaw(removed);
   }
   return removed;
 }
 
-function spawnToothpasteItem(distanceMin = TOOTHPASTE_DROP_MIN_DISTANCE, distanceMax = TOOTHPASTE_DROP_DISTANCE) {
+function spawnToothpasteItem(distanceMin = constants.TOOTHPASTE_DROP_MIN_DISTANCE, distanceMax = constants.TOOTHPASTE_DROP_DISTANCE) {
   const attempts = 18;
   for (let i = 0; i < attempts; i++) {
     const angle = randRange(0, Math.PI * 2);
@@ -1655,8 +1296,8 @@ function spawnToothpasteItem(distanceMin = TOOTHPASTE_DROP_MIN_DISTANCE, distanc
       state.playerPos.x + Math.cos(angle) * distance,
       state.playerPos.y + Math.sin(angle) * distance,
     );
-    if (Math.abs(pos.x) > WORLD_BOUNDS - 40 || Math.abs(pos.y) > WORLD_BOUNDS - 40) continue;
-    if (!collidesWithObstacles(pos.x, pos.y, PLAYER_SIZE)) {
+    if (Math.abs(pos.x) > constants.WORLD_BOUNDS - 40 || Math.abs(pos.y) > constants.WORLD_BOUNDS - 40) continue;
+    if (!collidesWithObstacles(pos.x, pos.y, constants.PLAYER_SIZE)) {
       state.toothpasteItems.push({ pos });
       return true;
     }
@@ -1669,31 +1310,31 @@ function spawnToothpasteAroundPlayer(count) {
   const maxAttempts = count * 8;
   let attempts = 0;
   while (placed < count && attempts < maxAttempts) {
-    if (spawnToothpasteItem(40, TOOTHPASTE_DROP_DISTANCE)) placed += 1;
+    if (spawnToothpasteItem(40, constants.TOOTHPASTE_DROP_DISTANCE)) placed += 1;
     attempts += 1;
   }
 }
 
 function tryDropToothpaste() {
-  if (Math.random() >= TOOTHPASTE_DROP_CHANCE) {
-    state.toothpasteTimer = TOOTHPASTE_DROP_INTERVAL;
+  if (Math.random() >= constants.TOOTHPASTE_DROP_CHANCE) {
+    state.toothpasteTimer = constants.TOOTHPASTE_DROP_INTERVAL;
     return;
   }
   spawnToothpasteItem();
-  state.toothpasteTimer = TOOTHPASTE_DROP_INTERVAL;
+  state.toothpasteTimer = constants.TOOTHPASTE_DROP_INTERVAL;
 }
 
 function triggerToothpastePickup(index) {
   if (index < 0 || index >= state.toothpasteItems.length) return;
   state.toothpasteItems.splice(index, 1);
-  state.toothpasteFlashTimer = TOOTHPASTE_FLASH_DURATION;
+  state.toothpasteFlashTimer = constants.TOOTHPASTE_FLASH_DURATION;
   if (state.enemies.length === 0) return;
   const sorted = [...state.enemies].sort((a, b) => {
     const da = vectorLengthSq(vectorSub(a.pos, state.playerPos));
     const db = vectorLengthSq(vectorSub(b.pos, state.playerPos));
     return da - db;
   });
-  const removeCount = Math.min(TOOTHPASTE_EFFECT_KILL_COUNT, sorted.length);
+  const removeCount = Math.min(constants.TOOTHPASTE_EFFECT_KILL_COUNT, sorted.length);
   const idsToRemove = new Set();
   for (let i = 0; i < removeCount; i++) {
     idsToRemove.add(sorted[i].id);
@@ -1728,7 +1369,7 @@ function resolvePendingLevelBlast() {
 
 function processLevelUps() {
   if (processingLevelChain) return;
-  processingLevelChain = true;
+  setProcessingLevelChain(true);
   while (state.xp >= state.xpToNext && !state.selectingUpgrade) {
     state.xp -= state.xpToNext;
     state.level += 1;
@@ -1737,7 +1378,7 @@ function processLevelUps() {
     openUpgradeSelection();
     if (state.selectingUpgrade) break;
   }
-  processingLevelChain = false;
+  setProcessingLevelChain(false);
   if (!state.selectingUpgrade) {
     resolvePendingLevelBlast();
   }
@@ -1760,7 +1401,7 @@ function detonateMine() {
   if (!state.mine.active) return;
   const defeated = state.enemies.length;
   state.mine.active = false;
-  state.mineFlashTimer = MINE_FLASH_DURATION;
+  state.mineFlashTimer = constants.MINE_FLASH_DURATION;
   if (defeated) {
     grantKillReward(defeated);
   }
@@ -1777,13 +1418,13 @@ function detonateMine() {
 function spawnEnemy() {
   // default small enemy
   const angle = randRange(0, Math.PI * 2);
-  const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
+  const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
   const pos = vector(
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
-  const speed = ENEMY_BASE_SPEED + state.elapsed * ENEMY_SPEED_SCALE * ENEMY_BASE_SPEED;
-  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: 1, size: ENEMY_SIZE, sprite: sprites.enemy });
+  const speed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
+  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: 1, size: constants.ENEMY_SIZE, sprite: sprites.enemy });
 }
 
 function spawnDarkBlueEnemy() {
@@ -1794,46 +1435,46 @@ function spawnDarkBlueEnemy() {
   // 장애물이 없는 위치를 찾을 때까지 반복
   do {
     const angle = randRange(0, Math.PI * 2);
-    const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
+    const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
     pos = vector(
       state.playerPos.x + Math.cos(angle) * radius,
       state.playerPos.y + Math.sin(angle) * radius,
     );
     attempts++;
-  } while (collidesWithObstacles(pos.x, pos.y, DARK_BLUE_ENEMY_SIZE) && attempts < maxAttempts);
+  } while (collidesWithObstacles(pos.x, pos.y, constants.DARK_BLUE_ENEMY_SIZE) && attempts < maxAttempts);
 
   // 최대 시도 횟수를 초과하면 기본 위치 사용 (장애물과 겹치더라도)
   if (attempts >= maxAttempts) {
     const angle = randRange(0, Math.PI * 2);
-    const radius = SPAWN_RADIUS_MAX;
+    const radius = constants.SPAWN_RADIUS_MAX;
     pos = vector(
       state.playerPos.x + Math.cos(angle) * radius,
       state.playerPos.y + Math.sin(angle) * radius,
     );
   }
 
-  const speed = DARK_BLUE_ENEMY_SPEED + state.elapsed * ENEMY_SPEED_SCALE * DARK_BLUE_ENEMY_SPEED;
+  const speed = constants.DARK_BLUE_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.DARK_BLUE_ENEMY_SPEED;
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
     speed,
-    health: DARK_BLUE_ENEMY_HEALTH,
-    size: DARK_BLUE_ENEMY_SIZE,
+    health: constants.DARK_BLUE_ENEMY_HEALTH,
+    size: constants.DARK_BLUE_ENEMY_SIZE,
     sprite: sprites.darkBlueEnemy,
-    fireTimer: randRange(0, DARK_BLUE_ENEMY_FIRE_INTERVAL),
+    fireTimer: randRange(0, constants.DARK_BLUE_ENEMY_FIRE_INTERVAL),
     type: 'darkBlue'
   });
 }
 
 function spawnBigEnemy() {
   const angle = randRange(0, Math.PI * 2);
-  const radius = randRange(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX);
+  const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
   const pos = vector(
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
-  const speed = BIG_ENEMY_SPEED + state.elapsed * ENEMY_SPEED_SCALE * BIG_ENEMY_SPEED;
-  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: BIG_ENEMY_HEALTH, size: BIG_ENEMY_SIZE, sprite: sprites.bigEnemy });
+  const speed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
+  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: constants.BIG_ENEMY_HEALTH, size: constants.BIG_ENEMY_SIZE, sprite: sprites.bigEnemy });
 }
 
 function spawnBoss() {
@@ -1845,11 +1486,11 @@ function spawnBoss() {
   );
   state.boss = {
     pos: bossPos,
-    health: BOSS_HEALTH,
+    health: constants.BOSS_HEALTH,
     state: 'idle',
     direction: vector(0, 0),
     attackTarget: vectorCopy(bossPos),
-    attackTimer: BOSS_ATTACK_INTERVAL,
+    attackTimer: constants.BOSS_ATTACK_INTERVAL,
     windupTimer: 0,
     facingAngle: 0,
   };
@@ -1873,15 +1514,15 @@ function updateBoss(dt) {
     case 'charging': {
       if (vectorLengthSq(boss.direction) === 0) {
         boss.state = 'idle';
-        boss.attackTimer = BOSS_ATTACK_INTERVAL;
+        boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
         return;
       }
       const remaining = vectorSub(boss.attackTarget, boss.pos);
-      const step = vectorScale(boss.direction, BOSS_CHARGE_SPEED * dt);
+      const step = vectorScale(boss.direction, constants.BOSS_CHARGE_SPEED * dt);
       if (vectorLengthSq(step) >= vectorLengthSq(remaining)) {
         boss.pos = vectorCopy(boss.attackTarget);
         boss.state = 'idle';
-        boss.attackTimer = BOSS_ATTACK_INTERVAL;
+        boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
         state.bossWarningTimer = 0;
       } else {
         boss.pos = vectorAdd(boss.pos, step);
@@ -1900,26 +1541,26 @@ function updateBoss(dt) {
   boss.direction = targetDir;
   boss.facingAngle = Math.atan2(targetDir.y, targetDir.x);
   if (vectorLengthSq(targetDir) > 0) {
-    boss.pos = vectorAdd(boss.pos, vectorScale(targetDir, BOSS_IDLE_SPEED * dt));
+    boss.pos = vectorAdd(boss.pos, vectorScale(targetDir, constants.BOSS_IDLE_SPEED * dt));
     clampWorldPosition(boss.pos);
   }
 
   if (boss.attackTimer <= 0) {
-    boss.attackTimer = BOSS_ATTACK_INTERVAL;
-    if (Math.random() < BOSS_ATTACK_CHANCE) {
+    boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
+    if (Math.random() < constants.BOSS_ATTACK_CHANCE) {
       boss.state = 'windup';
-      boss.windupTimer = BOSS_WINDUP_TIME;
+      boss.windupTimer = constants.BOSS_WINDUP_TIME;
       boss.attackTarget = vectorCopy(state.playerPos);
       boss.direction = vector(0, 0);
       boss.facingAngle = Math.atan2(state.playerPos.y - boss.pos.y, state.playerPos.x - boss.pos.x);
-      state.bossWarningTimer = BOSS_WINDUP_TIME;
+      state.bossWarningTimer = constants.BOSS_WINDUP_TIME;
     }
   }
 }
 
 function clampWorldPosition(pos) {
-  pos.x = clamp(pos.x, -WORLD_BOUNDS, WORLD_BOUNDS);
-  pos.y = clamp(pos.y, -WORLD_BOUNDS, WORLD_BOUNDS);
+  pos.x = clamp(pos.x, -constants.WORLD_BOUNDS, constants.WORLD_BOUNDS);
+  pos.y = clamp(pos.y, -constants.WORLD_BOUNDS, constants.WORLD_BOUNDS);
 }
 
 function moveWithCollision(position, movement, colliderSize) {
@@ -1939,9 +1580,6 @@ function moveWithCollision(position, movement, colliderSize) {
   return newPos;
 }
 
-function circleIntersects(posA, radiusA, posB, radiusB) {
-  return vectorLengthSq(vectorSub(posA, posB)) <= (radiusA + radiusB) * (radiusA + radiusB);
-}
 
 function collidesWithObstacleCircle(pos, radius) {
   return obstacles.some((obs) => circleIntersects(pos, radius, obs.center, obs.radius));
@@ -2077,7 +1715,7 @@ function update(dt) {
     .map((ef) => ({ ...ef, timer: ef.timer - dt }))
     .filter((ef) => ef.timer > 0);
 
-  if (!state.boss && !state.victory && state.elapsed >= BOSS_SPAWN_TIME) {
+  if (!state.boss && !state.victory && state.elapsed >= constants.BOSS_SPAWN_TIME) {
     spawnBoss();
   }
 
@@ -2119,17 +1757,17 @@ function handleMovement(dt) {
       move = vectorScale(vectorNormalize(move), currentPlayerSpeed * dt);
     }
   }
-  state.playerPos = moveWithCollision(state.playerPos, move, PLAYER_SIZE);
+  state.playerPos = moveWithCollision(state.playerPos, move, constants.PLAYER_SIZE);
   clampWorldPosition(state.playerPos);
   ensureChunksAroundPlayer();
 
   if (state.mine.active) {
     const distSq = vectorLengthSq(vectorSub(state.playerPos, state.mine.pos));
-    if (distSq <= MINE_TRIGGER_RADIUS * MINE_TRIGGER_RADIUS) detonateMine();
+    if (distSq <= constants.MINE_TRIGGER_RADIUS * constants.MINE_TRIGGER_RADIUS) detonateMine();
   }
   // Toothpaste pickup: sprite-overlap (circle vs circle) using actual sprite radii
   if (state.toothpasteItems.length > 0) {
-    const playerRadius = PLAYER_SIZE / 2;   // 20px
+    const playerRadius = constants.PLAYER_SIZE / 2;   // 20px
     const itemRadius = 48 / 2;              // 24px (createToothpasteSprite(48))
     for (let i = 0; i < state.toothpasteItems.length; i++) {
       const item = state.toothpasteItems[i];
@@ -2141,8 +1779,8 @@ function handleMovement(dt) {
   }
 
   const currentSpawn = Math.max(
-    SPAWN_INTERVAL_FLOOR,
-    SPAWN_INTERVAL - state.elapsed * 0.02,
+    constants.SPAWN_INTERVAL_FLOOR,
+    constants.SPAWN_INTERVAL - state.elapsed * 0.02,
   );
   if (state.spawnTimer <= 0) {
     if (!state.boss) {
@@ -2151,7 +1789,7 @@ function handleMovement(dt) {
         // 테스트용: 남색 세균을 시작부터 등장 (30% 확률)
         if(state.stage >= 2 && Math.random() < 0.3) {
           spawnDarkBlueEnemy();
-        } else if (state.elapsed >= BIG_ENEMY_SPAWN_TIME && Math.random() < BIG_ENEMY_SPAWN_CHANCE) {
+        } else if (state.elapsed >= constants.BIG_ENEMY_SPAWN_TIME && Math.random() < constants.BIG_ENEMY_SPAWN_CHANCE) {
           spawnBigEnemy();
         } else {
           spawnEnemy();
@@ -2173,7 +1811,7 @@ function recomputeBlades(dt) {
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
       const angle = state.bladeAngle + i * step;
-      const offset = vector(Math.cos(angle) * BLADE_RADIUS, Math.sin(angle) * BLADE_RADIUS);
+      const offset = vector(Math.cos(angle) * constants.BLADE_RADIUS, Math.sin(angle) * constants.BLADE_RADIUS);
       state.blades.push({
         pos: vectorAdd(state.playerPos, offset),
         spriteIndex: Math.min(i, sprites.blades.length - 1),
@@ -2189,13 +1827,13 @@ function rotate90(vec) {
 function spawnProjectile(direction) {
   const norm = vectorNormalize(direction);
   if (vectorLengthSq(norm) === 0) return;
-  const bulletSize = state.hasKimBugak ? Math.round(BULLET_SIZE * 2) : BULLET_SIZE;
+  const bulletSize = state.hasKimBugak ? Math.round(constants.BULLET_SIZE * 2) : constants.BULLET_SIZE;
   const bulletSprite = state.hasKimBugak ? sprites.kimBugakBullet : sprites.bullet;
 
   state.bullets.push({
     pos: vectorCopy(state.playerPos),
     dir: norm,
-    lifetime: BULLET_LIFETIME,
+    lifetime: constants.BULLET_LIFETIME,
     pierce: state.hasGanjangGim ? 1 : 0,
     penetratesObstacles: state.hasKimBugak,
     size: bulletSize,
@@ -2292,8 +1930,8 @@ function handleBullets(dt) {
     bullet.lifetime -= dt;
     if (bullet.lifetime <= 0) continue;
 
-    const movement = vectorScale(bullet.dir, BULLET_SPEED * dt);
-    const bulletRadius = (bullet.size || BULLET_SIZE) / 2;
+    const movement = vectorScale(bullet.dir, constants.BULLET_SPEED * dt);
+    const bulletRadius = (bullet.size || constants.BULLET_SIZE) / 2;
 
     // 김부각 탄환은 장애물을 통과
     if (bullet.penetratesObstacles) {
@@ -2312,7 +1950,7 @@ function handleBullets(dt) {
     let consumed = false;
     for (let i = 0; i < state.enemies.length; i++) {
       const enemy = state.enemies[i];
-      if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, (enemy.size || ENEMY_SIZE) / 2)) {
+      if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2)) {
         // 1 데미지 (보라색 큰 적은 health:4로 시작)
         enemy.health = (enemy.health || 1) - 1;
 
@@ -2334,9 +1972,9 @@ function handleBullets(dt) {
       }
     }
     if (!consumed && state.boss) {
-      if (circleIntersects(bullet.pos, bulletRadius, state.boss.pos, BOSS_RADIUS)) {
+      if (circleIntersects(bullet.pos, bulletRadius, state.boss.pos, constants.BOSS_RADIUS)) {
         state.boss.health -= 1;
-        state.score += BOSS_HIT_SCORE;
+        state.score += constants.BOSS_HIT_SCORE;
         if (state.boss.health <= 0) {
           state.boss = null;
           state.bossWarningTimer = 0;
@@ -2364,7 +2002,7 @@ function handleBullets(dt) {
 
 function triggerEmField() {
   const emInterval = Math.max(
-    EM_FIELD_MIN_INTERVAL,
+    constants.EM_FIELD_MIN_INTERVAL,
     currentEmInterval - 0.4 * (state.emFieldCount - 1),
   );
   state.emCooldown = emInterval;
@@ -2408,7 +2046,7 @@ function triggerEmField() {
         const boss = state.boss;
         if (boss) {
           boss.health -= 1;
-          state.score += BOSS_HIT_SCORE;
+          state.score += constants.BOSS_HIT_SCORE;
           if (boss.health <= 0) {
             state.boss = null;
             state.bossWarningTimer = 0;
@@ -2423,7 +2061,7 @@ function triggerEmField() {
           targetPos = vectorCopy(state.playerPos);
         }
       }
-      state.emEffects.push({ start: vectorCopy(last), end: vectorCopy(targetPos), timer: EM_EFFECT_LIFETIME });
+      state.emEffects.push({ start: vectorCopy(last), end: vectorCopy(targetPos), timer: constants.EM_EFFECT_LIFETIME });
       last = targetPos;
       if (state.victory && !state.boss) {
         targetsPool.length = 0;
@@ -2438,7 +2076,7 @@ function handleEnemies(dt) {
   const nextEnemies = [];
   for (const enemy of state.enemies) {
     const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
-    enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || ENEMY_SIZE);
+    enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || constants.ENEMY_SIZE);
     clampWorldPosition(enemy.pos);
 
     // 남색 세균의 발사 로직
@@ -2450,16 +2088,16 @@ function handleEnemies(dt) {
         state.enemyProjectiles.push({
           pos: vectorCopy(enemy.pos),
           dir: fireDirection,
-          speed: DARK_BLUE_PROJECTILE_SPEED,
-          size: DARK_BLUE_PROJECTILE_SIZE
+          speed: constants.DARK_BLUE_PROJECTILE_SPEED,
+          size: constants.DARK_BLUE_PROJECTILE_SIZE
         });
-        enemy.fireTimer = DARK_BLUE_ENEMY_FIRE_INTERVAL;
+        enemy.fireTimer = constants.DARK_BLUE_ENEMY_FIRE_INTERVAL;
       }
     }
 
-    if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, (enemy.size || ENEMY_SIZE) / 2, state.playerPos, PLAYER_SIZE / 2)) {
+    if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, state.playerPos, constants.PLAYER_SIZE / 2)) {
       state.playerHealth -= 1;
-      state.playerInvuln = PLAYER_INVULN_TIME;
+      state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
         handleGameOver();
@@ -2470,7 +2108,7 @@ function handleEnemies(dt) {
     let killed = false;
   if (state.blades.length > 0) {
     for (const blade of state.blades) {
-      if (circleIntersects(enemy.pos, (enemy.size || ENEMY_SIZE) / 2, blade.pos, BLADE_SIZE / 2)) {
+      if (circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, blade.pos, constants.BLADE_SIZE / 2)) {
         enemy.health = (enemy.health || 1) - 1; // 블레이드도 1 데미지
         if (enemy.health <= 0) {
           grantKillReward();
@@ -2492,17 +2130,17 @@ function handleEnemyProjectiles(dt) {
     projectile.pos = vectorAdd(projectile.pos, vectorScale(projectile.dir, projectile.speed * dt));
 
     // 화면 밖으로 나가면 제거
-    if (Math.abs(projectile.pos.x) > WORLD_BOUNDS || Math.abs(projectile.pos.y) > WORLD_BOUNDS) {
+    if (Math.abs(projectile.pos.x) > constants.WORLD_BOUNDS || Math.abs(projectile.pos.y) > constants.WORLD_BOUNDS) {
       continue;
     }
 
     // 플레이어와 충돌 검사
     if (state.playerInvuln <= 0 && circleIntersects(
       projectile.pos, projectile.size / 2,
-      state.playerPos, PLAYER_SIZE / 2
+      state.playerPos, constants.PLAYER_SIZE / 2
     )) {
       state.playerHealth -= 1;
-      state.playerInvuln = PLAYER_INVULN_TIME;
+      state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
         handleGameOver();
@@ -2515,9 +2153,9 @@ function handleEnemyProjectiles(dt) {
   state.enemyProjectiles = nextProjectiles;
 
   if (state.boss) {
-    if (state.playerInvuln <= 0 && circleIntersects(state.boss.pos, BOSS_RADIUS, state.playerPos, PLAYER_SIZE / 2)) {
+    if (state.playerInvuln <= 0 && circleIntersects(state.boss.pos, constants.BOSS_RADIUS, state.playerPos, constants.PLAYER_SIZE / 2)) {
       state.playerHealth -= 2;
-      state.playerInvuln = PLAYER_INVULN_TIME;
+      state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
         handleGameOver();
@@ -2528,10 +2166,10 @@ function handleEnemyProjectiles(dt) {
       const id = 'boss';
       if (!state.bladeCooldowns.has(id)) {
         for (const blade of state.blades) {
-          if (circleIntersects(state.boss.pos, BOSS_RADIUS, blade.pos, BLADE_SIZE / 2)) {
+          if (circleIntersects(state.boss.pos, constants.BOSS_RADIUS, blade.pos, constants.BLADE_SIZE / 2)) {
             state.boss.health -= 1;
-            state.score += BOSS_HIT_SCORE;
-            state.bladeCooldowns.set(id, BLADE_HIT_COOLDOWN);
+            state.score += constants.BOSS_HIT_SCORE;
+            state.bladeCooldowns.set(id, constants.BLADE_HIT_COOLDOWN);
             if (state.boss.health <= 0) {
               state.boss = null;
               state.victory = true;
@@ -2547,8 +2185,8 @@ function handleEnemyProjectiles(dt) {
 }
 
 function getWorldDims() {
-  const worldW = (window.__renderScale && window.__renderScale.worldW) || WIDTH;
-  const worldH = (window.__renderScale && window.__renderScale.worldH) || HEIGHT;
+  const worldW = (window.__renderScale && window.__renderScale.worldW) || constants.WIDTH;
+  const worldH = (window.__renderScale && window.__renderScale.worldH) || constants.HEIGHT;
   return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
 }
 
@@ -2565,7 +2203,7 @@ function render() {
   ctx.save();
   // Clear the full canvas (DPR-aware)
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = BACKGROUND_COLOR;
+  ctx.fillStyle = constants.BACKGROUND_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   //균등 스케일 + 중앙 정렬 적용
@@ -2581,7 +2219,7 @@ function render() {
   drawWorldBounds();
 
   if (state.mine.active) {
-    drawSprite(sprites.mine, state.mine.pos, MINE_SIZE);
+    drawSprite(sprites.mine, state.mine.pos, constants.MINE_SIZE);
   }
   if (state.toothpasteItems.length > 0) {
     for (const item of state.toothpasteItems) {
@@ -2591,7 +2229,7 @@ function render() {
 
   for (const enemy of state.enemies) {
     const spr = enemy.sprite || sprites.enemy;
-    const sz = enemy.size || ENEMY_SIZE;
+    const sz = enemy.size || constants.ENEMY_SIZE;
     drawSprite(spr, enemy.pos, sz);
   }
 
@@ -2615,7 +2253,7 @@ function render() {
   if (state.blades.length > 0) {
     for (const blade of state.blades) {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
-      drawSprite(sprite, blade.pos, BLADE_SIZE);
+      drawSprite(sprite, blade.pos, constants.BLADE_SIZE);
     }
   }
 
@@ -2674,7 +2312,7 @@ function drawBackground() {
   ctx.lineWidth = 1;
 
   // light inner strokes
-  ctx.strokeStyle = GRID_COLOR; // '#c6ccd4'
+  ctx.strokeStyle = constants.GRID_COLOR; // '#c6ccd4'
   for (let x = -tile - offsetX; x < worldW; x += tile) {
     ctx.beginPath();
     ctx.moveTo(x + halfW, 0);
@@ -2805,10 +2443,10 @@ function drawObstacles() {
 
 function drawWorldBounds() {
   const corners = [
-    vector(-WORLD_BOUNDS, -WORLD_BOUNDS),
-    vector(WORLD_BOUNDS, -WORLD_BOUNDS),
-    vector(WORLD_BOUNDS, WORLD_BOUNDS),
-    vector(-WORLD_BOUNDS, WORLD_BOUNDS),
+    vector(-constants.WORLD_BOUNDS, -constants.WORLD_BOUNDS),
+    vector(constants.WORLD_BOUNDS, -constants.WORLD_BOUNDS),
+    vector(constants.WORLD_BOUNDS, constants.WORLD_BOUNDS),
+    vector(-constants.WORLD_BOUNDS, constants.WORLD_BOUNDS),
   ].map(worldToScreen);
   ctx.strokeStyle = 'rgba(255,255,255,0.8)';
   ctx.lineWidth = 6;
@@ -2838,15 +2476,15 @@ function drawPlayer() {
   if (state.playerInvuln > 0) {
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
     ctx.globalAlpha = clamp(alpha, 0.2, 1);
-    ctx.drawImage(playerSprite, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.drawImage(playerSprite, screenX - constants.PLAYER_SIZE / 2, screenY - constants.PLAYER_SIZE / 2, constants.PLAYER_SIZE, constants.PLAYER_SIZE);
     ctx.globalAlpha = 1;
   } else if (state.playerHealth <= 2) {
     const alpha = 0.3 + 0.7 * Math.sin(performance.now() * 0.008);
     ctx.globalAlpha = clamp(alpha, 0.3, 1);
-    ctx.drawImage(playerSprite, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.drawImage(playerSprite, screenX - constants.PLAYER_SIZE / 2, screenY - constants.PLAYER_SIZE / 2, constants.PLAYER_SIZE, constants.PLAYER_SIZE);
     ctx.globalAlpha = 1;
   } else {
-    ctx.drawImage(playerSprite, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.drawImage(playerSprite, screenX - constants.PLAYER_SIZE / 2, screenY - constants.PLAYER_SIZE / 2, constants.PLAYER_SIZE, constants.PLAYER_SIZE);
   }
 }
 
@@ -2854,7 +2492,7 @@ function drawEmEffect(effect) {
   // 슈크림 색상(크림빛)으로 부드러운 광선 효과
   const a = worldToScreen(effect.start);
   const b = worldToScreen(effect.end);
-  const lifeRatio = clamp(effect.timer / EM_EFFECT_LIFETIME, 0, 1);
+  const lifeRatio = clamp(effect.timer / constants.EM_EFFECT_LIFETIME, 0, 1);
   const alpha = 0.25 + 0.75 * lifeRatio; // 생성 직후 더 밝고, 사라질수록 어둡게
 
   ctx.save();
@@ -2892,7 +2530,7 @@ function drawBulletSprite(bullet) {
   const screen = worldToScreen(bullet.pos);
   const angle = Math.atan2(bullet.dir.y, bullet.dir.x);
   const bulletSprite = bullet.sprite || sprites.bullet;
-  const bulletSize = bullet.size || BULLET_SIZE;
+  const bulletSize = bullet.size || constants.BULLET_SIZE;
   const width = bulletSize * 0.9;
   const height = bulletSize * 1.6;
 
@@ -2905,7 +2543,7 @@ function drawBulletSprite(bullet) {
 
 function drawBossEntity(boss) {
   const screen = worldToScreen(boss.pos);
-  const size = BOSS_RADIUS * 2.4;
+  const size = constants.BOSS_RADIUS * 2.4;
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.rotate(boss.facingAngle || 0);
@@ -2952,7 +2590,7 @@ function drawPlayerHPBar() {
 
   const { halfW, halfH } = getWorldDims();
   const screenX = halfW;
-  const screenY = halfH - PLAYER_SIZE / 2 - 20;
+  const screenY = halfH - constants.PLAYER_SIZE / 2 - 20;
 
   const barWidth = 80;
   const barHeight = 8;
@@ -2968,7 +2606,7 @@ function drawPlayerHPBar() {
   ctx.fillStyle = bgColor;
   ctx.fillRect(screenX - barWidth / 2, screenY - barHeight / 2, barWidth, barHeight);
 
-  const hpRatio = state.playerHealth / PLAYER_MAX_HEALTH;
+  const hpRatio = state.playerHealth / constants.PLAYER_MAX_HEALTH;
   const fillWidth = barWidth * hpRatio;
 
   if (state.playerHealth <= 2) {
@@ -2983,8 +2621,8 @@ function drawPlayerHPBar() {
 }
 
 function drawMineFlash() {
-  const ratio = state.mineFlashTimer / MINE_FLASH_DURATION;
-  const radius = MINE_TRIGGER_RADIUS * (1 + ratio * 1.5);
+  const ratio = state.mineFlashTimer / constants.MINE_FLASH_DURATION;
+  const radius = constants.MINE_TRIGGER_RADIUS * (1 + ratio * 1.5);
   const screen = worldToScreen(state.mine.pos);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, 'rgba(255,200,120,0.6)');
@@ -2996,8 +2634,8 @@ function drawMineFlash() {
 }
 
 function drawToothpasteFlash() {
-  const ratio = state.toothpasteFlashTimer / TOOTHPASTE_FLASH_DURATION;
-  const radius = TOOTHPASTE_PICKUP_RADIUS * (1 + ratio * 1.2);
+  const ratio = state.toothpasteFlashTimer / constants.TOOTHPASTE_FLASH_DURATION;
+  const radius = constants.TOOTHPASTE_PICKUP_RADIUS * (1 + ratio * 1.2);
   const screen = worldToScreen(state.playerPos);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, 'rgba(140,220,255,0.45)');
@@ -3027,10 +2665,10 @@ function drawToothpasteItem(item) {
 }
 
 function drawLevelBlast() {
-  const ratio = state.levelBlastTimer / LEVEL_BLAST_DURATION;
+  const ratio = state.levelBlastTimer / constants.LEVEL_BLAST_DURATION;
   if (ratio <= 0) return;
   const screen = worldToScreen(state.playerPos);
-  const radius = LEVEL_BLAST_RADIUS * (0.8 + (1 - ratio) * 0.7);
+  const radius = constants.LEVEL_BLAST_RADIUS * (0.8 + (1 - ratio) * 0.7);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, `rgba(255, 245, 170, ${0.5 * ratio + 0.3})`);
   gradient.addColorStop(0.55, `rgba(255, 214, 90, ${0.35 * ratio})`);
@@ -3046,17 +2684,7 @@ function drawLevelBlast() {
   ctx.stroke();
 }
 
-function calculateTotalScore() {
-  let totalScore = state.score;
-
-  // 3분(180초) 이후의 시간을 점수에 추가
-  if (state.elapsed > 180) {
-    const bonusTime = Math.floor(state.elapsed - 180);
-    totalScore += bonusTime;
-  }
-
-  return totalScore;
-}
+// calculateTotalScore 함수는 gameState.js에서 import
 
 function updateHud() {
   const totalScore = calculateTotalScore();
@@ -3064,12 +2692,12 @@ function updateHud() {
   statNickname.textContent = state.nickname || '---';
   statTime.textContent = formatTime(state.elapsed);
   statScore.textContent = totalScore.toString().padStart(5, '0');
-  statHP.textContent = `${Math.max(0, state.playerHealth)} / ${PLAYER_MAX_HEALTH}`;
+  statHP.textContent = `${Math.max(0, state.playerHealth)} / ${constants.PLAYER_MAX_HEALTH}`;
   statLevel.textContent = state.level;
 
   // Mirror to mobile top HUD if available
   if (mobileHud) {
-    if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${PLAYER_MAX_HEALTH}`;
+    if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${constants.PLAYER_MAX_HEALTH}`;
     if (mobileScore) mobileScore.textContent = totalScore.toString().padStart(5, '0');
     if (mobileTime) mobileTime.textContent = formatTime(state.elapsed);
   }
@@ -3077,7 +2705,7 @@ function updateHud() {
 
   if (state.boss) {
     statBoss.hidden = false;
-    statBossHP.textContent = `HP ${Math.max(0, state.boss.health)} / ${BOSS_HEALTH}`;
+    statBossHP.textContent = `HP ${Math.max(0, state.boss.health)} / ${constants.BOSS_HEALTH}`;
   } else {
     statBoss.hidden = true;
   }
@@ -3088,123 +2716,6 @@ function updateHud() {
   xpProgressText.textContent = `${state.xp} / ${state.xpToNext}`;
 }
 
-function showModal(title, message, { showRestart = false, showRanking = false, extraHTML = '' } = {}) {
-  modalOverlay.innerHTML = '';
-  const titleEl = document.createElement('h1');
-  titleEl.textContent = title;
-  const messageEl = document.createElement('p');
-  messageEl.textContent = message;
-  modalOverlay.appendChild(titleEl);
-  modalOverlay.appendChild(messageEl);
-  if (extraHTML) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'result-summary';
-    wrapper.innerHTML = extraHTML;
-    modalOverlay.appendChild(wrapper);
-  }
-
-  if (showRestart || showRanking) {
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.gap = '10px';
-    buttonContainer.style.justifyContent = 'center';
-
-    if (showRestart) {
-      const restartButton = document.createElement('button');
-      restartButton.className = 'overlay-button';
-      restartButton.type = 'button';
-      restartButton.textContent = '다시 시작';
-      restartButton.addEventListener('click', restartGame);
-      buttonContainer.appendChild(restartButton);
-    }
-
-    if (showRanking) {
-      const rankingButton = document.createElement('button');
-      rankingButton.className = 'overlay-button';
-      rankingButton.type = 'button';
-      rankingButton.textContent = '랭킹보기';
-      rankingButton.addEventListener('click', showRankingModal);
-      buttonContainer.appendChild(rankingButton);
-    }
-
-    modalOverlay.appendChild(buttonContainer);
-  }
-  modalOverlay.classList.add('active');
-}
-
-function showRankingModal() {
-  const rankings = loadRankingData();
-
-  let rankingHTML = '';
-  if (rankings.length === 0) {
-    rankingHTML = '<div style="text-align: center; padding: 20px; color: #9fb4d8;">아직 랭킹 데이터가 없습니다.</div>';
-  } else {
-    rankingHTML = '<div style="max-height: 400px; overflow-y: auto;">';
-    rankings.forEach((rank, index) => {
-      const characterName = getCharacterDisplayName(rank.character);
-      const survivalTime = formatSurvivalTime(rank.survivalTime);
-      rankingHTML += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; margin: 4px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'};">
-          <span style="font-weight: bold; color: #ffffff;">${index + 1}.</span>
-          <span style="color: #9fb4d8;">${rank.nickname}</span>
-          <span style="color: #7dd3fc;">${characterName}</span>
-          <span style="color: #a3e635;">스테이지 ${rank.stage}</span>
-          <span style="color: #fbbf24;">${survivalTime}</span>
-          <span style="color: #ffffff; font-weight: bold;">${rank.finalScore.toLocaleString()}</span>
-        </div>
-      `;
-    });
-    rankingHTML += '</div>';
-  }
-
-  showModal('🏆 랭킹', '', {
-    showRestart: false,
-    showRanking: false,
-    extraHTML: `
-      <div style="min-width: 600px;">
-        <div style="display: flex; justify-content: space-between; padding: 8px 12px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3);">
-          <span>순위</span>
-          <span>닉네임</span>
-          <span>캐릭터</span>
-          <span>스테이지</span>
-          <span>생존시간</span>
-          <span>최종점수</span>
-        </div>
-        ${rankingHTML}
-        <div style="text-align: center; margin-top: 20px;">
-          <button class="overlay-button" id="ranking-close-btn" style="background: #4a90e2;">닫기</button>
-        </div>
-      </div>
-    `
-  });
-
-  // 닫기 버튼에 이벤트 리스너 추가
-  setTimeout(() => {
-    const closeBtn = document.getElementById('ranking-close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', closeRankingAndGoToStart);
-    }
-  }, 0);
-}
-
-function closeRankingAndGoToStart() {
-  hideModal();
-  // 게임 상태 완전히 초기화하고 시작 화면으로 돌아가기
-  resetGameplayState();
-  state.started = false;
-  state.paused = true;
-  state.gameOver = false;
-  startOverlay.classList.add('active');
-
-  // 닉네임 입력 필드 초기화
-  nicknameInput.value = '';
-  updateStartButtonState();
-}
-
-function hideModal() {
-  modalOverlay.classList.remove('active');
-  modalOverlay.innerHTML = '';
-}
 
 function handleKeyDown(event) {
   const { code } = event;
@@ -3251,18 +2762,6 @@ function init() {
   requestAnimationFrame(gameLoop);
 }
 
-window.addEventListener('keydown', handleKeyDown);
-window.addEventListener('keyup', handleKeyUp);
-nicknameInput.addEventListener('input', () => {
-  updateStartButtonState();
-});
-nicknameInput.addEventListener('keydown', (event) => {
-  if (event.code === 'Enter' || event.code === 'NumpadEnter') {
-    event.preventDefault();
-    attemptStart();
-  }
-});
-startButton.addEventListener('click', attemptStart);
 
 // 캐릭터 선택 기능 초기화
 function initCharacterSelection() {
@@ -3298,8 +2797,34 @@ function initCharacterSelection() {
   });
 }
 
+// 전역에서 사용할 수 있도록 window 객체에 연결
+window.restartGame = restartGame;
+window.resetGameplayState = resetGameplayState;
+window.state = state;
+
 // 초기화
-initCharacterSelection();
-updateStartButtonState();
-nicknameInput.focus();
-init();
+async function initialize() {
+  await initializeDB(); // DB 초기화
+  initializeUIElements(); // UI 요소 초기화
+
+  // 이벤트 리스너 설정
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  nicknameInput.addEventListener('input', () => {
+    updateStartButtonState();
+  });
+  nicknameInput.addEventListener('keydown', (event) => {
+    if (event.code === 'Enter' || event.code === 'NumpadEnter') {
+      event.preventDefault();
+      attemptStart();
+    }
+  });
+  startButton.addEventListener('click', attemptStart);
+
+  initCharacterSelection();
+  updateStartButtonState();
+  nicknameInput.focus();
+  init();
+}
+
+initialize();
