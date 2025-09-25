@@ -35,14 +35,14 @@ export async function saveRankingData(nickname, character, stage, survivalTime, 
 export async function loadRankingData() {
   try {
     // Firebase 데이터 시도
-    const firebaseRankings = await loadRankingsFromFirebase(10);
+    const firebaseRankings = await loadRankingsFromFirebase(7);
     if (firebaseRankings && firebaseRankings.length > 0) {
       console.log('Firebase에서 랭킹 로드:', firebaseRankings.length, '개');
       return firebaseRankings;
     }
 
     // Firebase 실패 시 로컬 데이터 사용
-    const localRankings = await getTopRankings(10);
+    const localRankings = await getTopRankings(7);
     console.log('로컬 DB에서 랭킹 로드:', localRankings.length, '개');
     return localRankings;
   } catch (error) {

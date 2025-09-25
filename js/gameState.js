@@ -48,6 +48,14 @@ export const state = {
   emTargetsPerField: 1,
   emCooldown: constants.EM_FIELD_BASE_INTERVAL,
   emEffects: [],
+  sprinkles: [],
+  sprinkleTimer: constants.SPRINKLE_INTERVAL,
+  stageThreeActive: false,
+  stageTheme: 'factory',
+  hasDeulgireumRapid: false,
+  pendingRapidDirections: null,
+  rapidFireDoubleShotLevel: 0,
+  rapidFireTimer: 0,
   scoreBenchmark: 900,
   levelBlastTimer: 0,
   toothpasteItems: [],
@@ -107,6 +115,14 @@ export function resetGameplayState() {
   state.emTargetsPerField = 1;
   state.emCooldown = constants.EM_FIELD_BASE_INTERVAL;
   state.emEffects = [];
+  state.sprinkles = [];
+  state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
+  state.stageThreeActive = false;
+  state.stageTheme = 'factory';
+  state.hasDeulgireumRapid = false;
+  state.pendingRapidDirections = null;
+  state.rapidFireDoubleShotLevel = 0;
+  state.rapidFireTimer = 0;
   state.scoreBenchmark = 700 + Math.floor(Math.random() * 400);
   state.levelBlastTimer = 0;
   state.toothpasteItems = [];

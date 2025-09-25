@@ -21,6 +21,23 @@ export const BULLET_SIZE = 12;
 export const BULLET_SPEED = 520;
 export const BULLET_LIFETIME = 1.8;
 
+// 스프링클 스킬 설정
+export const SPRINKLE_INTERVAL = 0.5;
+export const SPRINKLE_BASE_COUNT = 2;
+export const SPRINKLE_SPEED = 440;
+export const SPRINKLE_LIFETIME = 2.8;
+export const SPRINKLE_TURN_RATE = Math.PI * 6;
+export const SPRINKLE_TRIGGER_RADIUS = 100;
+
+// 경험치 보상
+export const XP_REWARD_PINK = 20;
+export const XP_REWARD_PURPLE = 80;
+export const XP_REWARD_DARK_BLUE = 200;
+export const XP_REWARD_BOSS = 1000;
+
+// 특별 스테이지 설정
+export const STAGE_THREE_SURVIVAL_TIME = 60 * 15; // 15분
+
 // 적 설정
 export const ENEMY_SIZE = 20;
 export const ENEMY_BASE_SPEED = 48;
@@ -85,7 +102,7 @@ export const LEVEL_BLAST_DURATION = 0.4;
 
 // 치약 설정
 export const TOOTHPASTE_DROP_INTERVAL = 10;
-export const TOOTHPASTE_DROP_CHANCE = 0.2;
+export const TOOTHPASTE_DROP_CHANCE = 0.5;
 export const TOOTHPASTE_DROP_MIN_DISTANCE = 50;
 export const TOOTHPASTE_DROP_DISTANCE = 200;
 export const TOOTHPASTE_PICKUP_RADIUS = 90;
@@ -110,6 +127,8 @@ export const UPGRADE_DEFINITIONS = {
   attack_speed: { title: '공속 증가', max: 5 },
   multi_shot: { title: '김 추가', max: 5 },
   double_shot: { title: '더블 발사', max: 5 },
+  sprinkle: { title: '스프링클', max: 5 },
+  deulgireum_rapid: { title: '들기름(연사)', max: 1 },
   blade: { title: '김시리즈', max: 5 },
   em_field: { title: '슈크림', max: 5 },
   ganjang_gim: { title: '간장김', max: 1 },
@@ -117,10 +136,10 @@ export const UPGRADE_DEFINITIONS = {
   full_heal: { title: '라이프 회복', max: 5 },
 };
 
-export const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'full_heal'];
+export const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'sprinkle', 'deulgireum_rapid', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'full_heal'];
 
 // Gim variants
-export const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '들기름김'];
+export const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '독도김'];
 
 // Donut types
 export const DONUT_TYPES = ['boston_creme', 'cocoa_frosted', 'bavarian_filled', 'glazed_ring', 'signature_knotted'];

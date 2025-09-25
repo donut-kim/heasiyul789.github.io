@@ -80,7 +80,7 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
 }
 
 // 랭킹 데이터 불러오기 (Firestore)
-export async function loadRankingsFromFirebase(limitCount = 10) {
+export async function loadRankingsFromFirebase(limitCount = 7) {
   try {
     if (!isFirebaseReady) {
       const initialized = await initializeFirebase();

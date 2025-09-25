@@ -408,6 +408,35 @@ function createKimBugakSprite(size) {
   return off;
 }
 
+function createSprinkleProjectileSprite(size) {
+  const off = document.createElement('canvas');
+  const width = size * 0.6;
+  const height = size * 1.6;
+  off.width = Math.ceil(width + 6);
+  off.height = Math.ceil(height + 6);
+  const ict = off.getContext('2d');
+  const x = (off.width - width) / 2;
+  const y = (off.height - height) / 2;
+
+  const gradient = ict.createLinearGradient(x, y, x + width, y + height);
+  gradient.addColorStop(0, '#ff92c2');
+  gradient.addColorStop(0.5, '#ffe979');
+  gradient.addColorStop(1, '#8ad9ff');
+
+  ict.fillStyle = gradient;
+  ict.beginPath();
+  roundRect(ict, x, y, width, height, width * 0.45);
+  ict.fill();
+
+  ict.strokeStyle = 'rgba(255,255,255,0.6)';
+  ict.lineWidth = 1.4;
+  ict.beginPath();
+  roundRect(ict, x + 1, y + 1, width - 2, height - 2, width * 0.4);
+  ict.stroke();
+
+  return off;
+}
+
 function createMineSprite(size) {
   const off = document.createElement('canvas');
   off.width = size;
@@ -880,6 +909,7 @@ const sprites = {
   blades: constants.GIM_VARIANTS.map((label) => createGimSprite(constants.BLADE_SIZE, label)),
   bullet: createSeaweedSprite(constants.BULLET_SIZE),
   kimBugakBullet: createKimBugakSprite(Math.round(constants.BULLET_SIZE * 2)),
+  sprinkle: createSprinkleProjectileSprite(constants.BULLET_SIZE * 1.2),
   enemyProjectile: createEnemyProjectileSprite(constants.DARK_BLUE_PROJECTILE_SIZE),
   mine: createMineSprite(constants.MINE_SIZE),
   toothpaste: createToothpasteSprite(48),
@@ -1008,6 +1038,10 @@ function ensureChunk(cx, cy) {
   if (generatedChunks.has(key)) return;
   generatedChunks.add(key);
 
+  if (state.stage >= 3) {
+    return;
+  }
+
   if (cx === 0 && cy === 0) {
     baseObstacleTemplates.forEach((tpl, index) => {
       const type = constants.DONUT_TYPES[index % constants.DONUT_TYPES.length];
@@ -1073,6 +1107,41 @@ function handleVictory() {
   }, 2000);
 }
 
+function enterStageThree() {
+  if (state.stageThreeActive) return;
+  state.stage = 3;
+  state.stageThreeActive = true;
+  state.stageTheme = 'space';
+  state.elapsed = 0;
+  state.spawnTimer = constants.SPAWN_INTERVAL;
+  state.boss = null;
+  state.bossWarningTimer = 0;
+  obstacles.length = 0;
+  generatedChunks.clear();
+
+  // 기존 적들도 즉시 느려지도록 조정
+  const slowdown = getStageSpeedMultiplier();
+  state.enemies.forEach((enemy) => {
+    enemy.speed *= slowdown;
+  });
+}
+
+function handleStageThreeVictory() {
+  if (state.victory) return;
+  state.victory = true;
+  state.gameOver = true;
+  state.paused = true;
+
+  const details = computeFinalScoreDetails();
+  checkAndSaveRanking(state, computeFinalScoreDetails);
+
+  showModal('우주 생존 성공!', '15분 동안 생존에 성공했습니다!', {
+    showRestart: true,
+    showRanking: true,
+    extraHTML: buildResultHtml(details),
+  });
+}
+
 // 랭킹 시스템
 
 // checkAndSaveRanking 함수는 ranking.js에서 import
@@ -1105,10 +1174,13 @@ function restartGame() {
 
 function startGame() {
   resetGameplayState();
+  obstacles.length = 0;
+  generatedChunks.clear();
+  ensureChunksAroundPlayer();
+  updateHud(); // reset HUD to reflect fresh state (score, time, skills)
   state.started = true;
   state.paused = false;
   state.gameStartTime = performance.now();
-  spawnToothpasteAroundPlayer(10);
 }
 
 function attemptStart() {
@@ -1124,16 +1196,23 @@ function attemptStart() {
 }
 
 
+const RAPID_BURST_DELAY = 0.12;
+
 const upgradeDescriptions = {
-  speed: (next) => `이동 속도 +${next * 12}%`,
-  attack_speed: (next) => `공격 간격 -${next * 10}%`,
-  multi_shot: (next) => `추가 탄환 +${next}`,
-  double_shot: () => '90도 방향 추가 발사',
-  blade: (next) => `브랜드의 방부제 김들이 도넛을 지켜줍니다. ${next}개`,
-  em_field: () => '가장 가까운 적들을 연쇄로 공격하는 슈크림이 발사됩니다. (3연쇄)',
-  ganjang_gim: () => '간장에 조려진 김 발사: 탄환 1회 관통(최대 두 마리 적 처치)',
-  kim_bugak: () => '기본발사가 김부각으로 변경됩니다. 크기가 조금 더 커지고 장애물을 통과할 수 있습니다.',
-  full_heal: () => '현재 라이프를 모두 회복',
+  speed: (next) => `세균이 무서워 빨리도망가자!! +${next * 12}%`,
+  attack_speed: (next) => `조금 더 빠르게 때려볼까 !? -${next * 10}%`,
+  multi_shot: (next) => `내이름은 카드캡처 체리!`,
+  double_shot: () => '세균이 사방에서 온다고 !?',
+  sprinkle: (next) => {
+    const count = constants.SPRINKLE_BASE_COUNT + (next - 1) * 2;
+    return `이거 아마 방부제가 들어갔을걸...? 맛이 아주 "유도"적이야!`;
+  },
+  deulgireum_rapid: () => '이제 들기름을 곁드린.. 다 고소한맛!',
+  blade: (next) => `브랜드 김! 이제 방부제를 곁드린.... ${next}개`,
+  em_field: () => '슈크림은 잘 터져서 큰일이야 ㅠㅠ (연쇄공격)',
+  ganjang_gim: () => '간장공장공장장',
+  kim_bugak: () => '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!',
+  full_heal: () => '빠..빵가루가 필요해...!',
 };
 
 function rollUpgradeCards() {
@@ -1142,6 +1221,8 @@ function rollUpgradeCards() {
     .filter(([key, def]) =>
       key !== 'ganjang_gim' &&
       key !== 'kim_bugak' &&
+      key !== 'sprinkle' &&
+      key !== 'deulgireum_rapid' &&
       state.upgradeLevels[key] < def.max
     )
     .map(([key]) => key);
@@ -1156,9 +1237,19 @@ function rollUpgradeCards() {
   }
 
   // 5% 확률로 김부각 카드 주입 (아직 못 얻었을 때만)
-  if (!state.hasKimBugak && state.upgradeLevels.kim_bugak === 0 && Math.random() < 0.02) {
+  if (!state.hasKimBugak && state.upgradeLevels.kim_bugak === 0 && Math.random() < 0.05) {
     const replaceIndex = Math.floor(Math.random() * cards.length);
     cards[replaceIndex] = { key: 'kim_bugak' };
+  }
+
+  if (state.upgradeLevels.sprinkle < constants.UPGRADE_DEFINITIONS.sprinkle.max && Math.random() < 0.20) {
+    const replaceIndex = Math.floor(Math.random() * cards.length);
+    cards[replaceIndex] = { key: 'sprinkle' };
+  }
+
+  if (state.upgradeLevels.deulgireum_rapid < constants.UPGRADE_DEFINITIONS.deulgireum_rapid.max && Math.random() < 1.05) {
+    const replaceIndex = Math.floor(Math.random() * cards.length);
+    cards[replaceIndex] = { key: 'deulgireum_rapid' };
   }
 
   return cards;
@@ -1228,6 +1319,12 @@ function applyUpgrade(index) {
     case 'blade':
       state.bladeCooldowns.clear();
       break;
+    case 'sprinkle':
+      state.sprinkleTimer = 0;
+      break;
+    case 'deulgireum_rapid':
+      state.hasDeulgireumRapid = true;
+      break;
     default:
       break;
   }
@@ -1260,20 +1357,45 @@ function recomputePlayerStats() {
   );
 }
 
-function addKillRewardsRaw(count) {
-  if (count <= 0) return;
-  state.score += 10 * count;
-  state.xp += constants.XP_PER_KILL * count;
+function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
+  if (scoreDelta > 0) {
+    state.score += scoreDelta;
+  }
+  if (xpDelta > 0) {
+    state.xp += xpDelta;
+  }
+}
+
+function calculateEnemyReward(enemy) {
+  if (!enemy) {
+    return { score: 0, xp: 0 };
+  }
+  return {
+    score: enemy.scoreReward ?? 10,
+    xp: enemy.xpReward ?? constants.XP_REWARD_PINK,
+  };
+}
+
+function grantRewards(scoreDelta, xpDelta) {
+  if (scoreDelta <= 0 && xpDelta <= 0) return;
+  addKillRewardsRaw(scoreDelta, xpDelta);
+  processLevelUps();
+  resolvePendingLevelBlast();
+}
+
+function grantRewardForEnemy(enemy) {
+  const { score, xp } = calculateEnemyReward(enemy);
+  grantRewards(score, xp);
 }
 
 function triggerLevelBlast() {
   const radiusSq = constants.LEVEL_BLAST_RADIUS * constants.LEVEL_BLAST_RADIUS;
-  let removed = 0;
+  const removedEnemies = [];
   const survivors = [];
   for (const enemy of state.enemies) {
     const distSq = vectorLengthSq(vectorSub(enemy.pos, state.playerPos));
     if (distSq <= radiusSq) {
-      removed += 1;
+      removedEnemies.push(enemy);
       onEnemyRemoved(enemy);
     } else {
       survivors.push(enemy);
@@ -1281,38 +1403,31 @@ function triggerLevelBlast() {
   }
   state.enemies = survivors;
   state.levelBlastTimer = constants.LEVEL_BLAST_DURATION;
-  if (removed > 0) {
-    addKillRewardsRaw(removed);
+  if (removedEnemies.length > 0) {
+    let scoreTotal = 0;
+    let xpTotal = 0;
+    for (const enemy of removedEnemies) {
+      const reward = calculateEnemyReward(enemy);
+      scoreTotal += reward.score;
+      xpTotal += reward.xp;
+    }
+    grantRewards(scoreTotal, xpTotal);
   }
-  return removed;
+  return removedEnemies.length;
 }
 
-function spawnToothpasteItem(distanceMin = constants.TOOTHPASTE_DROP_MIN_DISTANCE, distanceMax = constants.TOOTHPASTE_DROP_DISTANCE) {
-  const attempts = 18;
+function spawnToothpasteItem() {
+  const attempts = 24;
+  const margin = 40;
   for (let i = 0; i < attempts; i++) {
-    const angle = randRange(0, Math.PI * 2);
-    const distance = distanceMin + Math.random() * (distanceMax - distanceMin);
-    const pos = vector(
-      state.playerPos.x + Math.cos(angle) * distance,
-      state.playerPos.y + Math.sin(angle) * distance,
-    );
-    if (Math.abs(pos.x) > constants.WORLD_BOUNDS - 40 || Math.abs(pos.y) > constants.WORLD_BOUNDS - 40) continue;
-    if (!collidesWithObstacles(pos.x, pos.y, constants.PLAYER_SIZE)) {
-      state.toothpasteItems.push({ pos });
+    const x = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
+    const y = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
+    if (!collidesWithObstacles(x, y, constants.PLAYER_SIZE)) {
+      state.toothpasteItems.push({ pos: vector(x, y) });
       return true;
     }
   }
   return false;
-}
-
-function spawnToothpasteAroundPlayer(count) {
-  let placed = 0;
-  const maxAttempts = count * 8;
-  let attempts = 0;
-  while (placed < count && attempts < maxAttempts) {
-    if (spawnToothpasteItem(40, constants.TOOTHPASTE_DROP_DISTANCE)) placed += 1;
-    attempts += 1;
-  }
 }
 
 function tryDropToothpaste() {
@@ -1341,17 +1456,26 @@ function triggerToothpastePickup(index) {
   }
   if (idsToRemove.size === 0) return;
   const survivors = [];
+  const removedEnemies = [];
   for (const enemy of state.enemies) {
     if (idsToRemove.has(enemy.id)) {
       onEnemyRemoved(enemy);
+      removedEnemies.push(enemy);
     } else {
       survivors.push(enemy);
     }
   }
   state.enemies = survivors;
-  addKillRewardsRaw(idsToRemove.size);
-  processLevelUps();
-  resolvePendingLevelBlast();
+  if (removedEnemies.length > 0) {
+    let scoreTotal = 0;
+    let xpTotal = 0;
+    for (const enemy of removedEnemies) {
+      const reward = calculateEnemyReward(enemy);
+      scoreTotal += reward.score;
+      xpTotal += reward.xp;
+    }
+    grantRewards(scoreTotal, xpTotal);
+  }
   state.lastEnemyTargetId = null;
 }
 
@@ -1384,13 +1508,6 @@ function processLevelUps() {
   }
 }
 
-function grantKillReward(count = 1) {
-  if (count <= 0) return;
-  addKillRewardsRaw(count);
-  processLevelUps();
-  resolvePendingLevelBlast();
-}
-
 function onEnemyRemoved(enemy) {
   if (enemy && state.lastEnemyTargetId === enemy.id) {
     state.lastEnemyTargetId = null;
@@ -1399,20 +1516,33 @@ function onEnemyRemoved(enemy) {
 
 function detonateMine() {
   if (!state.mine.active) return;
-  const defeated = state.enemies.length;
+  const defeatedEnemies = [...state.enemies];
   state.mine.active = false;
   state.mineFlashTimer = constants.MINE_FLASH_DURATION;
-  if (defeated) {
-    grantKillReward(defeated);
+  if (defeatedEnemies.length) {
+    let scoreTotal = 0;
+    let xpTotal = 0;
+    for (const enemy of defeatedEnemies) {
+      const reward = calculateEnemyReward(enemy);
+      scoreTotal += reward.score;
+      xpTotal += reward.xp;
+    }
+    grantRewards(scoreTotal, xpTotal);
   }
   state.enemies.length = 0;
   state.lastEnemyTargetId = null;
   if (state.boss) {
-    state.boss.health = 0;
+    const defeatedBoss = state.boss;
+    defeatedBoss.health = 0;
     state.boss = null;
     state.bossWarningTimer = 0;
+    grantRewards(defeatedBoss?.scoreReward ?? 100, defeatedBoss?.xpReward ?? constants.XP_REWARD_BOSS);
     handleVictory();
   }
+}
+
+function getStageSpeedMultiplier() {
+  return state.stage >= 3 ? 0.1 : 1;
 }
 
 function spawnEnemy() {
@@ -1423,8 +1553,18 @@ function spawnEnemy() {
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
-  const speed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
-  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: 1, size: constants.ENEMY_SIZE, sprite: sprites.enemy });
+  const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
+  state.enemies.push({
+    id: enemyIdCounter++,
+    pos,
+    speed: baseSpeed * getStageSpeedMultiplier(),
+    health: 1,
+    size: constants.ENEMY_SIZE,
+    sprite: sprites.enemy,
+    xpReward: constants.XP_REWARD_PINK,
+    scoreReward: 10,
+    type: 'pink'
+  });
 }
 
 function spawnDarkBlueEnemy() {
@@ -1453,16 +1593,18 @@ function spawnDarkBlueEnemy() {
     );
   }
 
-  const speed = constants.DARK_BLUE_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.DARK_BLUE_ENEMY_SPEED;
+  const baseSpeed = constants.DARK_BLUE_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.DARK_BLUE_ENEMY_SPEED;
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
-    speed,
+    speed: baseSpeed * getStageSpeedMultiplier(),
     health: constants.DARK_BLUE_ENEMY_HEALTH,
     size: constants.DARK_BLUE_ENEMY_SIZE,
     sprite: sprites.darkBlueEnemy,
     fireTimer: randRange(0, constants.DARK_BLUE_ENEMY_FIRE_INTERVAL),
-    type: 'darkBlue'
+    type: 'darkBlue',
+    xpReward: constants.XP_REWARD_DARK_BLUE,
+    scoreReward: 20
   });
 }
 
@@ -1473,8 +1615,18 @@ function spawnBigEnemy() {
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
-  const speed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
-  state.enemies.push({ id: enemyIdCounter++, pos, speed, health: constants.BIG_ENEMY_HEALTH, size: constants.BIG_ENEMY_SIZE, sprite: sprites.bigEnemy });
+  const baseSpeed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
+  state.enemies.push({
+    id: enemyIdCounter++,
+    pos,
+    speed: baseSpeed * getStageSpeedMultiplier(),
+    health: constants.BIG_ENEMY_HEALTH,
+    size: constants.BIG_ENEMY_SIZE,
+    sprite: sprites.bigEnemy,
+    xpReward: constants.XP_REWARD_PURPLE,
+    scoreReward: 15,
+    type: 'purple'
+  });
 }
 
 function spawnBoss() {
@@ -1493,6 +1645,8 @@ function spawnBoss() {
     attackTimer: constants.BOSS_ATTACK_INTERVAL,
     windupTimer: 0,
     facingAngle: 0,
+    xpReward: constants.XP_REWARD_BOSS,
+    scoreReward: 100,
   };
   state.enemies.length = 0;
 }
@@ -1638,15 +1792,8 @@ if (isMobile && canvas) {
   // Add touch events to canvas instead of joystick element
   canvas.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const canvasHeight = rect.height;
-    const touchY = t.clientY - rect.top;
-
-    // Only activate joystick if touch is in bottom half of screen
-    if (touchY > canvasHeight * 0.5) {
-      start(t.clientX, t.clientY);
-      e.preventDefault();
-    }
+    start(t.clientX, t.clientY);
+    e.preventDefault();
   }, { passive: false });
 
   canvas.addEventListener('touchmove', (e) => {
@@ -1692,6 +1839,15 @@ function update(dt) {
     state.elapsed += dt;
   }
 
+  if (state.stage === 2 && !state.stageThreeActive && !state.boss && !state.victory && state.elapsed >= constants.BOSS_SPAWN_TIME) {
+    enterStageThree();
+  }
+
+  if (state.stageThreeActive && !state.victory && state.elapsed >= constants.STAGE_THREE_SURVIVAL_TIME) {
+    handleStageThreeVictory();
+    return;
+  }
+
   state.playerInvuln = Math.max(0, state.playerInvuln - dt);
   state.mineFlashTimer = Math.max(0, state.mineFlashTimer - dt);
   state.levelBlastTimer = Math.max(0, state.levelBlastTimer - dt);
@@ -1700,6 +1856,10 @@ function update(dt) {
   state.hpBarTimer = Math.max(0, state.hpBarTimer - dt);
   if (state.bossWarningTimer > 0) {
     state.bossWarningTimer = Math.max(0, state.bossWarningTimer - dt);
+  }
+
+  if (state.hasDeulgireumRapid && state.rapidFireTimer > 0) {
+    state.rapidFireTimer = Math.max(0, state.rapidFireTimer - dt);
   }
 
   state.bladeCooldowns.forEach((value, key) => {
@@ -1715,7 +1875,7 @@ function update(dt) {
     .map((ef) => ({ ...ef, timer: ef.timer - dt }))
     .filter((ef) => ef.timer > 0);
 
-  if (!state.boss && !state.victory && state.elapsed >= constants.BOSS_SPAWN_TIME) {
+  if (!state.boss && !state.victory && state.stage < 3 && state.elapsed >= constants.BOSS_SPAWN_TIME) {
     spawnBoss();
   }
 
@@ -1734,6 +1894,7 @@ function update(dt) {
   handleMovement(dt);
   handleShooting(dt);
   handleBullets(dt);
+  handleSprinkles(dt);
   handleEnemies(dt);
   handleEnemyProjectiles(dt);
   if (state.boss) {
@@ -1841,7 +2002,33 @@ function spawnProjectile(direction) {
   });
 }
 
+function fireDirections(directions, doubleShotLevel) {
+  for (const dir of directions) {
+    const baseAngle = Math.atan2(dir.y, dir.x);
+
+    if (doubleShotLevel <= 0) {
+      spawnProjectile(dir);
+      continue;
+    }
+
+    const count = doubleShotLevel + 1;
+    const step = (count === 2) ? Math.PI : (Math.PI * 2) / count;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + i * step;
+      const vx = Math.cos(angle);
+      const vy = Math.sin(angle);
+      spawnProjectile(vector(vx, vy));
+    }
+  }
+}
+
 function handleShooting(dt) {
+  if (state.hasDeulgireumRapid && state.pendingRapidDirections && state.rapidFireTimer <= 0) {
+    fireDirections(state.pendingRapidDirections, state.rapidFireDoubleShotLevel);
+    state.pendingRapidDirections = null;
+  }
+
   if (state.enemies.length === 0) {
     state.lastEnemyTargetId = null;
   }
@@ -1890,27 +2077,12 @@ function handleShooting(dt) {
     }
 
     const doubleShotLevel = state.upgradeLevels.double_shot;
-    for (const dir of baseDirections) {
-      const baseAngle = Math.atan2(dir.y, dir.x);
+    fireDirections(baseDirections, doubleShotLevel);
 
-      if (doubleShotLevel <= 0) {
-        // 기본 한 발
-        spawnProjectile(dir);
-        continue;
-      }
-
-      // 레벨 N => N+1 발
-      const count = doubleShotLevel + 1;
-
-      // 각도 간격: 레벨1은 180°, 그 이상은 360°/count
-      const step = (count === 2) ? Math.PI : (Math.PI * 2) / count;
-
-      for (let i = 0; i < count; i++) {
-        const angle = baseAngle + i * step;
-        const vx = Math.cos(angle);
-        const vy = Math.sin(angle);
-        spawnProjectile(vector(vx, vy));
-      }
+    if (state.hasDeulgireumRapid) {
+      state.pendingRapidDirections = baseDirections.map((dir) => vectorCopy(dir));
+      state.rapidFireDoubleShotLevel = doubleShotLevel;
+      state.rapidFireTimer = RAPID_BURST_DELAY;
     }
 
     state.fireTimer = currentFireInterval;
@@ -1955,9 +2127,9 @@ function handleBullets(dt) {
         enemy.health = (enemy.health || 1) - 1;
 
         if (enemy.health <= 0) {
-          state.enemies.splice(i, 1);
-          onEnemyRemoved(enemy);
-          grantKillReward();
+          const defeated = state.enemies.splice(i, 1)[0];
+          onEnemyRemoved(defeated);
+          grantRewardForEnemy(defeated);
           i -= 1; // 배열 보정
         }
 
@@ -1976,8 +2148,10 @@ function handleBullets(dt) {
         state.boss.health -= 1;
         state.score += constants.BOSS_HIT_SCORE;
         if (state.boss.health <= 0) {
+          const defeatedBoss = state.boss;
           state.boss = null;
           state.bossWarningTimer = 0;
+          grantRewards(defeatedBoss?.scoreReward ?? 100, defeatedBoss?.xpReward ?? constants.XP_REWARD_BOSS);
           handleVictory();
         }
         if (bullet.pierce && bullet.pierce > 0) {
@@ -1998,6 +2172,170 @@ function handleBullets(dt) {
   ) {
     triggerEmField();
   }
+}
+
+function fireSprinkleVolley() {
+  if (state.upgradeLevels.sprinkle <= 0) {
+    state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
+    return;
+  }
+
+  const targets = [];
+
+  for (const enemy of state.enemies) {
+    const dist = vectorLengthSq(vectorSub(enemy.pos, state.playerPos));
+    targets.push({ type: 'enemy', ref: enemy, dist });
+  }
+  if (state.boss && state.boss.health > 0) {
+    const dist = vectorLengthSq(vectorSub(state.boss.pos, state.playerPos));
+    targets.push({ type: 'boss', ref: state.boss, dist });
+  }
+
+  if (targets.length === 0) {
+    state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
+    return;
+  }
+
+  targets.sort((a, b) => a.dist - b.dist);
+
+  const level = state.upgradeLevels.sprinkle;
+  const sprinkleCount = constants.SPRINKLE_BASE_COUNT + (level - 1) * 2;
+
+  for (let i = 0; i < sprinkleCount; i++) {
+    const target = targets[i % targets.length];
+    const pos = vectorCopy(state.playerPos);
+    const targetPos = vectorCopy(target.ref.pos);
+    const dir = vectorNormalize(vectorSub(targetPos, pos));
+    const fallbackDir = vectorLengthSq(dir) > 0 ? dir : vector(1, 0);
+
+    state.sprinkles.push({
+      pos,
+      dir: fallbackDir,
+      speed: constants.SPRINKLE_SPEED,
+      lifetime: constants.SPRINKLE_LIFETIME,
+      targetType: target.type,
+      targetId: target.type === 'enemy' ? target.ref.id : null,
+      size: constants.BULLET_SIZE * 1.2,
+      hitRadius: (constants.BULLET_SIZE * 0.75),
+    });
+  }
+
+  state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
+}
+
+function resolveSprinkleTarget(sprinkle) {
+  if (sprinkle.targetType === 'enemy') {
+    const enemy = state.enemies.find((e) => e.id === sprinkle.targetId);
+    if (enemy) {
+      return { type: 'enemy', ref: enemy };
+    }
+  } else if (sprinkle.targetType === 'boss') {
+    if (state.boss && state.boss.health > 0) {
+      return { type: 'boss', ref: state.boss };
+    }
+  }
+
+  let closest = null;
+  let closestDist = Infinity;
+  for (const enemy of state.enemies) {
+    const dist = vectorLengthSq(vectorSub(enemy.pos, sprinkle.pos));
+    if (dist < closestDist) {
+      closest = { type: 'enemy', ref: enemy };
+      closestDist = dist;
+    }
+  }
+  if (state.boss && state.boss.health > 0) {
+    const bossDist = vectorLengthSq(vectorSub(state.boss.pos, sprinkle.pos));
+    if (bossDist < closestDist) {
+      closest = { type: 'boss', ref: state.boss };
+      closestDist = bossDist;
+    }
+  }
+
+  if (closest) {
+    sprinkle.targetType = closest.type;
+    sprinkle.targetId = closest.type === 'enemy' ? closest.ref.id : null;
+    return closest;
+  }
+
+  sprinkle.targetType = null;
+  sprinkle.targetId = null;
+  return null;
+}
+
+function handleSprinkles(dt) {
+  if (state.upgradeLevels.sprinkle <= 0) {
+    state.sprinkles.length = 0;
+    state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
+    return;
+  }
+
+  state.sprinkleTimer -= dt;
+  if (state.sprinkleTimer <= 0) {
+    fireSprinkleVolley();
+  }
+
+  const nextSprinkles = [];
+  for (const sprinkle of state.sprinkles) {
+    sprinkle.lifetime -= dt;
+    if (sprinkle.lifetime <= 0) continue;
+
+    const resolved = resolveSprinkleTarget(sprinkle);
+    if (resolved) {
+      const desiredDir = vectorNormalize(vectorSub(resolved.ref.pos, sprinkle.pos));
+      if (vectorLengthSq(desiredDir) > 1e-6) {
+        const desiredAngle = Math.atan2(desiredDir.y, desiredDir.x);
+        const currentAngle = Math.atan2(sprinkle.dir.y, sprinkle.dir.x);
+        const angleDiff = angleDifference(currentAngle, desiredAngle);
+        const maxTurn = constants.SPRINKLE_TURN_RATE * dt;
+        const clampedTurn = clamp(angleDiff, -maxTurn, maxTurn);
+        const newAngle = currentAngle + clampedTurn;
+        sprinkle.dir = vector(Math.cos(newAngle), Math.sin(newAngle));
+      }
+    }
+
+    const movement = vectorScale(sprinkle.dir, sprinkle.speed * dt);
+    sprinkle.pos = vectorAdd(sprinkle.pos, movement);
+    clampWorldPosition(sprinkle.pos);
+
+    let consumed = false;
+
+    for (let i = 0; i < state.enemies.length; i++) {
+      const enemy = state.enemies[i];
+      if (circleIntersects(sprinkle.pos, sprinkle.hitRadius, enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2)) {
+        enemy.health = (enemy.health || 1) - 1;
+        if (enemy.health <= 0) {
+          const defeated = state.enemies.splice(i, 1)[0];
+          onEnemyRemoved(defeated);
+          grantRewardForEnemy(defeated);
+          i -= 1;
+        }
+        consumed = true;
+        break;
+      }
+    }
+
+    if (!consumed && state.boss) {
+      if (circleIntersects(sprinkle.pos, sprinkle.hitRadius, state.boss.pos, constants.BOSS_RADIUS)) {
+        state.boss.health -= 1;
+        state.score += constants.BOSS_HIT_SCORE;
+        if (state.boss.health <= 0) {
+          const bossDefeated = state.boss;
+          state.boss = null;
+          state.bossWarningTimer = 0;
+          grantRewards(bossDefeated?.scoreReward ?? 100, bossDefeated?.xpReward ?? constants.XP_REWARD_BOSS);
+          handleVictory();
+        }
+        consumed = true;
+      }
+    }
+
+    if (!consumed) {
+      nextSprinkles.push(sprinkle);
+    }
+  }
+
+  state.sprinkles = nextSprinkles;
 }
 
 function triggerEmField() {
@@ -2035,10 +2373,10 @@ function triggerEmField() {
         if (idx !== -1) {
           // EM 필드도 1 데미지
           enemy.health = (enemy.health || 1) - 1;
-          if (enemy.health <= 0) {
-            state.enemies.splice(idx, 1);
-            onEnemyRemoved(enemy);
-            grantKillReward();
+        if (enemy.health <= 0) {
+          const defeated = state.enemies.splice(idx, 1)[0];
+          onEnemyRemoved(defeated);
+          grantRewardForEnemy(defeated);
           }
         }
         targetPos = vectorCopy(enemy.pos);
@@ -2048,8 +2386,10 @@ function triggerEmField() {
           boss.health -= 1;
           state.score += constants.BOSS_HIT_SCORE;
           if (boss.health <= 0) {
+            const defeatedBoss = state.boss;
             state.boss = null;
             state.bossWarningTimer = 0;
+            grantRewards(defeatedBoss?.scoreReward ?? 100, defeatedBoss?.xpReward ?? constants.XP_REWARD_BOSS);
             handleVictory();
             targetsPool.splice(
               targetsPool.findIndex((t) => t.type === 'boss'),
@@ -2106,19 +2446,19 @@ function handleEnemies(dt) {
     }
 
     let killed = false;
-  if (state.blades.length > 0) {
-    for (const blade of state.blades) {
-      if (circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, blade.pos, constants.BLADE_SIZE / 2)) {
-        enemy.health = (enemy.health || 1) - 1; // 블레이드도 1 데미지
-        if (enemy.health <= 0) {
-          grantKillReward();
-          onEnemyRemoved(enemy);
-          killed = true;
+    if (state.blades.length > 0) {
+      for (const blade of state.blades) {
+        if (circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, blade.pos, constants.BLADE_SIZE / 2)) {
+          enemy.health = (enemy.health || 1) - 1; // 블레이드도 1 데미지
+          if (enemy.health <= 0) {
+            grantRewardForEnemy(enemy);
+            onEnemyRemoved(enemy);
+            killed = true;
+          }
+          break; // 한 프레임에 여러 번 깎이지 않도록
         }
-        break; // 한 프레임에 여러 번 깎이지 않도록
       }
     }
-  }
     if (!killed) nextEnemies.push(enemy);
   }
   state.enemies = nextEnemies;
@@ -2241,6 +2581,10 @@ function render() {
     drawEmEffect(effect);
   }
 
+  for (const sprinkle of state.sprinkles) {
+    drawSprinkleProjectile(sprinkle);
+  }
+
   for (const bullet of state.bullets) {
     drawBulletSprite(bullet);
   }
@@ -2280,6 +2624,10 @@ function render() {
 }
 
 function drawBackground() {
+  if (state.stageTheme === 'space') {
+    drawSpaceBackground();
+    return;
+  }
   const { worldW, worldH, halfW, halfH } = getWorldDims();
 
   // ===== Stainless (silver) base =====
@@ -2341,6 +2689,54 @@ function drawBackground() {
     ctx.lineTo(worldW, y + halfH + 0.5);
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
+}
+
+function drawSpaceBackground() {
+  const { worldW, worldH, halfW, halfH } = getWorldDims();
+
+  const skyGradient = ctx.createLinearGradient(0, 0, 0, worldH);
+  skyGradient.addColorStop(0, '#050b1f');
+  skyGradient.addColorStop(0.5, '#081b3f');
+  skyGradient.addColorStop(1, '#020814');
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, worldW, worldH);
+
+  const nebula = ctx.createRadialGradient(
+    halfW - worldW * 0.3,
+    halfH - worldH * 0.4,
+    worldW * 0.1,
+    halfW,
+    halfH,
+    worldW * 0.9,
+  );
+  nebula.addColorStop(0, 'rgba(128, 90, 213, 0.35)');
+  nebula.addColorStop(0.6, 'rgba(64, 105, 255, 0.15)');
+  nebula.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = nebula;
+  ctx.fillRect(0, 0, worldW, worldH);
+
+  const starSpacing = 140;
+  const offsetX = state.playerPos.x % starSpacing;
+  const offsetY = state.playerPos.y % starSpacing;
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  for (let x = -starSpacing - offsetX; x < worldW; x += starSpacing) {
+    for (let y = -starSpacing - offsetY; y < worldH; y += starSpacing) {
+      ctx.beginPath();
+      ctx.arc(x + halfW, y + halfH, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let x = -starSpacing * 0.5 - offsetX; x < worldW; x += starSpacing) {
+    for (let y = -starSpacing * 0.5 - offsetY; y < worldH; y += starSpacing) {
+      ctx.beginPath();
+      ctx.arc(x + halfW, y + halfH, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   ctx.globalAlpha = 1;
 }
 
@@ -2523,6 +2919,21 @@ function drawEmEffect(effect) {
   ctx.lineWidth = 24;
   ctx.stroke();
 
+  ctx.restore();
+}
+
+function drawSprinkleProjectile(projectile) {
+  const screen = worldToScreen(projectile.pos);
+  const angle = Math.atan2(projectile.dir.y, projectile.dir.x);
+  const sprite = sprites.sprinkle;
+  const size = projectile.size || constants.BULLET_SIZE * 1.2;
+  const width = size * 0.6;
+  const height = size * 1.6;
+
+  ctx.save();
+  ctx.translate(screen.x, screen.y);
+  ctx.rotate(angle);
+  ctx.drawImage(sprite, -width / 2, -height / 2, width, height);
   ctx.restore();
 }
 
