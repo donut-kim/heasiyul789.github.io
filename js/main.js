@@ -1174,6 +1174,7 @@ function restartGame() {
 
 function startGame() {
   resetGameplayState();
+  recomputePlayerStats(); // 탄환 갯수 포함 플레이어 스탯 초기화
   obstacles.length = 0;
   generatedChunks.clear();
   ensureChunksAroundPlayer();
@@ -1198,21 +1199,73 @@ function attemptStart() {
 
 const RAPID_BURST_DELAY = 0.12;
 
-const upgradeDescriptions = {
-  speed: (next) => `세균이 무서워 빨리도망가자!! +${next * 12}%`,
-  attack_speed: (next) => `조금 더 빠르게 때려볼까 !? -${next * 10}%`,
-  multi_shot: (next) => `내이름은 카드캡처 체리!`,
-  double_shot: () => '세균이 사방에서 온다고 !?',
-  sprinkle: (next) => {
-    const count = constants.SPRINKLE_BASE_COUNT + (next - 1) * 2;
-    return `이거 아마 방부제가 들어갔을걸...? 맛이 아주 "유도"적이야!`;
+const skillData = {
+  speed: {
+    name: '이속 증가',
+    title: '속도 향상',
+    option: (next) => `이동속도 +${next * 12}%`,
+    description: '세균이 무서워 빨리도망가자!!'
   },
-  deulgireum_rapid: () => '이제 들기름을 곁드린.. 다 고소한맛!',
-  blade: (next) => `브랜드 김! 이제 방부제를 곁드린.... ${next}개`,
-  em_field: () => '슈크림은 잘 터져서 큰일이야 ㅠㅠ (연쇄공격)',
-  ganjang_gim: () => '간장공장공장장',
-  kim_bugak: () => '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!',
-  full_heal: () => '빠..빵가루가 필요해...!',
+  attack_speed: {
+    name: '공속 증가',
+    title: '공격 속도',
+    option: (next) => `공격속도 +${next * 10}%`,
+    description: '조금 더 빠르게 때려볼까 !?'
+  },
+  multi_shot: {
+    name: '김 추가',
+    title: '공격 추가',
+    option: '김 + 1',
+    description: '내이름은 카드캡처 체리!'
+  },
+  double_shot: {
+    name: '더블 발사',
+    title: '양방향공격',
+    option: '김 + 1',
+    description: '김이 여러개지요 ~'
+  },
+  sprinkle: {
+    name: '스프링클',
+    title: '유도탄',
+    option: '유도스프링클 + 2',
+    description: '이거 아마 방부제가 들어갔을걸...?'
+  },
+  deulgireum_rapid: {
+    name: '들기름',
+    title: '연사',
+    option: '기본공격 연사 + 1',
+    description: '이제 들기름을 곁드린.. 더 고소한 맛 !'
+  },
+  blade: {
+    name: '킴스클럽',
+    title: '블레이드',
+    option: '회전 블레이드 김 + 1',
+    description: '브랜드 김! 이제 방부제를 곁드린....'
+  },
+  em_field: {
+    name: '슈크림',
+    title: '레이저',
+    option: '슈크림 연쇄공격 + 3',
+    description: '슈크림은 잘 터져서 큰일이야 ㅠㅠ'
+  },
+  ganjang_gim: {
+    name: '간장김',
+    title: '관통',
+    option: '관통 + 1',
+    description: '간장공장공장장'
+  },
+  kim_bugak: {
+    name: '김부각',
+    title: '기본공격 업그레이드',
+    option: '장애물 무시',
+    description: '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!'
+  },
+  full_heal: {
+    name: '부스러기 획득',
+    title: 'HP회복',
+    option: '체력 완전 회복',
+    description: '빠..빵가루가 필요해...!'
+  }
 };
 
 function rollUpgradeCards() {
@@ -1269,14 +1322,28 @@ function renderUpgradeOverlay() {
     const current = state.upgradeLevels[key];
     const next = current + 1;
     const card = document.createElement('div');
-    card.className = 'upgrade-card';
+    const isSpecialSkill = key === 'deulgireum_rapid' || key === 'ganjang_gim' || key === 'kim_bugak';
+    card.className = isSpecialSkill ? 'upgrade-card special-skill-card' : 'upgrade-card';
     card.dataset.index = String(index);
-    const titleStyle = (key === 'ganjang_gim' || key === 'kim_bugak') ? 'style="color: #4ade80;"' : '';
+    const skill = skillData[key];
+    if (!skill) return;
+
+    const skillName = skill.name;
+    const skillTitle = skill.title;
+    const skillOption = typeof skill.option === 'function' ? skill.option(next) : skill.option;
+    const skillDescription = skill.description;
+    const skillLevel = `Lv.${next} / ${def.max}`;
+
+    const titleStyle = isSpecialSkill ? 'color: #4ade80;' : 'color: #f0f6ff;';
+
     card.innerHTML = `
-      <div class="card-title" ${titleStyle}>${def.title}</div>
-      <div class="card-level">Lv.${next} / ${def.max}</div>
-      <div class="card-desc">${(upgradeDescriptions[key] || (() => '효과 없음'))(next)}</div>
-      <div class="card-hint">선택키: ${index + 1}</div>
+      <div class="card-skill-name" style="font-size: 12px; color: #888; text-align: center; margin-bottom: 4px;">스킬</div>
+      <div class="card-title" style="${titleStyle} font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 6px;">${skillName}</div>
+      <div class="card-skill-title" style="font-size: 14px; color: #fbbf24; text-align: center; margin-bottom: 4px;">${skillTitle}</div>
+      <div class="card-skill-option" style="font-size: 13px; color: #60a5fa; text-align: center; margin-bottom: 6px;">${skillOption}</div>
+      <div class="card-skill-desc" style="font-size: 12px; color: #d1d5db; text-align: left; margin-bottom: 6px;">${skillDescription}</div>
+      <div class="card-level" style="font-size: 12px; color: #9ca3af; text-align: center;">${skillLevel}</div>
+      <div class="card-hint" style="font-size: 11px; color: #6b7280; text-align: center; margin-top: 4px;">선택키: ${index + 1}</div>
     `;
     card.addEventListener('click', () => applyUpgrade(index));
     upgradeCardsWrapper.appendChild(card);
@@ -1361,7 +1428,7 @@ function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
   if (scoreDelta > 0) {
     state.score += scoreDelta;
   }
-  if (xpDelta > 0) {
+  if (xpDelta > 0 && state.level < 20) {
     state.xp += xpDelta;
   }
 }
@@ -1419,10 +1486,12 @@ function triggerLevelBlast() {
 function spawnToothpasteItem() {
   const attempts = 24;
   const margin = 40;
+  const toothpasteSize = 44;
+  const clearanceRadius = toothpasteSize + 20; // 치약 크기 + 20픽셀 여유분
   for (let i = 0; i < attempts; i++) {
     const x = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
     const y = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
-    if (!collidesWithObstacles(x, y, 44)) {
+    if (!collidesWithObstacles(x, y, clearanceRadius)) {
       state.toothpasteItems.push({ pos: vector(x, y) });
       return true;
     }
@@ -1494,7 +1563,7 @@ function resolvePendingLevelBlast() {
 function processLevelUps() {
   if (processingLevelChain) return;
   setProcessingLevelChain(true);
-  while (state.xp >= state.xpToNext && !state.selectingUpgrade) {
+  while (state.xp >= state.xpToNext && !state.selectingUpgrade && state.level < 20) {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = xpRequired(state.level);
@@ -1654,6 +1723,20 @@ function spawnBoss() {
 function updateBoss(dt) {
   const boss = state.boss;
   if (!boss) return;
+
+  // 감전 상태 업데이트
+  if (boss.electrocuted) {
+    boss.electrocutionTimer -= dt;
+    boss.electrocutionFlash -= dt;
+    if (boss.electrocutionTimer <= 0) {
+      boss.electrocuted = false;
+      boss.electrocutionTimer = 0;
+      boss.electrocutionFlash = 0;
+    }
+    // 감전 중에는 모든 행동 정지
+    return;
+  }
+
   switch (boss.state) {
     case 'windup': {
       boss.windupTimer -= dt;
@@ -2373,6 +2456,10 @@ function triggerEmField() {
         if (idx !== -1) {
           // EM 필드도 1 데미지
           enemy.health = (enemy.health || 1) - 1;
+          // 감전 효과 추가 (1초간 움직임 정지)
+          enemy.electrocuted = true;
+          enemy.electrocutionTimer = 1.0;
+          enemy.electrocutionFlash = 0.5; // 감전 플래시 효과
         if (enemy.health <= 0) {
           const defeated = state.enemies.splice(idx, 1)[0];
           onEnemyRemoved(defeated);
@@ -2385,6 +2472,10 @@ function triggerEmField() {
         if (boss) {
           boss.health -= 1;
           state.score += constants.BOSS_HIT_SCORE;
+          // 보스에게도 감전 효과 추가 (1초간 움직임 정지)
+          boss.electrocuted = true;
+          boss.electrocutionTimer = 1.0;
+          boss.electrocutionFlash = 0.5; // 감전 플래시 효과
           if (boss.health <= 0) {
             const defeatedBoss = state.boss;
             state.boss = null;
@@ -2415,9 +2506,23 @@ function triggerEmField() {
 function handleEnemies(dt) {
   const nextEnemies = [];
   for (const enemy of state.enemies) {
-    const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
-    enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || constants.ENEMY_SIZE);
-    clampWorldPosition(enemy.pos);
+    // 감전 상태 업데이트
+    if (enemy.electrocuted) {
+      enemy.electrocutionTimer -= dt;
+      enemy.electrocutionFlash -= dt;
+      if (enemy.electrocutionTimer <= 0) {
+        enemy.electrocuted = false;
+        enemy.electrocutionTimer = 0;
+        enemy.electrocutionFlash = 0;
+      }
+    }
+
+    // 감전되지 않은 상태일 때만 이동
+    if (!enemy.electrocuted) {
+      const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
+      enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || constants.ENEMY_SIZE);
+      clampWorldPosition(enemy.pos);
+    }
 
     // 남색 세균의 발사 로직
     if (enemy.type === 'darkBlue') {
@@ -2578,6 +2683,11 @@ function render() {
     const spr = enemy.sprite || sprites.enemy;
     const sz = enemy.size || constants.ENEMY_SIZE;
     drawSprite(spr, enemy.pos, sz);
+
+    // 감전 효과 그리기
+    if (enemy.electrocuted && enemy.electrocutionFlash > 0) {
+      drawElectrocutionEffect(enemy.pos, sz);
+    }
   }
 
   if (state.boss) {
@@ -2637,60 +2747,69 @@ function drawBackground() {
   }
   const { worldW, worldH, halfW, halfH } = getWorldDims();
 
-  // ===== Stainless (silver) base =====
-  // Subtle radial/linear blend to mimic brushed metal
+  // ===== 나무쟁반 배경 =====
   const centerX = halfW;
-  const centerY = halfH * 0.9; // slightly lower center for vignette feel
+  const centerY = halfH;
 
-  // Base fill
-  const baseGrad = ctx.createRadialGradient(centerX, centerY, Math.min(halfW, halfH) * 0.15, centerX, centerY, Math.max(worldW, worldH) * 0.7);
-  baseGrad.addColorStop(0.0, '#f3f5f7');  // bright center
-  baseGrad.addColorStop(0.45, '#e6eaee');
-  baseGrad.addColorStop(1.0, '#d6dbe2');  // outer rim
-  ctx.fillStyle = baseGrad;
+  // 떡갈나무 베이스 그라디언트 (진한 갈색과 황갈색)
+  const oakGrad = ctx.createRadialGradient(centerX, centerY, Math.min(halfW, halfH) * 0.15, centerX, centerY, Math.max(worldW, worldH) * 0.9);
+  oakGrad.addColorStop(0.0, '#d4a574');  // 떡갈나무 밝은 중심 (황갈색)
+  oakGrad.addColorStop(0.25, '#c7956a');  // 중간 황갈색
+  oakGrad.addColorStop(0.5, '#b5835d');   // 진한 황갈색
+  oakGrad.addColorStop(0.75, '#a0714f');  // 갈색으로 전환
+  oakGrad.addColorStop(1.0, '#8b5e3c');   // 가장자리 진한 갈색
+  ctx.fillStyle = oakGrad;
   ctx.fillRect(0, 0, worldW, worldH);
 
-  // very soft vertical sheen
-  const sheen = ctx.createLinearGradient(0, 0, worldW, 0);
-  sheen.addColorStop(0.0, 'rgba(255,255,255,0.08)');
-  sheen.addColorStop(0.5, 'rgba(255,255,255,0.02)');
-  sheen.addColorStop(1.0, 'rgba(255,255,255,0.08)');
-  ctx.fillStyle = sheen;
-  ctx.globalAlpha = 1;
+  // 떡갈나무 나무결 패턴 (더 뚜렷하고 불규칙한 결)
+  const oakGrain = ctx.createLinearGradient(0, 0, worldW, 0);
+  oakGrain.addColorStop(0.0, 'rgba(101,68,42,0.25)');  // 진한 갈색 결
+  oakGrain.addColorStop(0.15, 'rgba(101,68,42,0.08)');
+  oakGrain.addColorStop(0.3, 'rgba(101,68,42,0.32)');
+  oakGrain.addColorStop(0.45, 'rgba(101,68,42,0.12)');
+  oakGrain.addColorStop(0.6, 'rgba(101,68,42,0.28)');
+  oakGrain.addColorStop(0.75, 'rgba(101,68,42,0.15)');
+  oakGrain.addColorStop(0.9, 'rgba(101,68,42,0.35)');
+  oakGrain.addColorStop(1.0, 'rgba(101,68,42,0.18)');
+  ctx.fillStyle = oakGrain;
   ctx.fillRect(0, 0, worldW, worldH);
 
-  // ===== Silver grid =====
-  const tile = 180;
-  const offsetX = state.playerPos.x % tile;
-  const offsetY = state.playerPos.y % tile;
+
+  // 나무판자 경계선들 (쟁반 느낌)
+  const plankWidth = 140;
+  const offsetX = state.playerPos.x % plankWidth;
+  const offsetY = state.playerPos.y % plankWidth;
 
   ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(101,68,42,0.3)';
 
-  // light inner strokes
-  ctx.strokeStyle = constants.GRID_COLOR; // '#c6ccd4'
-  for (let x = -tile - offsetX; x < worldW; x += tile) {
+  // 세로 나무결 선 (떡갈나무 색상)
+  for (let x = -plankWidth - offsetX; x < worldW; x += plankWidth) {
     ctx.beginPath();
     ctx.moveTo(x + halfW, 0);
     ctx.lineTo(x + halfW, worldH);
     ctx.stroke();
   }
-  for (let y = -tile - offsetY; y < worldH; y += tile) {
+
+  // 가로 나무결 선 (더 연하게)
+  ctx.strokeStyle = 'rgba(101,68,42,0.18)';
+  for (let y = -plankWidth - offsetY; y < worldH; y += plankWidth) {
     ctx.beginPath();
     ctx.moveTo(0, y + halfH);
     ctx.lineTo(worldW, y + halfH);
     ctx.stroke();
   }
 
-  // soft highlight on grid intersections (subtle)
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-  ctx.globalAlpha = 0.35;
-  for (let x = -tile - offsetX; x < worldW; x += tile) {
+  // 떡갈나무 쟁반의 은은한 하이라이트 효과
+  ctx.strokeStyle = 'rgba(212,165,116,0.2)';
+  ctx.globalAlpha = 0.3;
+  for (let x = -plankWidth - offsetX; x < worldW; x += plankWidth) {
     ctx.beginPath();
     ctx.moveTo(x + halfW + 0.5, 0);
     ctx.lineTo(x + halfW + 0.5, worldH);
     ctx.stroke();
   }
-  for (let y = -tile - offsetY; y < worldH; y += tile) {
+  for (let y = -plankWidth - offsetY; y < worldH; y += plankWidth) {
     ctx.beginPath();
     ctx.moveTo(0, y + halfH + 0.5);
     ctx.lineTo(worldW, y + halfH + 0.5);
@@ -2892,39 +3011,155 @@ function drawPlayer() {
 }
 
 function drawEmEffect(effect) {
-  // 슈크림 색상(크림빛)으로 부드러운 광선 효과
+  // 전기 번개 효과
   const a = worldToScreen(effect.start);
   const b = worldToScreen(effect.end);
   const lifeRatio = clamp(effect.timer / constants.EM_EFFECT_LIFETIME, 0, 1);
-  const alpha = 0.25 + 0.75 * lifeRatio; // 생성 직후 더 밝고, 사라질수록 어둡게
+  const alpha = 0.4 + 0.6 * lifeRatio; // 생성 직후 더 밝고, 사라질수록 어둡게
 
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
 
-  // 밝은 노란색 그라디언트
-  const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-  grad.addColorStop(0, `rgba(255, 255, 0, ${0.85 * alpha})`);
-  grad.addColorStop(1, `rgba(255, 215, 0, ${0.95 * alpha})`);
-  ctx.strokeStyle = grad;
+  // 지그재그 번개 모양 생성
+  const distance = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+  const segments = Math.max(8, Math.floor(distance / 20));
+  const points = [];
 
-  // 메인 스트로크
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    let x = a.x + (b.x - a.x) * t;
+    let y = a.y + (b.y - a.y) * t;
+
+    // 시작점과 끝점이 아닐 때만 지그재그 효과 추가
+    if (i > 0 && i < segments) {
+      const perpX = -(b.y - a.y) / distance;
+      const perpY = (b.x - a.x) / distance;
+      const zigzagAmount = (Math.random() - 0.5) * 40 * Math.sin(t * Math.PI);
+      x += perpX * zigzagAmount;
+      y += perpY * zigzagAmount;
+    }
+
+    points.push({ x, y });
+  }
+
+  // 검은색 테두리
+  ctx.strokeStyle = `rgba(0, 0, 0, ${0.8 * alpha})`;
+  ctx.lineWidth = 8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 6;
   ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
+  for (let i = 0; i < points.length; i++) {
+    if (i === 0) {
+      ctx.moveTo(points[i].x, points[i].y);
+    } else {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+  }
   ctx.stroke();
 
-  // 외곽 글로우
-  ctx.globalAlpha = 0.20 * alpha;
-  ctx.lineWidth = 12;
+  // 전기 번개 색상 (밝은 파란색-흰색)
+  const lightningGrad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+  lightningGrad.addColorStop(0, `rgba(135, 206, 255, ${0.95 * alpha})`); // 하늘색
+  lightningGrad.addColorStop(0.5, `rgba(255, 255, 255, ${1.0 * alpha})`); // 흰색
+  lightningGrad.addColorStop(1, `rgba(173, 216, 230, ${0.9 * alpha})`); // 연한 파란색
+  ctx.strokeStyle = lightningGrad;
+
+  // 메인 번개
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    if (i === 0) {
+      ctx.moveTo(points[i].x, points[i].y);
+    } else {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+  }
   ctx.stroke();
 
-  // 소프트 오라
-  ctx.globalAlpha = 0.08 * alpha;
-  ctx.lineWidth = 24;
+  // 내부 밝은 코어
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * alpha})`;
+  ctx.lineWidth = 2;
   ctx.stroke();
+
+  // 전기 스파크 효과
+  for (let i = 1; i < points.length - 1; i++) {
+    if (Math.random() < 0.3) {
+      const sparkLength = 10 + Math.random() * 15;
+      const angle = Math.random() * Math.PI * 2;
+      const sparkX = points[i].x + Math.cos(angle) * sparkLength;
+      const sparkY = points[i].y + Math.sin(angle) * sparkLength;
+
+      ctx.strokeStyle = `rgba(135, 206, 255, ${0.6 * alpha})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(points[i].x, points[i].y);
+      ctx.lineTo(sparkX, sparkY);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawElectrocutionEffect(worldPos, size) {
+  const screen = worldToScreen(worldPos);
+  const radius = size / 2 + 10;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  // 감전 플래시 효과 (파란 빛 오버레이)
+  const flashIntensity = Math.sin(Date.now() * 0.02) * 0.3 + 0.5;
+  ctx.fillStyle = `rgba(135, 206, 255, ${0.3 * flashIntensity})`;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 전기 스파크 효과들
+  const sparkCount = 8;
+  const time = Date.now() * 0.01;
+
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = (i / sparkCount) * Math.PI * 2 + time;
+    const distance = radius + Math.sin(time + i) * 8;
+    const sparkX = screen.x + Math.cos(angle) * distance;
+    const sparkY = screen.y + Math.sin(angle) * distance;
+
+    // 작은 전기 스파크
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.7 + Math.sin(time * 2 + i) * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    // 지그재그 스파크 모양
+    const sparkLength = 12;
+    const segments = 4;
+    for (let j = 0; j <= segments; j++) {
+      const t = j / segments;
+      const sparkEndX = sparkX + Math.cos(angle + Math.PI * 0.1) * sparkLength * t;
+      const sparkEndY = sparkY + Math.sin(angle + Math.PI * 0.1) * sparkLength * t;
+
+      // 지그재그 효과
+      const zigzag = Math.sin(t * Math.PI * 4) * 3;
+      const perpX = -Math.sin(angle + Math.PI * 0.1);
+      const perpY = Math.cos(angle + Math.PI * 0.1);
+
+      const finalX = sparkEndX + perpX * zigzag;
+      const finalY = sparkEndY + perpY * zigzag;
+
+      if (j === 0) {
+        ctx.moveTo(sparkX, sparkY);
+      } else {
+        ctx.lineTo(finalX, finalY);
+      }
+    }
+    ctx.stroke();
+  }
+
+  // 중앙 전기 코어
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.8 + Math.sin(time * 3) * 0.2})`;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
@@ -2967,6 +3202,11 @@ function drawBossEntity(boss) {
   ctx.rotate(boss.facingAngle || 0);
   ctx.drawImage(sprites.boss, -size / 2, -size / 2, size, size);
   ctx.restore();
+
+  // 보스 감전 효과 그리기
+  if (boss.electrocuted && boss.electrocutionFlash > 0) {
+    drawElectrocutionEffect(boss.pos, size);
+  }
 }
 
 function drawBossWarning() {

@@ -30,10 +30,10 @@ export const SPRINKLE_TURN_RATE = Math.PI * 6;
 export const SPRINKLE_TRIGGER_RADIUS = 100;
 
 // 경험치 보상
-export const XP_REWARD_PINK = 20;
-export const XP_REWARD_PURPLE = 80;
-export const XP_REWARD_DARK_BLUE = 200;
-export const XP_REWARD_BOSS = 1000;
+export const XP_REWARD_PINK = 50;
+export const XP_REWARD_PURPLE = 100;
+export const XP_REWARD_DARK_BLUE = 400;
+export const XP_REWARD_BOSS = 5000;
 
 // 특별 스테이지 설정
 export const STAGE_THREE_SURVIVAL_TIME = 60 * 15; // 15분
@@ -128,18 +128,18 @@ export const UPGRADE_DEFINITIONS = {
   multi_shot: { title: '김 추가', max: 5 },
   double_shot: { title: '더블 발사', max: 5 },
   sprinkle: { title: '스프링클', max: 5 },
-  deulgireum_rapid: { title: '들기름(연사)', max: 1 },
-  blade: { title: '김시리즈', max: 5 },
+  deulgireum_rapid: { title: '들기름', max: 1 },
+  blade: { title: '킴스클럽', max: 5 },
   em_field: { title: '슈크림', max: 5 },
   ganjang_gim: { title: '간장김', max: 1 },
   kim_bugak: { title: '김부각', max: 1 },
-  full_heal: { title: '라이프 회복', max: 5 },
+  full_heal: { title: '부스러기 획득', max: 5 },
 };
 
 export const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'sprinkle', 'deulgireum_rapid', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'full_heal'];
 
 // Gim variants
-export const GIM_VARIANTS = ['광성김', '성경김', '광천김', '재래김', '독도김'];
+export const GIM_VARIANTS = ['독도김','성경김', '광천김', '성광김', '재래김'];
 
 // Donut types
 export const DONUT_TYPES = ['boston_creme', 'cocoa_frosted', 'bavarian_filled', 'glazed_ring', 'signature_knotted'];
