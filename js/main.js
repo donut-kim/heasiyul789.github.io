@@ -1422,7 +1422,7 @@ function spawnToothpasteItem() {
   for (let i = 0; i < attempts; i++) {
     const x = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
     const y = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
-    if (!collidesWithObstacles(x, y, constants.PLAYER_SIZE)) {
+    if (!collidesWithObstacles(x, y, 44)) {
       state.toothpasteItems.push({ pos: vector(x, y) });
       return true;
     }
@@ -2497,6 +2497,13 @@ function handleEnemyProjectiles(dt) {
       state.playerHealth -= 2;
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
+
+      // 보스를 플레이어로부터 뒤로 팅겨내기
+      const knockbackDistance = 120;
+      const direction = vectorNormalize(vectorSub(state.boss.pos, state.playerPos));
+      const knockbackVector = vectorScale(direction, knockbackDistance);
+      state.boss.pos = vectorAdd(state.boss.pos, knockbackVector);
+
       if (state.playerHealth <= 0) {
         handleGameOver();
       }
