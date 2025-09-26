@@ -1059,10 +1059,11 @@ function ensureChunk(cx, cy) {
   for (let i = 0; i < count; i++) {
     const width = randInt(80, 160);
     const height = randInt(60, 140);
-    const xMin = clamp(minX + 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - width - 40);
-    const xMax = clamp(maxX - width - 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - width - 40);
-    const yMin = clamp(minY + 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - height - 40);
-    const yMax = clamp(maxY - height - 40, -constants.WORLD_BOUNDS + 40, constants.WORLD_BOUNDS - height - 40);
+    const bounds = getCurrentWorldBounds();
+    const xMin = clamp(minX + 40, -bounds + 40, bounds - width - 40);
+    const xMax = clamp(maxX - width - 40, -bounds + 40, bounds - width - 40);
+    const yMin = clamp(minY + 40, -bounds + 40, bounds - height - 40);
+    const yMax = clamp(maxY - height - 40, -bounds + 40, bounds - height - 40);
     if (xMax <= xMin || yMax <= yMin) continue;
     const x = randInt(xMin, xMax);
     const y = randInt(yMin, yMax);
@@ -1111,19 +1112,30 @@ function enterStageThree() {
   if (state.stageThreeActive) return;
   state.stage = 3;
   state.stageThreeActive = true;
-  state.stageTheme = 'space';
+  state.stageTheme = 'grassland';
   state.elapsed = 0;
   state.spawnTimer = constants.SPAWN_INTERVAL;
   state.boss = null;
   state.bossWarningTimer = 0;
+
+  // 기존 맵 완전히 제거 - 모든 장애물과 청크 삭제
   obstacles.length = 0;
   generatedChunks.clear();
 
-  // 기존 적들도 즉시 느려지도록 조정
-  const slowdown = getStageSpeedMultiplier();
-  state.enemies.forEach((enemy) => {
-    enemy.speed *= slowdown;
-  });
+  // 모든 기존 적들 제거 (새로운 작은 맵에서 새로 스폰됨)
+  state.enemies = [];
+  state.enemyProjectiles = [];
+
+  // 스킬들이 이미 획득되어 있다면 타이머를 리셋하여 즉시 사용 가능하게 함
+  if (state.upgradeLevels.sprinkle > 0) {
+    state.sprinkleTimer = 0;
+  }
+  if (state.emFieldCount > 0) {
+    state.emCooldown = 0;
+  }
+
+  // 플레이어 위치는 유지하되, 새로운 작은 맵 경계 내로 클램프
+  clampWorldPosition(state.playerPos);
 }
 
 function handleStageThreeVictory() {
@@ -1489,8 +1501,9 @@ function spawnToothpasteItem() {
   const toothpasteSize = 44;
   const clearanceRadius = toothpasteSize + 20; // 치약 크기 + 20픽셀 여유분
   for (let i = 0; i < attempts; i++) {
-    const x = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
-    const y = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
+    const bounds = getCurrentWorldBounds();
+    const x = randRange(-bounds + margin, bounds - margin);
+    const y = randRange(-bounds + margin, bounds - margin);
     if (!collidesWithObstacles(x, y, clearanceRadius)) {
       state.toothpasteItems.push({ pos: vector(x, y) });
       return true;
@@ -1612,6 +1625,10 @@ function detonateMine() {
 
 function getStageSpeedMultiplier() {
   return state.stage >= 3 ? 0.1 : 1;
+}
+
+function getCurrentWorldBounds() {
+  return state.stage >= 3 ? constants.STAGE_THREE_WORLD_BOUNDS : constants.WORLD_BOUNDS;
 }
 
 function spawnEnemy() {
@@ -1796,8 +1813,9 @@ function updateBoss(dt) {
 }
 
 function clampWorldPosition(pos) {
-  pos.x = clamp(pos.x, -constants.WORLD_BOUNDS, constants.WORLD_BOUNDS);
-  pos.y = clamp(pos.y, -constants.WORLD_BOUNDS, constants.WORLD_BOUNDS);
+  const bounds = getCurrentWorldBounds();
+  pos.x = clamp(pos.x, -bounds, bounds);
+  pos.y = clamp(pos.y, -bounds, bounds);
 }
 
 function moveWithCollision(position, movement, colliderSize) {
@@ -2064,9 +2082,7 @@ function recomputeBlades(dt) {
   }
 }
 
-function rotate90(vec) {
-  return vector(-vec.y, vec.x);
-}
+// 사용하지 않는 함수 제거됨
 
 function spawnProjectile(direction) {
   const norm = vectorNormalize(direction);
@@ -2575,7 +2591,8 @@ function handleEnemyProjectiles(dt) {
     projectile.pos = vectorAdd(projectile.pos, vectorScale(projectile.dir, projectile.speed * dt));
 
     // 화면 밖으로 나가면 제거
-    if (Math.abs(projectile.pos.x) > constants.WORLD_BOUNDS || Math.abs(projectile.pos.y) > constants.WORLD_BOUNDS) {
+    const bounds = getCurrentWorldBounds();
+    if (Math.abs(projectile.pos.x) > bounds || Math.abs(projectile.pos.y) > bounds) {
       continue;
     }
 
@@ -2745,6 +2762,10 @@ function drawBackground() {
     drawSpaceBackground();
     return;
   }
+  if (state.stageTheme === 'grassland') {
+    drawGrasslandBackground();
+    return;
+  }
   const { worldW, worldH, halfW, halfH } = getWorldDims();
 
   // ===== 나무쟁반 배경 =====
@@ -2817,6 +2838,176 @@ function drawBackground() {
   }
   ctx.globalAlpha = 1;
 }
+
+function drawGrasslandBackground() {
+  const { worldW, worldH } = getWorldDims();
+
+  // 하늘 그라디언트 (밝은 파란 하늘) - 전체 화면
+  const skyGradient = ctx.createLinearGradient(0, 0, 0, worldH);
+  skyGradient.addColorStop(0, '#87ceeb'); // 스카이 블루
+  skyGradient.addColorStop(0.7, '#98e4ff'); // 연한 하늘색
+  skyGradient.addColorStop(1, '#b8f5b8'); // 연한 초록 (지평선 근처)
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, worldW, worldH);
+
+  // 잔디밭 (밝은 초록색) - 전체 화면 하단
+  const grassGradient = ctx.createLinearGradient(0, worldH * 0.6, 0, worldH);
+  grassGradient.addColorStop(0, '#7dd87d'); // 밝은 초록
+  grassGradient.addColorStop(0.5, '#66bb6a'); // 중간 초록
+  grassGradient.addColorStop(1, '#4caf50'); // 진한 초록
+  ctx.fillStyle = grassGradient;
+  ctx.fillRect(0, worldH * 0.6, worldW, worldH * 0.4);
+
+  // 월드 좌표 기준으로 고정된 배경 요소들 그리기
+  drawFixedVillageElements();
+}
+
+// 월드 좌표에 고정된 마을 요소들 그리기
+function drawFixedVillageElements() {
+
+  // 월드 좌표에서의 고정 위치들 (맵 전체에 분산 배치)
+  const houses = [
+    { worldX: -400, worldY: -200, w: 60, h: 50 },
+    { worldX: 300, worldY: -300, w: 70, h: 55 },
+    { worldX: -100, worldY: 250, w: 55, h: 45 },
+    { worldX: 450, worldY: 150, w: 65, h: 60 },
+    { worldX: -350, worldY: 100, w: 50, h: 40 },
+  ];
+
+  for (const house of houses) {
+    // 화면 좌표로 변환
+    const screenPos = worldToScreen(vector(house.worldX, house.worldY));
+
+    // 화면 밖이면 그리지 않음 (최적화)
+    if (screenPos.x < -100 || screenPos.x > canvas.width + 100 ||
+        screenPos.y < -100 || screenPos.y > canvas.height + 100) continue;
+
+    // 집 본체 (벽)
+    ctx.fillStyle = '#f4e4bc'; // 크림색 벽
+    ctx.fillRect(screenPos.x, screenPos.y, house.w, house.h);
+
+    // 지붕
+    ctx.fillStyle = '#d32f2f'; // 빨간 지붕
+    ctx.beginPath();
+    ctx.moveTo(screenPos.x - 5, screenPos.y);
+    ctx.lineTo(screenPos.x + house.w / 2, screenPos.y - house.h * 0.4);
+    ctx.lineTo(screenPos.x + house.w + 5, screenPos.y);
+    ctx.closePath();
+    ctx.fill();
+
+    // 문
+    ctx.fillStyle = '#8d6e63'; // 갈색 문
+    const doorW = house.w * 0.3;
+    const doorH = house.h * 0.6;
+    ctx.fillRect(screenPos.x + house.w / 2 - doorW / 2, screenPos.y + house.h - doorH, doorW, doorH);
+
+    // 창문
+    ctx.fillStyle = '#42a5f5'; // 파란 창문
+    const winSize = house.w * 0.15;
+    ctx.fillRect(screenPos.x + house.w * 0.2, screenPos.y + house.h * 0.3, winSize, winSize);
+    ctx.fillRect(screenPos.x + house.w * 0.65, screenPos.y + house.h * 0.3, winSize, winSize);
+  }
+
+  // 나무들
+  const trees = [
+    { worldX: -500, worldY: -100, size: 30 },
+    { worldX: 200, worldY: -450, size: 40 },
+    { worldX: -250, worldY: 350, size: 35 },
+    { worldX: 400, worldY: -50, size: 25 },
+    { worldX: 100, worldY: 300, size: 45 },
+    { worldX: -600, worldY: 200, size: 35 },
+    { worldX: 550, worldY: -200, size: 30 },
+  ];
+
+  for (const tree of trees) {
+    // 화면 좌표로 변환
+    const screenPos = worldToScreen(vector(tree.worldX, tree.worldY));
+
+    // 화면 밖이면 그리지 않음 (최적화)
+    if (screenPos.x < -100 || screenPos.x > canvas.width + 100 ||
+        screenPos.y < -100 || screenPos.y > canvas.height + 100) continue;
+
+    // 나무 줄기
+    ctx.fillStyle = '#8d6e63'; // 갈색 줄기
+    const trunkW = tree.size * 0.2;
+    const trunkH = tree.size * 0.8;
+    ctx.fillRect(screenPos.x - trunkW / 2, screenPos.y, trunkW, trunkH);
+
+    // 나무 잎
+    ctx.fillStyle = '#2e7d32'; // 진한 초록 잎
+    ctx.beginPath();
+    ctx.arc(screenPos.x, screenPos.y + trunkH * 0.2, tree.size, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 밝은 초록 하이라이트
+    ctx.fillStyle = '#4caf50';
+    ctx.beginPath();
+    ctx.arc(screenPos.x - tree.size * 0.3, screenPos.y, tree.size * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 꽃들
+  const flowers = [
+    { worldX: -300, worldY: -50, color: '#ff5722' }, // 빨간 꽃
+    { worldX: 150, worldY: -200, color: '#ffeb3b' }, // 노란 꽃
+    { worldX: -50, worldY: 180, color: '#e91e63' }, // 분홍 꽃
+    { worldX: 250, worldY: 100, color: '#9c27b0' }, // 보라 꽃
+    { worldX: -450, worldY: 250, color: '#ff9800' }, // 주황 꽃
+    { worldX: 350, worldY: -350, color: '#ff5722' },
+    { worldX: -150, worldY: -300, color: '#ffeb3b' },
+    { worldX: 500, worldY: 50, color: '#e91e63' },
+  ];
+
+  for (const flower of flowers) {
+    // 화면 좌표로 변환
+    const screenPos = worldToScreen(vector(flower.worldX, flower.worldY));
+
+    // 화면 밖이면 그리지 않음 (최적화)
+    if (screenPos.x < -20 || screenPos.x > canvas.width + 20 ||
+        screenPos.y < -20 || screenPos.y > canvas.height + 20) continue;
+
+    ctx.fillStyle = flower.color;
+    ctx.beginPath();
+    ctx.arc(screenPos.x, screenPos.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 꽃 중심 (노란색)
+    ctx.fillStyle = '#ffeb3b';
+    ctx.beginPath();
+    ctx.arc(screenPos.x, screenPos.y, 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 구름들 (높은 하늘에 고정)
+  const clouds = [
+    { worldX: -600, worldY: -600, size: 40 },
+    { worldX: 400, worldY: -700, size: 50 },
+    { worldX: 0, worldY: -650, size: 35 },
+    { worldX: 700, worldY: -680, size: 30 },
+    { worldX: -300, worldY: -720, size: 25 },
+  ];
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  for (const cloud of clouds) {
+    // 화면 좌표로 변환
+    const screenPos = worldToScreen(vector(cloud.worldX, cloud.worldY));
+
+    // 화면 밖이면 그리지 않음 (최적화)
+    if (screenPos.x < -200 || screenPos.x > canvas.width + 200 ||
+        screenPos.y < -200 || screenPos.y > canvas.height + 200) continue;
+
+    // 구름 그리기 (여러 원으로 구성)
+    ctx.beginPath();
+    ctx.arc(screenPos.x - cloud.size * 0.3, screenPos.y, cloud.size * 0.6, 0, Math.PI * 2);
+    ctx.arc(screenPos.x, screenPos.y, cloud.size, 0, Math.PI * 2);
+    ctx.arc(screenPos.x + cloud.size * 0.3, screenPos.y, cloud.size * 0.7, 0, Math.PI * 2);
+    ctx.arc(screenPos.x - cloud.size * 0.1, screenPos.y - cloud.size * 0.3, cloud.size * 0.5, 0, Math.PI * 2);
+    ctx.arc(screenPos.x + cloud.size * 0.1, screenPos.y - cloud.size * 0.2, cloud.size * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// 사용하지 않는 함수들 제거됨
 
 function drawSpaceBackground() {
   const { worldW, worldH, halfW, halfH } = getWorldDims();
@@ -2964,11 +3155,12 @@ function drawObstacles() {
 }
 
 function drawWorldBounds() {
+  const bounds = getCurrentWorldBounds();
   const corners = [
-    vector(-constants.WORLD_BOUNDS, -constants.WORLD_BOUNDS),
-    vector(constants.WORLD_BOUNDS, -constants.WORLD_BOUNDS),
-    vector(constants.WORLD_BOUNDS, constants.WORLD_BOUNDS),
-    vector(-constants.WORLD_BOUNDS, constants.WORLD_BOUNDS),
+    vector(-bounds, -bounds),
+    vector(bounds, -bounds),
+    vector(bounds, bounds),
+    vector(-bounds, bounds),
   ].map(worldToScreen);
   ctx.strokeStyle = 'rgba(255,255,255,0.8)';
   ctx.lineWidth = 6;

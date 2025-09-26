@@ -6,6 +6,7 @@ export const HALF_HEIGHT = HEIGHT / 2;
 
 // 세계 설정
 export const WORLD_BOUNDS = 2200;
+export const STAGE_THREE_WORLD_BOUNDS = 880; // 기존 4배 크기
 export const CHUNK_SIZE = 400;
 export const CAMERA_VIEWPORT_MARGIN = 120;
 
