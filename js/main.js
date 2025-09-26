@@ -1174,6 +1174,7 @@ function restartGame() {
 
 function startGame() {
   resetGameplayState();
+  recomputePlayerStats(); // 탄환 갯수 포함 플레이어 스탯 초기화
   obstacles.length = 0;
   generatedChunks.clear();
   ensureChunksAroundPlayer();
@@ -1198,21 +1199,73 @@ function attemptStart() {
 
 const RAPID_BURST_DELAY = 0.12;
 
-const upgradeDescriptions = {
-  speed: (next) => `세균이 무서워 빨리도망가자!! +${next * 12}%`,
-  attack_speed: (next) => `조금 더 빠르게 때려볼까 !? -${next * 10}%`,
-  multi_shot: (next) => `내이름은 카드캡처 체리!`,
-  double_shot: () => '세균이 사방에서 온다고 !?',
-  sprinkle: (next) => {
-    const count = constants.SPRINKLE_BASE_COUNT + (next - 1) * 2;
-    return `이거 아마 방부제가 들어갔을걸...? 맛이 아주 "유도"적이야!`;
+const skillData = {
+  speed: {
+    name: '이속 증가',
+    title: '속도 향상',
+    option: (next) => `이동속도 +${next * 12}%`,
+    description: '세균이 무서워 빨리도망가자!!'
   },
-  deulgireum_rapid: () => '이제 들기름을 곁드린.. 다 고소한맛!',
-  blade: (next) => `브랜드 김! 이제 방부제를 곁드린.... ${next}개`,
-  em_field: () => '슈크림은 잘 터져서 큰일이야 ㅠㅠ (연쇄공격)',
-  ganjang_gim: () => '간장공장공장장',
-  kim_bugak: () => '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!',
-  full_heal: () => '빠..빵가루가 필요해...!',
+  attack_speed: {
+    name: '공속 증가',
+    title: '공격 속도',
+    option: (next) => `공격속도 +${next * 10}%`,
+    description: '조금 더 빠르게 때려볼까 !?'
+  },
+  multi_shot: {
+    name: '김 추가',
+    title: '공격 추가',
+    option: '김 + 1',
+    description: '내이름은 카드캡처 체리!'
+  },
+  double_shot: {
+    name: '더블 발사',
+    title: '양방향공격',
+    option: '김 + 1',
+    description: '김이 여러개지요 ~'
+  },
+  sprinkle: {
+    name: '스프링클',
+    title: '유도탄',
+    option: '유도스프링클 + 2',
+    description: '이거 아마 방부제가 들어갔을걸...?'
+  },
+  deulgireum_rapid: {
+    name: '들기름',
+    title: '연사',
+    option: '기본공격 연사 + 1',
+    description: '이제 들기름을 곁드린.. 더 고소한 맛 !'
+  },
+  blade: {
+    name: '킴스클럽',
+    title: '블레이드',
+    option: '회전 블레이드 김 + 1',
+    description: '브랜드 김! 이제 방부제를 곁드린....'
+  },
+  em_field: {
+    name: '슈크림',
+    title: '레이저',
+    option: '슈크림 연쇄공격 + 3',
+    description: '슈크림은 잘 터져서 큰일이야 ㅠㅠ'
+  },
+  ganjang_gim: {
+    name: '간장김',
+    title: '관통',
+    option: '관통 + 1',
+    description: '간장공장공장장'
+  },
+  kim_bugak: {
+    name: '김부각',
+    title: '기본공격 업그레이드',
+    option: '장애물 무시',
+    description: '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!'
+  },
+  full_heal: {
+    name: '부스러기 획득',
+    title: 'HP회복',
+    option: '체력 완전 회복',
+    description: '빠..빵가루가 필요해...!'
+  }
 };
 
 function rollUpgradeCards() {
@@ -1269,14 +1322,28 @@ function renderUpgradeOverlay() {
     const current = state.upgradeLevels[key];
     const next = current + 1;
     const card = document.createElement('div');
-    card.className = 'upgrade-card';
+    const isSpecialSkill = key === 'deulgireum_rapid' || key === 'ganjang_gim' || key === 'kim_bugak';
+    card.className = isSpecialSkill ? 'upgrade-card special-skill-card' : 'upgrade-card';
     card.dataset.index = String(index);
-    const titleStyle = (key === 'ganjang_gim' || key === 'kim_bugak') ? 'style="color: #4ade80;"' : '';
+    const skill = skillData[key];
+    if (!skill) return;
+
+    const skillName = skill.name;
+    const skillTitle = skill.title;
+    const skillOption = typeof skill.option === 'function' ? skill.option(next) : skill.option;
+    const skillDescription = skill.description;
+    const skillLevel = `Lv.${next} / ${def.max}`;
+
+    const titleStyle = isSpecialSkill ? 'color: #4ade80;' : 'color: #f0f6ff;';
+
     card.innerHTML = `
-      <div class="card-title" ${titleStyle}>${def.title}</div>
-      <div class="card-level">Lv.${next} / ${def.max}</div>
-      <div class="card-desc">${(upgradeDescriptions[key] || (() => '효과 없음'))(next)}</div>
-      <div class="card-hint">선택키: ${index + 1}</div>
+      <div class="card-skill-name" style="font-size: 12px; color: #888; text-align: center; margin-bottom: 4px;">스킬</div>
+      <div class="card-title" style="${titleStyle} font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 6px;">${skillName}</div>
+      <div class="card-skill-title" style="font-size: 14px; color: #fbbf24; text-align: center; margin-bottom: 4px;">${skillTitle}</div>
+      <div class="card-skill-option" style="font-size: 13px; color: #60a5fa; text-align: center; margin-bottom: 6px;">${skillOption}</div>
+      <div class="card-skill-desc" style="font-size: 12px; color: #d1d5db; text-align: left; margin-bottom: 6px;">${skillDescription}</div>
+      <div class="card-level" style="font-size: 12px; color: #9ca3af; text-align: center;">${skillLevel}</div>
+      <div class="card-hint" style="font-size: 11px; color: #6b7280; text-align: center; margin-top: 4px;">선택키: ${index + 1}</div>
     `;
     card.addEventListener('click', () => applyUpgrade(index));
     upgradeCardsWrapper.appendChild(card);
@@ -1361,7 +1428,7 @@ function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
   if (scoreDelta > 0) {
     state.score += scoreDelta;
   }
-  if (xpDelta > 0) {
+  if (xpDelta > 0 && state.level < 20) {
     state.xp += xpDelta;
   }
 }
@@ -1419,10 +1486,12 @@ function triggerLevelBlast() {
 function spawnToothpasteItem() {
   const attempts = 24;
   const margin = 40;
+  const toothpasteSize = 44;
+  const clearanceRadius = toothpasteSize + 20; // 치약 크기 + 20픽셀 여유분
   for (let i = 0; i < attempts; i++) {
     const x = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
     const y = randRange(-constants.WORLD_BOUNDS + margin, constants.WORLD_BOUNDS - margin);
-    if (!collidesWithObstacles(x, y, 44)) {
+    if (!collidesWithObstacles(x, y, clearanceRadius)) {
       state.toothpasteItems.push({ pos: vector(x, y) });
       return true;
     }
@@ -1494,7 +1563,7 @@ function resolvePendingLevelBlast() {
 function processLevelUps() {
   if (processingLevelChain) return;
   setProcessingLevelChain(true);
-  while (state.xp >= state.xpToNext && !state.selectingUpgrade) {
+  while (state.xp >= state.xpToNext && !state.selectingUpgrade && state.level < 20) {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = xpRequired(state.level);
