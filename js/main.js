@@ -2129,20 +2129,108 @@ function clampWorldPosition(pos) {
 }
 
 function moveWithCollision(position, movement, colliderSize) {
-  const newPos = vectorCopy(position);
-  if (movement.x !== 0) {
-    newPos.x += movement.x;
-    if (collidesWithObstacles(newPos.x, position.y, colliderSize)) {
-      newPos.x -= movement.x;
+  // 이동하려는 목표 위치
+  const targetPos = vectorAdd(position, movement);
+
+  // 충돌이 없으면 그대로 이동
+  if (!collidesWithObstacles(targetPos.x, targetPos.y, colliderSize)) {
+    return targetPos;
+  }
+
+  // 부드러운 미끄러짐을 위한 다단계 시도
+  let currentPos = vectorCopy(position);
+  let remainingMovement = vectorCopy(movement);
+  const radius = colliderSize / 2;
+  const maxIterations = 3;
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    if (vectorLengthSq(remainingMovement) < 0.001) break;
+
+    // 이동할 위치 계산
+    const testPos = vectorAdd(currentPos, remainingMovement);
+
+    // 충돌 검사
+    if (!collidesWithObstacles(testPos.x, testPos.y, colliderSize)) {
+      currentPos = testPos;
+      break;
+    }
+
+    // 충돌하는 장애물 찾기
+    let blockingObstacle = null;
+    let minPenetration = Infinity;
+
+    for (const obs of obstacles) {
+      const distToObstacle = distance(testPos, obs.center);
+      const requiredDistance = radius + obs.radius;
+      const penetration = requiredDistance - distToObstacle;
+
+      if (penetration > 0 && penetration < minPenetration) {
+        minPenetration = penetration;
+        blockingObstacle = obs;
+      }
+    }
+
+    if (!blockingObstacle) break;
+
+    // 충돌 표면의 법선 벡터 계산
+    const toPlayer = vectorSub(currentPos, blockingObstacle.center);
+    const normal = vectorNormalize(toPlayer);
+
+    // 움직임을 표면에 투영 (벽을 뚫고 들어가는 성분 제거)
+    const dotProduct = remainingMovement.x * normal.x + remainingMovement.y * normal.y;
+
+    if (dotProduct < 0) {
+      // 벽으로 향하는 성분을 제거하고 표면 평행 성분만 유지
+      const slidingMovement = vector(
+        remainingMovement.x - normal.x * dotProduct,
+        remainingMovement.y - normal.y * dotProduct
+      );
+
+      // 미끄러짐 움직임의 강도를 약간 줄여서 더 부드럽게
+      const slidingFactor = 0.95;
+      remainingMovement = vectorScale(slidingMovement, slidingFactor);
+
+      // 미끄러짐 이동 시도
+      const slideTarget = vectorAdd(currentPos, remainingMovement);
+      if (!collidesWithObstacles(slideTarget.x, slideTarget.y, colliderSize)) {
+        currentPos = slideTarget;
+        break;
+      }
+
+      // 미끄러짐도 안되면 작은 단위로 시도
+      const steps = 8;
+      const stepMovement = vectorScale(remainingMovement, 1 / steps);
+
+      for (let step = 0; step < steps; step++) {
+        const nextPos = vectorAdd(currentPos, stepMovement);
+        if (!collidesWithObstacles(nextPos.x, nextPos.y, colliderSize)) {
+          currentPos = nextPos;
+        } else {
+          break;
+        }
+      }
+
+      // 남은 움직임 감소
+      remainingMovement = vectorScale(remainingMovement, 0.5);
+    } else {
+      // 벽에서 멀어지는 방향이면 그대로 시도
+      break;
     }
   }
-  if (movement.y !== 0) {
-    newPos.y += movement.y;
-    if (collidesWithObstacles(newPos.x, newPos.y, colliderSize)) {
-      newPos.y -= movement.y;
+
+  // 플레이어가 장애물에 끼어있는지 확인하고 밀어내기
+  for (const obs of obstacles) {
+    const distToObstacle = distance(currentPos, obs.center);
+    const requiredDistance = radius + obs.radius + 0.5; // 0.5픽셀 여유
+
+    if (distToObstacle < requiredDistance) {
+      const pushDirection = vectorNormalize(vectorSub(currentPos, obs.center));
+      const pushDistance = requiredDistance - distToObstacle;
+      currentPos = vectorAdd(currentPos, vectorScale(pushDirection, pushDistance));
     }
   }
-  return newPos;
+
+  return currentPos;
 }
 
 
