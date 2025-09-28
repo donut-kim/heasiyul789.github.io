@@ -1,5 +1,5 @@
 // Sprite creation functions
-import { PLAYER_SIZE, ENEMY_SIZE, BIG_ENEMY_SIZE, BOSS_RADIUS, BLADE_SIZE, BULLET_SIZE, MINE_SIZE, GIM_VARIANTS } from './constants.js';
+import { PLAYER_SIZE, ENEMY_SIZE, BIG_ENEMY_SIZE, BOSS_RADIUS, BLADE_SIZE, BULLET_SIZE, MINE_SIZE, GIM_VARIANTS, BLACK_DUST_SIZE } from './constants.js';
 import { roundRect } from './utils.js';
 
 // Donut styles configuration
@@ -299,6 +299,95 @@ export function createBacteriaSpritePurple(size) {
   return off;
 }
 
+export function createBlackDustSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const radius = center - 2;
+
+  const baseRadius = radius * 0.8;
+
+  ict.fillStyle = '#1a1a1a';
+  ict.beginPath();
+  ict.arc(center, center, baseRadius, 0, Math.PI * 2);
+  ict.fill();
+
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const legLength = baseRadius * 0.6;
+    const legWidth = 2;
+
+    const startX = center + Math.cos(angle) * baseRadius * 0.8;
+    const startY = center + Math.sin(angle) * baseRadius * 0.8;
+    const endX = center + Math.cos(angle) * (baseRadius + legLength);
+    const endY = center + Math.sin(angle) * (baseRadius + legLength);
+
+    ict.strokeStyle = '#2a2a2a';
+    ict.lineWidth = legWidth;
+    ict.lineCap = 'round';
+    ict.beginPath();
+    ict.moveTo(startX, startY);
+    ict.lineTo(endX, endY);
+    ict.stroke();
+  }
+
+  ict.fillStyle = '#000000';
+  ict.beginPath();
+  ict.arc(center, center, baseRadius * 0.9, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.fillStyle = '#333333';
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * baseRadius * 0.6;
+    const x = center + Math.cos(angle) * dist;
+    const y = center + Math.sin(angle) * dist;
+    const dotSize = 1 + Math.random() * 2;
+
+    ict.beginPath();
+    ict.arc(x, y, dotSize, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  ict.fillStyle = '#ffffff';
+  const eyeOffset = baseRadius * 0.3;
+  const eyeSize = baseRadius * 0.15;
+
+  ict.beginPath();
+  ict.arc(center - eyeOffset, center - eyeOffset * 0.5, eyeSize, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.beginPath();
+  ict.arc(center + eyeOffset, center - eyeOffset * 0.5, eyeSize, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.fillStyle = '#000000';
+  const pupilSize = eyeSize * 0.6;
+
+  ict.beginPath();
+  ict.arc(center - eyeOffset, center - eyeOffset * 0.5, pupilSize, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.beginPath();
+  ict.arc(center + eyeOffset, center - eyeOffset * 0.5, pupilSize, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.fillStyle = '#ffffff';
+  const highlightSize = pupilSize * 0.3;
+
+  ict.beginPath();
+  ict.arc(center - eyeOffset + highlightSize * 0.5, center - eyeOffset * 0.5 - highlightSize * 0.5, highlightSize, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.beginPath();
+  ict.arc(center + eyeOffset + highlightSize * 0.5, center - eyeOffset * 0.5 - highlightSize * 0.5, highlightSize, 0, Math.PI * 2);
+  ict.fill();
+
+  return off;
+}
+
 // Additional sprite creation functions would be added here
 // (createGimSprite, createSeaweedSprite, createMineSprite, etc.)
 
@@ -454,6 +543,7 @@ export const sprites = {
   glazedDonut: createGlazedDonutSprite(PLAYER_SIZE),
   enemy: createBacteriaSprite(ENEMY_SIZE),
   bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
+  blackDust: createBlackDustSprite(BLACK_DUST_SIZE),
   boss: createClampBossSprite(BOSS_RADIUS * 2.6),
   // Additional sprites would be initialized here
 };

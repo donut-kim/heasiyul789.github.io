@@ -34,6 +34,8 @@ export const SPRINKLE_TRIGGER_RADIUS = 100;
 export const XP_REWARD_PINK = 50;
 export const XP_REWARD_PURPLE = 100;
 export const XP_REWARD_DARK_BLUE = 400;
+export const XP_REWARD_BLACK_DUST = 100;
+export const XP_REWARD_ORANGE_LADYBUG = 1000;
 export const XP_REWARD_BOSS = 5000;
 
 // 특별 스테이지 설정
@@ -61,9 +63,27 @@ export const BIG_ENEMY_SPAWN_CHANCE = 0.35;
 export const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2;
 export const DARK_BLUE_ENEMY_HEALTH = 8;
 export const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7;
-export const DARK_BLUE_ENEMY_FIRE_INTERVAL = 2.5;
-export const DARK_BLUE_PROJECTILE_SIZE = 16;
-export const DARK_BLUE_PROJECTILE_SPEED = 200;
+export const DARK_BLUE_ENEMY_FIRE_INTERVAL = 3.25;
+export const DARK_BLUE_PROJECTILE_SIZE = 8;
+export const DARK_BLUE_PROJECTILE_SPEED = 140;
+
+// 검은 먼지 적 설정 (센과치히로 먼지벌레)
+export const BLACK_DUST_SIZE = BIG_ENEMY_SIZE;
+export const BLACK_DUST_HEALTH = 2;
+export const BLACK_DUST_SPEED = ENEMY_BASE_SPEED * 0.3;
+export const BLACK_DUST_SPAWN_CHANCE = 0.3;
+export const BLACK_DUST_SPAWN_INTERVAL = 5.0;
+export const BLACK_DUST_MIN_COUNT = 3;
+export const BLACK_DUST_MAX_COUNT = 5;
+
+// 주황색 무당벌레 설정 (3스테이지 전용)
+export const ORANGE_LADYBUG_SIZE = ENEMY_SIZE;
+export const ORANGE_LADYBUG_HEALTH = 10;
+export const ORANGE_LADYBUG_SPEED = ENEMY_BASE_SPEED * 1.2;
+export const ORANGE_LADYBUG_SPAWN_INTERVAL_MIN = 5.0;
+export const ORANGE_LADYBUG_SPAWN_INTERVAL_MAX = 10.0;
+export const ORANGE_LADYBUG_ZIGZAG_AMPLITUDE = 80;
+export const ORANGE_LADYBUG_ZIGZAG_FREQUENCY = 2.0;
 
 // 보스 설정
 export const BOSS_SPAWN_TIME = 180.0;

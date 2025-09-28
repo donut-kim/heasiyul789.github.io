@@ -667,10 +667,10 @@ function createClampBossSprite(size) {
   ict.lineCap = 'round';
   ict.lineJoin = 'round';
 
-  // 가위 손잡이 부분
-  const handleLength = size * 0.25;
-  const handleWidth = size * 0.08;
-  const bladeLength = size * 0.35;
+  // 가위 손잡이 부분 (더 크고 위협적으로)
+  const handleLength = size * 0.3;
+  const handleWidth = size * 0.1;
+  const bladeLength = size * 0.45;
 
   // 가위의 금속질감 그라디언트
   const metalGradient = ict.createLinearGradient(-handleLength, -handleLength, handleLength, handleLength);
@@ -678,9 +678,9 @@ function createClampBossSprite(size) {
   metalGradient.addColorStop(0.5, '#d1d5db');
   metalGradient.addColorStop(1, '#6b7280');
 
-  // 위쪽 가위날 (손잡이 포함)
+  // 위쪽 가위날 (손잡이 포함) - 더 위협적인 각도
   ict.save();
-  ict.rotate(-Math.PI / 6);
+  ict.rotate(-Math.PI / 4.5);
 
   // 손잡이
   ict.fillStyle = '#4b5563';
@@ -689,18 +689,33 @@ function createClampBossSprite(size) {
   ict.fillRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
   ict.strokeRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
 
-  // 날 부분
+  // 날 부분 - 더 날카롭고 위험하게
   ict.fillStyle = metalGradient;
   ict.strokeStyle = '#4b5563';
-  ict.lineWidth = size * 0.02;
+  ict.lineWidth = size * 0.025;
   ict.beginPath();
   ict.moveTo(-handleLength * 0.2, 0);
-  ict.lineTo(bladeLength, -handleWidth * 0.3);
-  ict.lineTo(bladeLength + size * 0.08, 0);
-  ict.lineTo(bladeLength, handleWidth * 0.3);
+  ict.lineTo(bladeLength, -handleWidth * 0.5);
+  ict.lineTo(bladeLength + size * 0.12, 0);
+  ict.lineTo(bladeLength, handleWidth * 0.5);
   ict.closePath();
   ict.fill();
   ict.stroke();
+
+  // 가위날에 톱니 추가 (더 가위스럽게)
+  ict.strokeStyle = '#374151';
+  ict.lineWidth = size * 0.01;
+  for (let i = 0; i < 5; i++) {
+    const x = (bladeLength * 0.3) + (i * bladeLength * 0.15);
+    const y1 = -handleWidth * 0.2;
+    const y2 = handleWidth * 0.2;
+    ict.beginPath();
+    ict.moveTo(x, y1);
+    ict.lineTo(x + size * 0.02, y1 - size * 0.015);
+    ict.moveTo(x, y2);
+    ict.lineTo(x + size * 0.02, y2 + size * 0.015);
+    ict.stroke();
+  }
 
   // 날 끝의 눈
   const eyeX = bladeLength + size * 0.04;
@@ -726,9 +741,9 @@ function createClampBossSprite(size) {
 
   ict.restore();
 
-  // 아래쪽 가위날 (손잡이 포함)
+  // 아래쪽 가위날 (손잡이 포함) - 더 위협적인 각도
   ict.save();
-  ict.rotate(Math.PI / 6);
+  ict.rotate(Math.PI / 4.5);
 
   // 손잡이
   ict.fillStyle = '#4b5563';
@@ -737,18 +752,33 @@ function createClampBossSprite(size) {
   ict.fillRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
   ict.strokeRect(-handleLength, -handleWidth / 2, handleLength * 0.8, handleWidth);
 
-  // 날 부분
+  // 날 부분 - 더 날카롭고 위험하게
   ict.fillStyle = metalGradient;
   ict.strokeStyle = '#4b5563';
-  ict.lineWidth = size * 0.02;
+  ict.lineWidth = size * 0.025;
   ict.beginPath();
   ict.moveTo(-handleLength * 0.2, 0);
-  ict.lineTo(bladeLength, -handleWidth * 0.3);
-  ict.lineTo(bladeLength + size * 0.08, 0);
-  ict.lineTo(bladeLength, handleWidth * 0.3);
+  ict.lineTo(bladeLength, -handleWidth * 0.5);
+  ict.lineTo(bladeLength + size * 0.12, 0);
+  ict.lineTo(bladeLength, handleWidth * 0.5);
   ict.closePath();
   ict.fill();
   ict.stroke();
+
+  // 가위날에 톱니 추가 (더 가위스럽게)
+  ict.strokeStyle = '#374151';
+  ict.lineWidth = size * 0.01;
+  for (let i = 0; i < 5; i++) {
+    const x = (bladeLength * 0.3) + (i * bladeLength * 0.15);
+    const y1 = -handleWidth * 0.2;
+    const y2 = handleWidth * 0.2;
+    ict.beginPath();
+    ict.moveTo(x, y1);
+    ict.lineTo(x + size * 0.02, y1 - size * 0.015);
+    ict.moveTo(x, y2);
+    ict.lineTo(x + size * 0.02, y2 + size * 0.015);
+    ict.stroke();
+  }
 
   // 날 끝의 눈
   ict.fillStyle = '#ffffff';
@@ -773,8 +803,8 @@ function createClampBossSprite(size) {
 
   ict.restore();
 
-  // 중심 연결부 (나사/리벳)
-  const centerRadius = size * 0.06;
+  // 중심 연결부 (나사/리벳) - 더 크고 견고하게
+  const centerRadius = size * 0.08;
   const centerGradient = ict.createRadialGradient(0, 0, 0, 0, 0, centerRadius);
   centerGradient.addColorStop(0, '#f3f4f6');
   centerGradient.addColorStop(0.7, '#d1d5db');
@@ -865,6 +895,194 @@ function createBacteriaSpriteDarkBlue(size) {
   return off;
 }
 
+function createBlackDustSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const radius = center - 2;
+
+  const baseRadius = radius * 0.75;
+
+  // 몸체를 더 둥글고 부드럽게
+  const bodyGradient = ict.createRadialGradient(center - baseRadius * 0.3, center - baseRadius * 0.3, 0, center, center, baseRadius);
+  bodyGradient.addColorStop(0, '#3a3a3a');
+  bodyGradient.addColorStop(0.7, '#1a1a1a');
+  bodyGradient.addColorStop(1, '#0a0a0a');
+
+  ict.fillStyle = bodyGradient;
+  ict.beginPath();
+  ict.arc(center, center, baseRadius, 0, Math.PI * 2);
+  ict.fill();
+
+  // 더 짧고 귀여운 다리들 (6개로 줄임)
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const legLength = baseRadius * 0.4;
+    const legWidth = 1.5;
+
+    const startX = center + Math.cos(angle) * baseRadius * 0.7;
+    const startY = center + Math.sin(angle) * baseRadius * 0.7;
+    const endX = center + Math.cos(angle) * (baseRadius + legLength);
+    const endY = center + Math.sin(angle) * (baseRadius + legLength);
+
+    ict.strokeStyle = '#2a2a2a';
+    ict.lineWidth = legWidth;
+    ict.lineCap = 'round';
+    ict.beginPath();
+    ict.moveTo(startX, startY);
+    ict.lineTo(endX, endY);
+    ict.stroke();
+  }
+
+  // 더 부드러운 내부 원
+  const innerGradient = ict.createRadialGradient(center, center, 0, center, center, baseRadius * 0.8);
+  innerGradient.addColorStop(0, '#2a2a2a');
+  innerGradient.addColorStop(1, '#000000');
+
+  ict.fillStyle = innerGradient;
+  ict.beginPath();
+  ict.arc(center, center, baseRadius * 0.8, 0, Math.PI * 2);
+  ict.fill();
+
+  // 귀여운 반짝이 점들
+  ict.fillStyle = '#555555';
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const dist = baseRadius * 0.3 + Math.random() * baseRadius * 0.2;
+    const x = center + Math.cos(angle) * dist;
+    const y = center + Math.sin(angle) * dist;
+    const dotSize = 0.5 + Math.random() * 1;
+
+    ict.beginPath();
+    ict.arc(x, y, dotSize, 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // 더 크고 귀여운 눈 (센과치히로 스타일)
+  ict.fillStyle = '#ffffff';
+  const eyeOffset = baseRadius * 0.4;
+  const eyeSize = baseRadius * 0.4;
+
+  // 왼쪽 눈
+  ict.beginPath();
+  ict.arc(center - eyeOffset, center - eyeOffset * 0.3, eyeSize, 0, Math.PI * 2);
+  ict.fill();
+
+  // 오른쪽 눈
+  ict.beginPath();
+  ict.arc(center + eyeOffset, center - eyeOffset * 0.3, eyeSize, 0, Math.PI * 2);
+  ict.fill();
+
+  // 작은 검은 눈동자 (센과치히로 스타일)
+  ict.fillStyle = '#000000';
+  const pupilSize = eyeSize * 0.25;
+
+  ict.beginPath();
+  ict.arc(center - eyeOffset, center - eyeOffset * 0.3, pupilSize, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.beginPath();
+  ict.arc(center + eyeOffset, center - eyeOffset * 0.3, pupilSize, 0, Math.PI * 2);
+  ict.fill();
+
+  // 귀여운 작은 입 추가
+  ict.fillStyle = '#ffffff';
+  ict.beginPath();
+  ict.arc(center, center + eyeOffset * 0.8, 1, 0, Math.PI * 2);
+  ict.fill();
+
+  return off;
+}
+
+function createOrangeLadybugSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const radius = center - 2;
+
+  // 주황색 몸체 그라디언트
+  const bodyGradient = ict.createRadialGradient(center - radius * 0.3, center - radius * 0.3, radius * 0.1, center, center, radius);
+  bodyGradient.addColorStop(0, '#ff8c42');
+  bodyGradient.addColorStop(0.6, '#ff6b1a');
+  bodyGradient.addColorStop(1, '#e55100');
+
+  ict.fillStyle = bodyGradient;
+  ict.beginPath();
+  ict.arc(center, center, radius, 0, Math.PI * 2);
+  ict.fill();
+
+  // 무당벌레 테두리
+  ict.strokeStyle = '#bf360c';
+  ict.lineWidth = 2;
+  ict.stroke();
+
+  // 무당벌레 중앙 선
+  ict.strokeStyle = '#d84315';
+  ict.lineWidth = 2;
+  ict.beginPath();
+  ict.moveTo(center, center - radius);
+  ict.lineTo(center, center + radius);
+  ict.stroke();
+
+  // 검은 점들 (무당벌레 특징)
+  ict.fillStyle = '#263238';
+  const spots = [
+    { x: -0.4, y: -0.3, size: 0.15 },
+    { x: 0.4, y: -0.3, size: 0.15 },
+    { x: -0.3, y: 0.2, size: 0.12 },
+    { x: 0.3, y: 0.2, size: 0.12 },
+    { x: 0, y: 0.4, size: 0.1 }
+  ];
+
+  spots.forEach(spot => {
+    ict.beginPath();
+    ict.arc(
+      center + spot.x * radius,
+      center + spot.y * radius,
+      spot.size * radius,
+      0, Math.PI * 2
+    );
+    ict.fill();
+  });
+
+  // 무당벌레 머리 부분
+  ict.fillStyle = '#d84315';
+  ict.beginPath();
+  ict.arc(center, center - radius * 0.7, radius * 0.3, 0, Math.PI * 2);
+  ict.fill();
+
+  // 작은 눈
+  ict.fillStyle = '#000000';
+  ict.beginPath();
+  ict.arc(center - radius * 0.15, center - radius * 0.7, radius * 0.08, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.beginPath();
+  ict.arc(center + radius * 0.15, center - radius * 0.7, radius * 0.08, 0, Math.PI * 2);
+  ict.fill();
+
+  // 더듬이
+  ict.strokeStyle = '#263238';
+  ict.lineWidth = 1.5;
+  ict.lineCap = 'round';
+
+  ict.beginPath();
+  ict.moveTo(center - radius * 0.1, center - radius * 0.9);
+  ict.lineTo(center - radius * 0.2, center - radius * 1.1);
+  ict.stroke();
+
+  ict.beginPath();
+  ict.moveTo(center + radius * 0.1, center - radius * 0.9);
+  ict.lineTo(center + radius * 0.2, center - radius * 1.1);
+  ict.stroke();
+
+  return off;
+}
+
 function createEnemyProjectileSprite(size) {
   const off = document.createElement('canvas');
   off.width = size;
@@ -905,7 +1123,9 @@ const sprites = {
   enemy: createBacteriaSprite(constants.ENEMY_SIZE),
   bigEnemy: createBacteriaSpritePurple(constants.BIG_ENEMY_SIZE),
   darkBlueEnemy: createBacteriaSpriteDarkBlue(constants.DARK_BLUE_ENEMY_SIZE),
-  boss: createClampBossSprite(constants.BOSS_RADIUS * 2.6),
+  blackDust: createBlackDustSprite(constants.BLACK_DUST_SIZE),
+  orangeLadybug: createOrangeLadybugSprite(constants.ORANGE_LADYBUG_SIZE),
+  boss: createClampBossSprite(constants.BOSS_RADIUS * 3.2),
   blades: constants.GIM_VARIANTS.map((label) => createGimSprite(constants.BLADE_SIZE, label)),
   bullet: createSeaweedSprite(constants.BULLET_SIZE),
   kimBugakBullet: createKimBugakSprite(Math.round(constants.BULLET_SIZE * 2)),
@@ -1694,6 +1914,62 @@ function spawnDarkBlueEnemy() {
   });
 }
 
+function spawnBlackDustGroup() {
+  const count = randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
+  const baseAngle = randRange(0, Math.PI * 2);
+
+  for (let i = 0; i < count; i++) {
+    const angle = baseAngle + randRange(-Math.PI / 4, Math.PI / 4);
+    const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
+    const pos = vector(
+      state.playerPos.x + Math.cos(angle) * radius,
+      state.playerPos.y + Math.sin(angle) * radius,
+    );
+
+    const baseSpeed = constants.BLACK_DUST_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BLACK_DUST_SPEED;
+    state.enemies.push({
+      id: enemyIdCounter++,
+      pos,
+      speed: baseSpeed * getStageSpeedMultiplier(),
+      health: constants.BLACK_DUST_HEALTH,
+      size: constants.BLACK_DUST_SIZE,
+      sprite: sprites.blackDust,
+      type: 'blackDust',
+      xpReward: constants.XP_REWARD_BLACK_DUST,
+      scoreReward: 15
+    });
+  }
+}
+
+function spawnOrangeLadybug() {
+  // 플레이어 주변에서 먼 곳에 스폰
+  const angle = randRange(0, Math.PI * 2);
+  const radius = randRange(constants.SPAWN_RADIUS_MIN * 1.5, constants.SPAWN_RADIUS_MAX * 1.2);
+  const pos = vector(
+    state.playerPos.x + Math.cos(angle) * radius,
+    state.playerPos.y + Math.sin(angle) * radius,
+  );
+
+  const baseSpeed = constants.ORANGE_LADYBUG_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ORANGE_LADYBUG_SPEED;
+
+  state.enemies.push({
+    id: enemyIdCounter++,
+    pos,
+    speed: baseSpeed * getStageSpeedMultiplier(),
+    health: constants.ORANGE_LADYBUG_HEALTH,
+    size: constants.ORANGE_LADYBUG_SIZE,
+    sprite: sprites.orangeLadybug,
+    type: 'orangeLadybug',
+    xpReward: constants.XP_REWARD_ORANGE_LADYBUG,
+    scoreReward: 100,
+    // 지그재그 이동을 위한 추가 속성들
+    zigzagTime: 0,
+    zigzagPhase: Math.random() * Math.PI * 2,
+    baseDirection: angleTowards(pos, state.playerPos),
+    canPassObstacles: true
+  });
+}
+
 function spawnBigEnemy() {
   const angle = randRange(0, Math.PI * 2);
   const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
@@ -1984,12 +2260,30 @@ function update(dt) {
 
   state.fireTimer -= dt;
   state.spawnTimer -= dt;
+  state.blackDustSpawnTimer -= dt;
+  if (state.stageThreeActive) {
+    state.orangeLadybugSpawnTimer -= dt;
+  }
   if (state.emFieldCount > 0) {
     state.emCooldown -= dt;
   }
   state.toothpasteTimer -= dt;
   if (state.toothpasteTimer <= 0) {
     tryDropToothpaste();
+  }
+
+  if (state.blackDustSpawnTimer <= 0) {
+    if (!state.boss && Math.random() < constants.BLACK_DUST_SPAWN_CHANCE * (1 + state.elapsed * 0.01)) {
+      spawnBlackDustGroup();
+    }
+    state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
+  }
+
+  if (state.stageThreeActive && state.orangeLadybugSpawnTimer <= 0) {
+    if (!state.boss) {
+      spawnOrangeLadybug();
+    }
+    state.orangeLadybugSpawnTimer = randRange(constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MIN, constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MAX);
   }
 
   handleMovement(dt);
@@ -2535,9 +2829,33 @@ function handleEnemies(dt) {
 
     // 감전되지 않은 상태일 때만 이동
     if (!enemy.electrocuted) {
-      const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
-      enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || constants.ENEMY_SIZE);
-      clampWorldPosition(enemy.pos);
+      if (enemy.type === 'orangeLadybug') {
+        // 주황색 무당벌레의 지그재그 이동
+        enemy.zigzagTime += dt;
+
+        // 플레이어 방향으로의 기본 방향 업데이트
+        enemy.baseDirection = angleTowards(enemy.pos, state.playerPos);
+
+        // 지그재그 오프셋 계산
+        const zigzagOffset = Math.sin(enemy.zigzagTime * constants.ORANGE_LADYBUG_ZIGZAG_FREQUENCY + enemy.zigzagPhase) * constants.ORANGE_LADYBUG_ZIGZAG_AMPLITUDE;
+
+        // 수직 방향 계산 (기본 방향에 수직)
+        const perpDirection = enemy.baseDirection + Math.PI / 2;
+
+        // 최종 이동 방향
+        const baseDir = vector(Math.cos(enemy.baseDirection), Math.sin(enemy.baseDirection));
+        const perpDir = vector(Math.cos(perpDirection) * zigzagOffset * 0.01, Math.sin(perpDirection) * zigzagOffset * 0.01);
+        const finalDirection = vectorAdd(baseDir, perpDir);
+
+        // 장애물을 무시하고 이동 (canPassObstacles가 true)
+        enemy.pos = vectorAdd(enemy.pos, vectorScale(finalDirection, enemy.speed * dt));
+        clampWorldPosition(enemy.pos);
+      } else {
+        // 일반 적들의 이동
+        const direction = vectorNormalize(vectorSub(state.playerPos, enemy.pos));
+        enemy.pos = moveWithCollision(enemy.pos, vectorScale(direction, enemy.speed * dt), enemy.size || constants.ENEMY_SIZE);
+        clampWorldPosition(enemy.pos);
+      }
     }
 
     // 남색 세균의 발사 로직

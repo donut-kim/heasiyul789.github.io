@@ -65,6 +65,8 @@ export const state = {
   toothpasteGlowPhase: 0,
   hasGanjangGim: false,
   hpBarTimer: 0,
+  blackDustSpawnTimer: constants.BLACK_DUST_SPAWN_INTERVAL,
+  orangeLadybugSpawnTimer: constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MAX,
   lastPlayerHealth: constants.PLAYER_MAX_HEALTH,
   joystickCenter: null,
   joystickActive: false,
@@ -133,6 +135,8 @@ export function resetGameplayState() {
   state.hasGanjangGim = false;
   state.hasKimBugak = false;
   state.hpBarTimer = 0;
+  state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
+  state.orangeLadybugSpawnTimer = constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MAX;
   state.lastPlayerHealth = constants.PLAYER_MAX_HEALTH;
   state.joystickCenter = null;
   state.joystickActive = false;
