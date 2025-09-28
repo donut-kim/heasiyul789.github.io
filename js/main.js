@@ -2030,6 +2030,40 @@ function updateBoss(dt) {
     return;
   }
 
+  // 화상 상태 업데이트
+  if (boss.burning) {
+    boss.burnDuration -= dt;
+    boss.burnTickTimer -= dt;
+    if (boss.burnFlash > 0) {
+      boss.burnFlash -= dt;
+    }
+
+    // 1초마다 화상 피해 적용
+    if (boss.burnTickTimer <= 0) {
+      boss.health -= constants.BURN_DAMAGE_PER_SECOND;
+      boss.burnTickTimer = constants.BURN_TICK_INTERVAL;
+      boss.burnFlash = 0.15; // 피해 시 플래시 효과
+
+      // 화상으로 보스가 죽으면 처리
+      if (boss.health <= 0) {
+        const bossDefeated = state.boss;
+        state.boss = null;
+        state.bossWarningTimer = 0;
+        grantRewards(bossDefeated?.scoreReward ?? 100, bossDefeated?.xpReward ?? constants.XP_REWARD_BOSS);
+        handleVictory();
+        return;
+      }
+    }
+
+    // 화상 지속시간 종료
+    if (boss.burnDuration <= 0) {
+      boss.burning = false;
+      boss.burnDuration = 0;
+      boss.burnTickTimer = 0;
+      boss.burnFlash = 0;
+    }
+  }
+
   switch (boss.state) {
     case 'windup': {
       boss.windupTimer -= dt;
@@ -2697,6 +2731,13 @@ function handleSprinkles(dt) {
       const enemy = state.enemies[i];
       if (circleIntersects(sprinkle.pos, sprinkle.hitRadius, enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2)) {
         enemy.health = (enemy.health || 1) - 1;
+
+        // 화상효과 적용
+        enemy.burning = true;
+        enemy.burnDuration = constants.BURN_DURATION;
+        enemy.burnTickTimer = constants.BURN_TICK_INTERVAL;
+        enemy.burnFlash = 0.2; // 화상 시각 효과용
+
         if (enemy.health <= 0) {
           const defeated = state.enemies.splice(i, 1)[0];
           onEnemyRemoved(defeated);
@@ -2712,6 +2753,12 @@ function handleSprinkles(dt) {
       if (circleIntersects(sprinkle.pos, sprinkle.hitRadius, state.boss.pos, constants.BOSS_RADIUS)) {
         state.boss.health -= 1;
         state.score += constants.BOSS_HIT_SCORE;
+
+        // 보스에게도 화상효과 적용
+        state.boss.burning = true;
+        state.boss.burnDuration = constants.BURN_DURATION;
+        state.boss.burnTickTimer = constants.BURN_TICK_INTERVAL;
+        state.boss.burnFlash = 0.2;
         if (state.boss.health <= 0) {
           const bossDefeated = state.boss;
           state.boss = null;
@@ -2824,6 +2871,40 @@ function handleEnemies(dt) {
         enemy.electrocuted = false;
         enemy.electrocutionTimer = 0;
         enemy.electrocutionFlash = 0;
+      }
+    }
+
+    // 화상 상태 업데이트
+    if (enemy.burning) {
+      enemy.burnDuration -= dt;
+      enemy.burnTickTimer -= dt;
+      if (enemy.burnFlash > 0) {
+        enemy.burnFlash -= dt;
+      }
+
+      // 1초마다 화상 피해 적용
+      if (enemy.burnTickTimer <= 0) {
+        enemy.health = (enemy.health || 1) - constants.BURN_DAMAGE_PER_SECOND;
+        enemy.burnTickTimer = constants.BURN_TICK_INTERVAL;
+        enemy.burnFlash = 0.15; // 피해 시 플래시 효과
+
+        // 화상으로 적이 죽으면 처리
+        if (enemy.health <= 0) {
+          const defeated = state.enemies.splice(state.enemies.indexOf(enemy), 1)[0];
+          if (defeated) {
+            onEnemyRemoved(defeated);
+            grantRewardForEnemy(defeated);
+          }
+          continue;
+        }
+      }
+
+      // 화상 지속시간 종료
+      if (enemy.burnDuration <= 0) {
+        enemy.burning = false;
+        enemy.burnDuration = 0;
+        enemy.burnTickTimer = 0;
+        enemy.burnFlash = 0;
       }
     }
 
@@ -3022,6 +3103,11 @@ function render() {
     // 감전 효과 그리기
     if (enemy.electrocuted && enemy.electrocutionFlash > 0) {
       drawElectrocutionEffect(enemy.pos, sz);
+    }
+
+    // 화상 효과 그리기
+    if (enemy.burning) {
+      drawBurnEffect(enemy.pos, sz, enemy.burnFlash || 0);
     }
   }
 
@@ -3674,6 +3760,58 @@ function drawElectrocutionEffect(worldPos, size) {
   ctx.restore();
 }
 
+function drawBurnEffect(worldPos, size, flashIntensity = 0) {
+  const screen = worldToScreen(worldPos);
+  const radius = size / 2 + 8;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  // 화상 플래시 효과 (빨간/주황 빛 오버레이)
+  const baseIntensity = Math.sin(Date.now() * 0.015) * 0.2 + 0.4;
+  const totalIntensity = Math.min(baseIntensity + flashIntensity * 2, 1.0);
+
+  // 화염 그라디언트
+  const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
+  gradient.addColorStop(0, `rgba(255, 255, 0, ${0.4 * totalIntensity})`); // 노란 중심
+  gradient.addColorStop(0.5, `rgba(255, 140, 0, ${0.3 * totalIntensity})`); // 주황
+  gradient.addColorStop(1, `rgba(255, 69, 0, ${0.1 * totalIntensity})`); // 빨강 외곽
+
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 화염 파티클 효과들
+  const particleCount = 6;
+  const time = Date.now() * 0.008;
+
+  for (let i = 0; i < particleCount; i++) {
+    const angle = (i / particleCount) * Math.PI * 2 + time;
+    const distance = radius * 0.7 + Math.sin(time * 3 + i) * 6;
+    const particleX = screen.x + Math.cos(angle) * distance;
+    const particleY = screen.y + Math.sin(angle) * distance;
+
+    // 작은 화염 파티클
+    const particleSize = 3 + Math.sin(time * 4 + i) * 2;
+    const particleAlpha = 0.6 + Math.sin(time * 2 + i) * 0.3;
+
+    ctx.fillStyle = `rgba(255, ${100 + Math.sin(time + i) * 50}, 0, ${particleAlpha * totalIntensity})`;
+    ctx.beginPath();
+    ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 중앙 화염 코어
+  const coreAlpha = 0.9 + Math.sin(time * 5) * 0.1;
+  ctx.fillStyle = `rgba(255, 255, 255, ${coreAlpha * totalIntensity})`;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function drawSprinkleProjectile(projectile) {
   const screen = worldToScreen(projectile.pos);
   const angle = Math.atan2(projectile.dir.y, projectile.dir.x);
@@ -3716,6 +3854,11 @@ function drawBossEntity(boss) {
   // 보스 감전 효과 그리기
   if (boss.electrocuted && boss.electrocutionFlash > 0) {
     drawElectrocutionEffect(boss.pos, size);
+  }
+
+  // 보스 화상 효과 그리기
+  if (boss.burning) {
+    drawBurnEffect(boss.pos, size, boss.burnFlash || 0);
   }
 }
 

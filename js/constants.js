@@ -22,13 +22,18 @@ export const BULLET_SIZE = 12;
 export const BULLET_SPEED = 520;
 export const BULLET_LIFETIME = 1.8;
 
-// 스프링클 스킬 설정
+// 스프링클 스킬 설정 (불속성)
 export const SPRINKLE_INTERVAL = 0.5;
 export const SPRINKLE_BASE_COUNT = 2;
 export const SPRINKLE_SPEED = 440;
 export const SPRINKLE_LIFETIME = 2.8;
 export const SPRINKLE_TURN_RATE = Math.PI * 6;
 export const SPRINKLE_TRIGGER_RADIUS = 100;
+
+// 화상 효과 설정
+export const BURN_DURATION = 3.0;
+export const BURN_DAMAGE_PER_SECOND = 0.5;
+export const BURN_TICK_INTERVAL = 1.0;
 
 // 경험치 보상
 export const XP_REWARD_PINK = 50;
