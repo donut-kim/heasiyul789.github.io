@@ -21,7 +21,11 @@ async function initializeFirebase() {
       getDocs,
       query,
       orderBy,
-      limit
+      limit,
+      where,
+      updateDoc,
+      doc,
+      setDoc
     } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
 
     db = getFirestore(app);
@@ -34,7 +38,11 @@ async function initializeFirebase() {
       getDocs,
       query,
       orderBy,
-      limit
+      limit,
+      where,
+      updateDoc,
+      doc,
+      setDoc
     };
 
     isFirebaseReady = true;
@@ -46,7 +54,7 @@ async function initializeFirebase() {
   }
 }
 
-// 랭킹 데이터 저장 (Firestore)
+// 랭킹 데이터 저장 (Firestore) - 닉네임별 최고 점수만 업데이트
 export async function saveRankingToFirebase(nickname, character, stage, survivalTime, finalScore) {
   try {
     if (!isFirebaseReady) {
@@ -56,23 +64,63 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
       }
     }
 
-    const { collection, addDoc } = window.firestoreDB;
+    const { collection, getDocs, query, where, setDoc, doc } = window.firestoreDB;
+    const cleanNickname = nickname.trim();
 
-    const newRanking = {
-      nickname: nickname.trim(),
-      character,
-      stage: parseInt(stage),
-      survivalTime: parseFloat(survivalTime),
-      finalScore: parseInt(finalScore),
-      timestamp: Date.now(),
-      date: new Date().toISOString()
-    };
+    // 기존 해당 닉네임의 기록 찾기
+    const existingQuery = query(
+      collection(db, 'rankings'),
+      where('nickname', '==', cleanNickname)
+    );
 
-    // Firestore의 'rankings' 컬렉션에 문서 추가
-    const docRef = await addDoc(collection(db, 'rankings'), newRanking);
+    const existingSnapshot = await getDocs(existingQuery);
 
-    console.log('Firestore에 랭킹 저장 완료:', newRanking, 'ID:', docRef.id);
-    return true;
+    const newScore = parseInt(finalScore);
+    let shouldSave = false;
+    let docId = cleanNickname; // 닉네임을 document ID로 사용
+
+    if (existingSnapshot.empty) {
+      // 해당 닉네임이 없으면 새로 저장
+      shouldSave = true;
+      console.log('새로운 닉네임, 랭킹 저장:', cleanNickname);
+    } else {
+      // 기존 기록이 있으면 점수 비교
+      let maxExistingScore = 0;
+      existingSnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.finalScore > maxExistingScore) {
+          maxExistingScore = data.finalScore;
+        }
+      });
+
+      if (newScore > maxExistingScore) {
+        shouldSave = true;
+        console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 업데이트`);
+      } else {
+        console.log(`기존 최고점수(${maxExistingScore}) >= 새 점수(${newScore}), 저장 안함`);
+        return false;
+      }
+    }
+
+    if (shouldSave) {
+      const rankingData = {
+        nickname: cleanNickname,
+        character,
+        stage: parseInt(stage),
+        survivalTime: parseFloat(survivalTime),
+        finalScore: newScore,
+        timestamp: Date.now(),
+        date: new Date().toISOString()
+      };
+
+      // 닉네임을 document ID로 사용하여 upsert
+      await setDoc(doc(db, 'rankings', docId), rankingData);
+
+      console.log('Firestore에 랭킹 저장 완료:', rankingData);
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error('Firestore 랭킹 저장 실패:', error);
     return false;

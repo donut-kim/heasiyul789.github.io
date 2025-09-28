@@ -1,4 +1,4 @@
-import { loadRankingData, formatSurvivalTime, getCharacterDisplayName, truncateText } from './ranking.js';
+import { loadRankingData, formatSurvivalTime, getCharacterDisplayName, truncateText, isLocalEnvironment } from './ranking.js';
 
 // DOM 요소들
 export let modalOverlay, startOverlay, nicknameInput, startButton;
@@ -60,7 +60,7 @@ export async function showRankingModal() {
     showRestart: false,
     showRanking: false,
     extraHTML: `
-      <div style="min-width: 600px;">
+      <div style="width: min(95vw, 600px); max-width: 600px;">
         <div style="text-align: center; padding: 40px; color: #9fb4d8;">
           랭킹 데이터를 불러오는 중...
         </div>
@@ -76,17 +76,17 @@ export async function showRankingModal() {
     if (rankings.length === 0) {
       rankingHTML = '<div style="text-align: center; padding: 20px; color: #9fb4d8;">아직 랭킹 데이터가 없습니다.</div>';
     } else {
-      rankingHTML = '<div style="max-height: 400px; overflow-y: auto; font-family: monospace;">';
+      rankingHTML = '<div style="max-height: min(60vh, 400px); overflow-y: auto; font-family: monospace;">';
       rankings.forEach((rank, index) => {
-        const nickname = truncateText(rank.nickname, 10);
+        const nickname = truncateText(rank.nickname, 8);
         const survivalTime = formatSurvivalTime(rank.survivalTime);
         rankingHTML += `
-          <div style="display: grid; grid-template-columns: 30px 1fr 60px 70px 80px; gap: 8px; align-items: center; padding: 8px 12px; margin: 4px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 14px;">
+          <div style="display: grid; grid-template-columns: 25px 1fr 55px 65px 75px; gap: 6px; align-items: center; padding: 6px 8px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 13px;">
             <span style="font-weight: bold; color: #ffffff; text-align: center;">${index + 1}</span>
             <span style="color: #9fb4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${nickname}</span>
-            <span style="color: #a3e635; text-align: center;">스테이지${rank.stage}</span>
-            <span style="color: #fbbf24; text-align: center;">${survivalTime}</span>
-            <span style="color: #ffffff; font-weight: bold; text-align: right;">${rank.finalScore.toLocaleString()}</span>
+            <span style="color: #a3e635; text-align: center; font-size: 12px;">S${rank.stage}</span>
+            <span style="color: #fbbf24; text-align: center; font-size: 12px;">${survivalTime}</span>
+            <span style="color: #ffffff; font-weight: bold; text-align: right; font-size: 12px;">${rank.finalScore.toLocaleString()}</span>
           </div>
         `;
       });
@@ -97,17 +97,22 @@ export async function showRankingModal() {
     rankingHTML = '<div style="text-align: center; padding: 20px; color: #ff6b6b;">랭킹 데이터를 불러오는데 실패했습니다.</div>';
   }
 
+  // 로컬 환경 경고 메시지
+  const localWarning = isLocalEnvironment() ?
+    '<div style="background: rgba(255, 193, 7, 0.2); border: 1px solid #ffc107; border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; font-size: 12px; color: #ffc107; text-align: center;">⚠️ 로컬 환경에서는 랭킹 저장이 비활성화됩니다</div>' : '';
+
   showModal('🏆 랭킹', '', {
     showRestart: false,
     showRanking: false,
     extraHTML: `
-      <div style="min-width: 320px; max-width: 90vw;">
-        <div style="display: grid; grid-template-columns: 30px 1fr 60px 70px 80px; gap: 8px; padding: 8px 12px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 14px;">
+      <div style="width: min(95vw, 600px); max-width: 600px;">
+        ${localWarning}
+        <div style="display: grid; grid-template-columns: 25px 1fr 55px 65px 75px; gap: 6px; padding: 6px 8px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 13px;">
           <span style="text-align: center;">순위</span>
           <span>닉네임</span>
           <span style="text-align: center;">스테이지</span>
-          <span style="text-align: center;">생존시간</span>
-          <span style="text-align: right;">최종점수</span>
+          <span style="text-align: center;">시간</span>
+          <span style="text-align: right;">점수</span>
         </div>
         ${rankingHTML}
         <div style="text-align: center; margin-top: 20px;">
