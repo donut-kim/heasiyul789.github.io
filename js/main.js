@@ -1130,6 +1130,69 @@ function createEnemyProjectileSprite(size) {
   return off;
 }
 
+function createTornadoSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+
+  // 흰색 배경
+  ict.fillStyle = '#ffffff';
+  ict.beginPath();
+  ict.arc(center, center, size * 0.48, 0, Math.PI * 2);
+  ict.fill();
+
+  // 검은색 테두리
+  ict.strokeStyle = '#000000';
+  ict.lineWidth = 2;
+  ict.beginPath();
+  ict.arc(center, center, size * 0.48, 0, Math.PI * 2);
+  ict.stroke();
+
+  // 나선형 토네이도 (검은색 선)
+  const spiralTurns = 3;
+  const spiralSteps = 60;
+
+  // 여러 레이어로 나선형 그리기
+  for (let layer = 0; layer < 4; layer++) {
+    const opacity = 0.9 - layer * 0.2;
+    const offset = layer * size * 0.04;
+
+    ict.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ict.lineWidth = size * (0.05 - layer * 0.008);
+    ict.lineCap = 'round';
+
+    ict.beginPath();
+    for (let step = 0; step <= spiralSteps; step++) {
+      const t = step / spiralSteps;
+      const angle = t * Math.PI * 2 * spiralTurns + layer * 0.3;
+
+      // 나선형 반지름 (중심에서 바깥으로 점진적 증가)
+      const maxRadius = size * 0.35 - offset;
+      const radius = maxRadius * Math.pow(t, 0.6); // 곡선적으로 증가
+
+      const x = center + Math.cos(angle) * radius;
+      const y = center + Math.sin(angle) * radius;
+
+      if (step === 0) {
+        ict.moveTo(x, y);
+      } else {
+        ict.lineTo(x, y);
+      }
+    }
+    ict.stroke();
+  }
+
+  // 중심점 (검은색)
+  ict.fillStyle = '#000000';
+  ict.beginPath();
+  ict.arc(center, center, size * 0.04, 0, Math.PI * 2);
+  ict.fill();
+
+  return off;
+}
+
 
 const sprites = {
   player: createDonutSprite(constants.PLAYER_SIZE),
@@ -1147,6 +1210,7 @@ const sprites = {
   enemyProjectile: createEnemyProjectileSprite(constants.DARK_BLUE_PROJECTILE_SIZE),
   mine: createMineSprite(constants.MINE_SIZE),
   toothpaste: createToothpasteSprite(48),
+  tornado: createTornadoSprite(48),
 };
 
 const DONUT_STYLES = {
@@ -2425,6 +2489,7 @@ function update(dt) {
   handleMovement(dt);
   handleShooting(dt);
   handleBullets(dt);
+  handleTornadoes(dt);
   handleSprinkles(dt);
   handleEnemies(dt);
   handleEnemyProjectiles(dt);
@@ -2499,7 +2564,15 @@ function recomputeBlades(dt) {
   const bladeCount = state.upgradeLevels.blade;
   if (bladeCount > 0) {
     const tau = Math.PI * 2;
+    const previousAngle = state.bladeAngle;
     state.bladeAngle = (state.bladeAngle + dt * currentBladeRotationSpeed) % tau;
+
+    // 블레이드가 한 바퀴 완주했는지 확인 (0 지점을 지났는지)
+    if (previousAngle > state.bladeAngle) {
+      // 토네이도 발사
+      spawnTornado();
+    }
+
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
       const angle = state.bladeAngle + i * step;
@@ -2509,6 +2582,46 @@ function recomputeBlades(dt) {
         spriteIndex: Math.min(i, sprites.blades.length - 1),
       });
     }
+  }
+}
+
+function spawnTornado() {
+  const bladeCount = state.upgradeLevels.blade;
+  if (bladeCount === 0 || state.enemies.length === 0) return; // 블레이드가 없거나 적이 없으면 발사하지 않음
+
+  // 적들을 거리 순으로 정렬
+  const sortedEnemies = [...state.enemies].sort((a, b) => {
+    const distanceA = vectorLengthSq(vectorSub(a.pos, state.playerPos));
+    const distanceB = vectorLengthSq(vectorSub(b.pos, state.playerPos));
+    return distanceA - distanceB;
+  });
+
+  const tornadoSpeed = 180; // 토네이도 이동 속도
+  const tornadoLifetime = 3.0; // 3초 동안 지속
+
+  // 블레이드 개수만큼 토네이도 발사
+  for (let i = 0; i < bladeCount; i++) {
+    let direction;
+
+    if (i < sortedEnemies.length) {
+      // 가까운 적 순서대로 타겟팅
+      direction = vectorNormalize(vectorSub(sortedEnemies[i].pos, state.playerPos));
+    } else {
+      // 적이 부족하면 각도를 분산해서 발사
+      const angle = (i / bladeCount) * Math.PI * 2;
+      direction = vector(Math.cos(angle), Math.sin(angle));
+    }
+
+    state.tornadoes.push({
+      pos: vectorCopy(state.playerPos),
+      dir: direction,
+      speed: tornadoSpeed,
+      lifetime: tornadoLifetime,
+      damage: 0.5,
+      knockbackDistance: 10,
+      size: 48,
+      rotation: 0
+    });
   }
 }
 
@@ -2962,6 +3075,52 @@ function triggerEmField() {
   }
 }
 
+function handleTornadoes(dt) {
+  const nextTornadoes = [];
+  for (const tornado of state.tornadoes) {
+    tornado.lifetime -= dt;
+    if (tornado.lifetime <= 0) continue;
+
+    // 토네이도 이동
+    const movement = vectorScale(tornado.dir, tornado.speed * dt);
+    tornado.pos = vectorAdd(tornado.pos, movement);
+    tornado.rotation += dt * 360; // 회전 효과
+
+    // 월드 경계 체크
+    if (Math.abs(tornado.pos.x) > constants.WORLD_BOUNDS - tornado.size/2 ||
+        Math.abs(tornado.pos.y) > constants.WORLD_BOUNDS - tornado.size/2) {
+      continue; // 경계를 벗어나면 제거
+    }
+
+    // 적들과의 충돌 체크
+    for (const enemy of state.enemies) {
+      const distance = vectorLength(vectorSub(enemy.pos, tornado.pos));
+      const hitRadius = (enemy.size || constants.ENEMY_SIZE) / 2 + tornado.size / 2;
+
+      if (distance <= hitRadius) {
+        // 데미지 적용
+        enemy.health = (enemy.health || 1) - tornado.damage;
+
+        // 넉백 적용
+        const knockbackDir = vectorNormalize(vectorSub(enemy.pos, tornado.pos));
+        if (vectorLengthSq(knockbackDir) > 0) {
+          const knockbackForce = vectorScale(knockbackDir, tornado.knockbackDistance);
+          enemy.pos = vectorAdd(enemy.pos, knockbackForce);
+
+          // 월드 경계 내로 제한
+          enemy.pos.x = Math.max(-constants.WORLD_BOUNDS + (enemy.size || constants.ENEMY_SIZE)/2,
+                               Math.min(constants.WORLD_BOUNDS - (enemy.size || constants.ENEMY_SIZE)/2, enemy.pos.x));
+          enemy.pos.y = Math.max(-constants.WORLD_BOUNDS + (enemy.size || constants.ENEMY_SIZE)/2,
+                               Math.min(constants.WORLD_BOUNDS - (enemy.size || constants.ENEMY_SIZE)/2, enemy.pos.y));
+        }
+      }
+    }
+
+    nextTornadoes.push(tornado);
+  }
+  state.tornadoes = nextTornadoes;
+}
+
 function handleEnemies(dt) {
   const nextEnemies = [];
   for (const enemy of state.enemies) {
@@ -3238,6 +3397,13 @@ function render() {
     for (const blade of state.blades) {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
       drawSprite(sprite, blade.pos, constants.BLADE_SIZE);
+    }
+  }
+
+  // 토네이도 렌더링
+  if (state.tornadoes.length > 0) {
+    for (const tornado of state.tornadoes) {
+      drawSprite(sprites.tornado, tornado.pos, tornado.size);
     }
   }
 
