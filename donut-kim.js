@@ -114,7 +114,7 @@ const BIG_ENEMY_SPAWN_CHANCE = 0.35; // 35% of spawns after threshold
 
 // Dark Blue Enemy (Stage 2+)
 const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2; // 48
-const DARK_BLUE_ENEMY_HEALTH = 8;
+const DARK_BLUE_ENEMY_HEALTH = 3;
 const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7; // 30% slower than normal
 const DARK_BLUE_ENEMY_FIRE_INTERVAL = 2.5; // shoots every 2.5 seconds
 const DARK_BLUE_PROJECTILE_SIZE = 16;
@@ -415,36 +415,50 @@ function createGlazedDonutSprite(size) {
   const center = size / 2;
   const outer = size / 2 - 1;
 
-  // 도넛 베이스 (꽉 찬 원형)
+  // 외곽 테두리 (더 명확한 윤곽)
+  ict.strokeStyle = '#8b6914';
+  ict.lineWidth = 2;
+  ict.beginPath();
+  ict.arc(center, center, outer, 0, Math.PI * 2);
+  ict.stroke();
+
+  // 도넛 베이스 (더 진한 색상으로 대비 증가)
   const doughGradient = ict.createRadialGradient(center, center, outer * 0.2, center, center, outer);
-  doughGradient.addColorStop(0, '#f2d794');
-  doughGradient.addColorStop(0.6, '#e8c799');
-  doughGradient.addColorStop(1, '#ba9147');
+  doughGradient.addColorStop(0, '#f4d79a');
+  doughGradient.addColorStop(0.6, '#d4a853');
+  doughGradient.addColorStop(1, '#a67c00');
   ict.fillStyle = doughGradient;
   ict.beginPath();
   ict.arc(center, center, outer, 0, Math.PI * 2);
   ict.fill();
 
-  // 흰색 글레이즈 (꽉 찬 원형)
-  const glazeGradient = ict.createRadialGradient(center, center, 0, center, center, outer * 0.85);
+  // 흰색 글레이즈 (더 밝고 대비가 강한 글레이즈)
+  const glazeGradient = ict.createRadialGradient(center, center, 0, center, center, outer * 0.8);
   glazeGradient.addColorStop(0, '#ffffff');
-  glazeGradient.addColorStop(0.8, '#f8f8f8');
-  glazeGradient.addColorStop(1, '#e8e8e8');
+  glazeGradient.addColorStop(0.7, '#f0f0f0');
+  glazeGradient.addColorStop(1, '#d0d0d0');
   ict.fillStyle = glazeGradient;
   ict.beginPath();
-  ict.arc(center, center, outer * 0.85, 0, Math.PI * 2);
+  ict.arc(center, center, outer * 0.8, 0, Math.PI * 2);
   ict.fill();
 
-  // 글레이즈 하이라이트 (더 밝은 반짝임)
-  ict.fillStyle = 'rgba(255,255,255,0.8)';
+  // 글레이즈 테두리
+  ict.strokeStyle = '#c0c0c0';
+  ict.lineWidth = 1;
   ict.beginPath();
-  ict.ellipse(center - outer * 0.25, center - outer * 0.25, outer * 0.35, outer * 0.22, -0.55, 0, Math.PI * 2);
+  ict.arc(center, center, outer * 0.8, 0, Math.PI * 2);
+  ict.stroke();
+
+  // 글레이즈 하이라이트 (더 뚜렷한 반짝임)
+  ict.fillStyle = 'rgba(255,255,255,0.9)';
+  ict.beginPath();
+  ict.ellipse(center - outer * 0.2, center - outer * 0.2, outer * 0.3, outer * 0.18, -0.5, 0, Math.PI * 2);
   ict.fill();
 
-  // 작은 하이라이트
-  ict.fillStyle = 'rgba(255,255,255,0.6)';
+  // 작은 하이라이트 (더 밝게)
+  ict.fillStyle = 'rgba(255,255,255,0.7)';
   ict.beginPath();
-  ict.ellipse(center + outer * 0.2, center + outer * 0.15, outer * 0.15, outer * 0.1, 0.8, 0, Math.PI * 2);
+  ict.ellipse(center + outer * 0.25, center + outer * 0.1, outer * 0.12, outer * 0.08, 0.8, 0, Math.PI * 2);
   ict.fill();
 
   return off;
