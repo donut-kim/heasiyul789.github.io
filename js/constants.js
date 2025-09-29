@@ -51,20 +51,20 @@ export const ENEMY_SIZE = 20;
 export const ENEMY_BASE_SPEED = 48;
 export const ENEMY_SPEED_SCALE = 0.02;
 
-// 스폰 설정
+// 핑크세균
 export const SPAWN_INTERVAL = 2.0;
 export const SPAWN_INTERVAL_FLOOR = 0.7;
 export const SPAWN_RADIUS_MIN = 420;
 export const SPAWN_RADIUS_MAX = 680;
 
-// 큰 적 설정
+// 보라세균
 export const BIG_ENEMY_SIZE = ENEMY_SIZE * 2;
-export const BIG_ENEMY_HEALTH = 4;
+export const BIG_ENEMY_HEALTH = 3;
 export const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.8;
 export const BIG_ENEMY_SPAWN_TIME = 90;
 export const BIG_ENEMY_SPAWN_CHANCE = 0.35;
 
-// 어두운 파란 적 설정 (스테이지 2+)
+// 남색세균 (스테이지 2+)
 export const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2;
 export const DARK_BLUE_ENEMY_HEALTH = 8;
 export const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7;
@@ -72,7 +72,7 @@ export const DARK_BLUE_ENEMY_FIRE_INTERVAL = 3.25;
 export const DARK_BLUE_PROJECTILE_SIZE = 8;
 export const DARK_BLUE_PROJECTILE_SPEED = 140;
 
-// 검은 먼지 적 설정 (센과치히로 먼지벌레)
+// 검은 먼지 적 설정
 export const BLACK_DUST_SIZE = BIG_ENEMY_SIZE;
 export const BLACK_DUST_HEALTH = 2;
 export const BLACK_DUST_SPEED = ENEMY_BASE_SPEED * 0.3;

@@ -44,6 +44,8 @@ export const state = {
   bladeAngle: 0,
   blades: [],
   bladeCooldowns: new Map(),
+  tornadoes: [],
+  lastBladeAngle: 0,
   emFieldCount: 0,
   emTargetsPerField: 1,
   emCooldown: constants.EM_FIELD_BASE_INTERVAL,
@@ -113,6 +115,8 @@ export function resetGameplayState() {
   state.bladeAngle = 0;
   state.blades = [];
   state.bladeCooldowns.clear();
+  state.tornadoes = [];
+  state.lastBladeAngle = 0;
   state.emFieldCount = 0;
   state.emTargetsPerField = 1;
   state.emCooldown = constants.EM_FIELD_BASE_INTERVAL;
