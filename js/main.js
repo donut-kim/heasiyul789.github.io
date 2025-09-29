@@ -1531,7 +1531,7 @@ const skillData = {
   double_shot: {
     name: '더블 발사',
     title: '양방향공격',
-    option: '김 + 1',
+    option: '다방향 동시 발사',
     description: '김이 여러개지요 ~'
   },
   sprinkle: {
