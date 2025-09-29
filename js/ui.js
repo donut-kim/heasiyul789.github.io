@@ -82,7 +82,7 @@ export async function showRankingModal() {
         const survivalTime = formatSurvivalTime(rank.survivalTime);
         const rankEmoji = index === 0 || index === 1 ? ' 🍗' : '';
         rankingHTML += `
-          <div style="display: grid; grid-template-columns: 25px 1fr 55px 65px 75px; gap: 6px; align-items: center; padding: 6px 8px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 13px;">
+          <div style="display: grid; grid-template-columns: 40px 1fr 55px 65px 75px; gap: 6px; align-items: center; padding: 6px 8px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 13px;">
             <span style="font-weight: bold; color: #ffffff; text-align: center;">${index + 1}${rankEmoji}</span>
             <span style="color: #9fb4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${nickname}</span>
             <span style="color: #a3e635; text-align: center; font-size: 12px;">S${rank.stage}</span>
@@ -108,7 +108,7 @@ export async function showRankingModal() {
     extraHTML: `
       <div style="width: min(95vw, 600px); max-width: 600px;">
         ${localWarning}
-        <div style="display: grid; grid-template-columns: 25px 1fr 55px 65px 75px; gap: 6px; padding: 6px 8px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 13px;">
+        <div style="display: grid; grid-template-columns: 40px 1fr 55px 65px 75px; gap: 6px; padding: 6px 8px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 13px;">
           <span style="text-align: center;">순위</span>
           <span>닉네임</span>
           <span style="text-align: center;">스테이지</span>
