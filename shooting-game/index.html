@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>도넛 슈팅게임 - 땡땡마법사 스타일</title>
+    <meta name="description" content="도넛이 하늘에서 내려오는 몬스터들을 스프링클로 물리치는 슈팅게임">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+      :root {
+        color-scheme: dark;
+        --playfield-width: 400px;
+        --playfield-height: 700px;
+        --background: #101218;
+        --grid: #1e242a;
+        --panel-bg: #121a24;
+        --panel-border: #405268;
+        --accent: #70c8ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Apple SD Gothic Neo", "NanumGothic", "Malgun Gothic", "Noto Sans KR", sans-serif;
+        background: radial-gradient(circle at top, #1a2230, #080a10 80%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: #d6e0f0;
+        user-select: none;
+      }
+
+      #game-wrapper {
+        position: relative;
+        width: var(--playfield-width);
+        height: var(--playfield-height);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #06080d;
+      }
+
+      #game-canvas {
+        width: 100%;
+        height: 100%;
+        background: var(--background);
+        display: block;
+      }
+
+      #ui-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #eef5ff;
+        font-size: 16px;
+        font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+      }
+
+      .hud-item {
+        background: rgba(18, 26, 36, 0.8);
+        border: 1px solid rgba(110, 214, 255, 0.4);
+        border-radius: 8px;
+        padding: 6px 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        font-size: 14px;
+      }
+
+      #start-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(5, 8, 12, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+      }
+
+      #start-overlay.hidden {
+        display: none;
+      }
+
+      .start-card {
+        width: 350px;
+        padding: 24px 28px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(22, 28, 40, 0.95), rgba(12, 18, 26, 0.95));
+        border: 1px solid rgba(110, 214, 255, 0.35);
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .start-card h1 {
+        margin: 0;
+        font-size: 36px;
+        color: #fdf9ff;
+        text-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+      }
+
+      .start-card p {
+        margin: 0;
+        font-size: 16px;
+        color: #c2d4f0;
+      }
+
+      #start-button {
+        padding: 12px 0;
+        border: none;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #ffb347, #ff9068);
+        color: #1f1204;
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 18px 32px rgba(255, 144, 104, 0.35);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+
+      #start-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 24px 38px rgba(255, 144, 104, 0.5);
+      }
+
+      #game-over-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        color: #eef5ff;
+        text-align: center;
+        z-index: 20;
+      }
+
+      #game-over-overlay.active {
+        display: flex;
+      }
+
+      #game-over-overlay h1 {
+        font-size: 48px;
+        margin: 0;
+        color: #ff6b6b;
+        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+      }
+
+      #final-score {
+        font-size: 24px;
+        color: #70c8ff;
+        margin: 10px 0;
+      }
+
+      .game-over-button {
+        padding: 12px 24px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 999px;
+        border: none;
+        color: #0b101a;
+        background: linear-gradient(90deg, #6ed6ff, #b5f5ff);
+        box-shadow: 0 10px 24px rgba(110, 214, 255, 0.35);
+        cursor: pointer;
+        transition: transform 120ms ease;
+      }
+
+      .game-over-button:hover {
+        transform: translateY(-2px);
+      }
+
+      /* Mobile responsive - optimized for portrait */
+      @media (max-width: 820px) {
+        :root {
+          --playfield-width: 100vw;
+          --playfield-height: 100vh;
+        }
+        body {
+          height: 100vh;
+          overflow: hidden;
+        }
+        #game-wrapper {
+          width: var(--playfield-width);
+          height: var(--playfield-height);
+          border-radius: 0;
+        }
+        .start-card {
+          width: min(90vw, 350px);
+          padding: 20px 24px;
+        }
+        #hud {
+          top: 10px;
+          left: 10px;
+          right: 10px;
+          font-size: 14px;
+        }
+        .hud-item {
+          padding: 4px 8px;
+          font-size: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-wrapper">
+      <canvas id="game-canvas"></canvas>
+
+      <div id="ui-overlay">
+        <div id="hud">
+          <div class="hud-item">점수: <span id="score">0</span></div>
+          <div class="hud-item">스테이지: <span id="stage">1</span></div>
+          <div class="hud-item">레벨: <span id="level">1</span></div>
+        </div>
+      </div>
+
+      <div id="start-overlay">
+        <div class="start-card">
+          <h1>🍩 도넛 슈팅</h1>
+          <p>하늘에서 내려오는 몬스터들을 스프링클로 물리치세요!</p>
+          <p>도넛이 자동으로 몬스터를 조준하여 스프링클을 발사합니다!</p>
+          <button id="start-button">게임 시작</button>
+        </div>
+      </div>
+
+      <div id="game-over-overlay">
+        <h1>게임 오버</h1>
+        <div id="final-score">최종 점수: 0</div>
+        <button class="game-over-button" onclick="restartGame()">다시 시작</button>
+      </div>
+    </div>
+
+    <script src="game.js"></script>
+  </body>
+</html>
