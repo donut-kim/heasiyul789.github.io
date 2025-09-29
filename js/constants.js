@@ -151,15 +151,15 @@ export const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun 
 export const UPGRADE_DEFINITIONS = {
   speed: { title: '이속 증가', max: 5 },
   attack_speed: { title: '공속 증가', max: 5 },
-  multi_shot: { title: '김 추가', max: 5 },
-  double_shot: { title: '더블 발사', max: 5 },
-  sprinkle: { title: '스프링클', max: 5 },
+  multi_shot: { title: '김 추가', max: 3 },
+  double_shot: { title: '더블 발사', max: 3 },
+  sprinkle: { title: '스프링클', max: 3 },
   deulgireum_rapid: { title: '들기름', max: 1 },
   blade: { title: '킴스클럽', max: 5 },
-  em_field: { title: '슈크림', max: 5 },
+  em_field: { title: '슈크림', max: 3 },
   ganjang_gim: { title: '간장김', max: 1 },
   kim_bugak: { title: '김부각', max: 1 },
-  full_heal: { title: '부스러기 획득', max: 5 },
+  full_heal: { title: '부스러기 획득', max: 1 },
 };
 
 export const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'double_shot', 'sprinkle', 'deulgireum_rapid', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'full_heal'];
