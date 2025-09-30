@@ -76,6 +76,17 @@ export const state = {
   gameStartTime: null,
   gameMode: 'normal', // 'normal' 또는 'timeattack'
   timeAttackRemaining: 60 * 15, // 타임어택 모드 남은 시간 (15분)
+  timeAttackBossTimer: 0, // 타임어택 보스 타이머
+  timeAttackBossIndex: 0, // 현재 보스 인덱스 (0: 무당벌레, 1: 달팽이, 2: 개미, 3: 나비, 4: 고양이)
+  moveDirection: vector(1, 0), // 캐릭터 이동 방향 (기본: 오른쪽)
+  lastMoveDirection: vector(1, 0), // 마지막 이동 방향 (정지 시에도 유지)
+  specialBurstQueue: [],
+  specialBurstTimer: 0,
+  specialBurstPending: false,
+  specialBurstProgress: 0,
+  specialBurstEnabled: false,
+  specialBurstEffectTimer: 0,
+  specialBurstInterval: 0,
 };
 
 export const keys = new Set();
@@ -93,7 +104,9 @@ export function resetGameplayState() {
   } else {
     state.playerPos = vector(0, 0);
   }
-  state.playerHealth = constants.PLAYER_MAX_HEALTH;
+  state.playerHealth = state.gameMode === 'timeattack'
+    ? timeAttackConstants.TIME_ATTACK_PLAYER_MAX_HEALTH
+    : constants.PLAYER_MAX_HEALTH;
   state.playerInvuln = 0;
   state.score = 0;
   state.elapsed = 0;
@@ -149,15 +162,27 @@ export function resetGameplayState() {
   state.hpBarTimer = 0;
   state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
   state.orangeLadybugSpawnTimer = constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MAX;
-  state.lastPlayerHealth = constants.PLAYER_MAX_HEALTH;
+  state.lastPlayerHealth = state.playerHealth;
   state.joystickCenter = null;
   state.joystickActive = false;
   state.gameStartTime = null;
+  state.specialBurstQueue = [];
+  state.specialBurstTimer = 0;
+  state.specialBurstPending = false;
+  state.specialBurstProgress = 0;
+  state.specialBurstEnabled = false;
+  state.specialBurstEffectTimer = 0;
+  state.specialBurstInterval = 0;
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {
     state.timeAttackRemaining = 60 * 15; // 15분 초기화
+    state.timeAttackBossTimer = 0;
+    state.timeAttackBossIndex = 0;
   }
+
+  state.moveDirection = vector(1, 0);
+  state.lastMoveDirection = vector(1, 0);
 
   keys.clear();
 }

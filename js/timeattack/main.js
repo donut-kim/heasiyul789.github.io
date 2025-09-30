@@ -50,6 +50,25 @@ import {
   getElementCenter,
   roundRect
 } from './utils.js';
+import {
+  spawnEnemy,
+  spawnDarkBlueEnemy,
+  spawnBlackDustGroup,
+  spawnOrangeLadybug,
+  spawnBigEnemy,
+  spawnBoss,
+  spawnTimeAttackBoss,
+  spawnToothpasteItem,
+  getEnemySizeForMode,
+  getStageSpeedMultiplier
+} from './obj.js';
+import {
+  findTimeAttackTarget,
+  findNormalModeTarget,
+  calculateAttackDirections,
+  updateLastTargetId,
+  drawAttackIndicator
+} from './attack.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -59,6 +78,16 @@ const mediaPortrait = window.matchMedia('(max-width: 820px), (orientation: portr
 const BASE_LANDSCAPE = { w: 960, h: 540 };
 const BASE_PORTRAIT  = { w: 360, h: 640 };
 const BASE_TIME_ATTACK = { w: 600, h: 1000 };
+const SPECIAL_BURST_EFFECT_DURATION = 0.5; // seconds
+
+// Toggle to force multi-shot upgrade to appear every roll during Time Attack testing
+const FORCE_TIMEATTACK_MULTI_SHOT = true;
+
+function getPlayerMaxHealth() {
+  return state.gameMode === 'timeattack'
+    ? timeAttackConstants.TIME_ATTACK_PLAYER_MAX_HEALTH
+    : constants.PLAYER_MAX_HEALTH;
+}
 
 function sizeCanvasToCss() {
   const rootStyle = document.documentElement?.style;
@@ -1645,8 +1674,11 @@ const skillData = {
   multi_shot: {
     name: '김 추가',
     title: '공격 추가',
-    option: '김 + 1',
-    description: '내이름은 카드캡처 체리!'
+    option: (next) => {
+      if (next <= 3) return '김 + 1';
+      return next === 4 ? '반원 공격 준비!' : '반원 공격 강화!';
+    },
+    description: '김이 점점 늘어나고, 4레벨부터는 반원으로 퍼지는 귀여운 특공을 준비해요.'
   },
   double_shot: {
     name: '더블 발사',
@@ -1735,6 +1767,15 @@ function rollUpgradeCards() {
     cards[replaceIndex] = { key: 'deulgireum_rapid' };
   }
 
+  if (
+    FORCE_TIMEATTACK_MULTI_SHOT &&
+    state.gameMode === 'timeattack' &&
+    state.upgradeLevels.multi_shot < constants.UPGRADE_DEFINITIONS.multi_shot.max &&
+    !cards.some((card) => card.key === 'multi_shot')
+  ) {
+    cards[0] = { key: 'multi_shot' };
+  }
+
   return cards;
 }
 
@@ -1802,7 +1843,7 @@ function applyUpgrade(index) {
       state.hasKimBugak = true; // 1회용 - 얻으면 다시 나오지 않음
       break;
     case 'full_heal':
-      state.playerHealth = constants.PLAYER_MAX_HEALTH;
+      state.playerHealth = getPlayerMaxHealth();
       break;
     case 'em_field':
       if (state.emFieldCount === 0) {
@@ -1843,7 +1884,24 @@ let currentSprinkleInterval = constants.SPRINKLE_INTERVAL;
 function recomputePlayerStats() {
   currentPlayerSpeed = constants.PLAYER_SPEED * (1 + 0.12 * state.upgradeLevels.speed);
   currentFireInterval = Math.max(0.08, constants.PLAYER_FIRE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
-  bulletCount = 1 + state.upgradeLevels.multi_shot;
+
+  const multiShotLevel = state.upgradeLevels.multi_shot;
+  const burstEligible = state.gameMode === 'timeattack' && multiShotLevel > 3;
+
+  if (!burstEligible) {
+    bulletCount = 1 + multiShotLevel;
+    state.specialBurstEnabled = false;
+    state.specialBurstPending = false;
+    state.specialBurstProgress = 0;
+    state.specialBurstQueue = [];
+    state.specialBurstInterval = 0;
+  } else {
+    bulletCount = 4; // 3레벨 까지의 최대치 유지
+    state.specialBurstEnabled = true;
+    state.specialBurstInterval = multiShotLevel >= 5
+      ? timeAttackConstants.TIME_ATTACK_BURST_INTERVAL_LV5
+      : timeAttackConstants.TIME_ATTACK_BURST_INTERVAL_LV4;
+  }
 
   // 공속 업그레이드가 블레이드 회전속도에도 영향
   let baseRotationSpeed = constants.BLADE_ROTATION_SPEED;
@@ -1866,7 +1924,8 @@ function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
   if (scoreDelta > 0) {
     state.score += scoreDelta;
   }
-  if (xpDelta > 0 && state.level < 20) {
+  const maxLevel = state.gameMode === 'timeattack' ? 40 : 20;
+  if (xpDelta > 0 && state.level < maxLevel) {
     state.xp += xpDelta;
   }
 }
@@ -1922,29 +1981,12 @@ function triggerLevelBlast() {
   return removedEnemies.length;
 }
 
-function spawnToothpasteItem() {
-  const attempts = 24;
-  const margin = 40;
-  const toothpasteSize = 44;
-  const clearanceRadius = toothpasteSize + 20; // 치약 크기 + 20픽셀 여유분
-  for (let i = 0; i < attempts; i++) {
-    const bounds = getCurrentWorldBounds();
-    const x = randRange(-bounds + margin, bounds - margin);
-    const y = randRange(-bounds + margin, bounds - margin);
-    if (!collidesWithObstacles(x, y, clearanceRadius)) {
-      state.toothpasteItems.push({ pos: vector(x, y) });
-      return true;
-    }
-  }
-  return false;
-}
-
 function tryDropToothpaste() {
   if (Math.random() >= constants.TOOTHPASTE_DROP_CHANCE) {
     state.toothpasteTimer = constants.TOOTHPASTE_DROP_INTERVAL;
     return;
   }
-  spawnToothpasteItem();
+  spawnToothpasteItem(getCurrentWorldBounds, collidesWithObstacles);
   state.toothpasteTimer = constants.TOOTHPASTE_DROP_INTERVAL;
 }
 
@@ -2003,10 +2045,13 @@ function resolvePendingLevelBlast() {
 function processLevelUps() {
   if (processingLevelChain) return;
   setProcessingLevelChain(true);
-  while (state.xp >= state.xpToNext && !state.selectingUpgrade && state.level < 20) {
+  const maxLevel = state.gameMode === 'timeattack' ? 40 : 20;
+  while (state.xp >= state.xpToNext && !state.selectingUpgrade && state.level < maxLevel) {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = xpRequired(state.level);
+    state.playerHealth = getPlayerMaxHealth();
+    state.hpBarTimer = 1.5;
     state.pendingLevelBlast = (state.pendingLevelBlast || 0) + 1;
     openUpgradeSelection();
     if (state.selectingUpgrade) break;
@@ -2050,191 +2095,9 @@ function detonateMine() {
   }
 }
 
-function getStageSpeedMultiplier() {
-  return state.stage >= 3 ? 0.1 : 1;
-}
-
-function getEnemySizeForMode(baseSize, enemyType = 'default') {
-  if (state.gameMode === 'timeattack') {
-    // 분홍세균(일반 적)은 30%만 줄임 (0.7배)
-    if (enemyType === 'pink' || baseSize === constants.ENEMY_SIZE) {
-      return baseSize * 0.7;
-    }
-    // 나머지 적들은 기존 배율 적용
-    return baseSize * constants.TIME_ATTACK_ENEMY_SIZE_MULTIPLIER;
-  }
-  return baseSize;
-}
 
 function getCurrentWorldBounds() {
   return state.stage >= 3 ? constants.STAGE_THREE_WORLD_BOUNDS : constants.WORLD_BOUNDS;
-}
-
-function spawnEnemy() {
-  // default small enemy
-  const angle = randRange(0, Math.PI * 2);
-  const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
-  const pos = vector(
-    state.playerPos.x + Math.cos(angle) * radius,
-    state.playerPos.y + Math.sin(angle) * radius,
-  );
-  const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
-  const size = getEnemySizeForMode(constants.ENEMY_SIZE, 'pink');
-  state.enemies.push({
-    id: enemyIdCounter++,
-    pos,
-    speed: baseSpeed * getStageSpeedMultiplier(),
-    health: 1,
-    size,
-    sprite: sprites.enemy,
-    xpReward: constants.XP_REWARD_PINK,
-    scoreReward: 10,
-    type: 'pink'
-  });
-}
-
-function spawnDarkBlueEnemy() {
-  const enemySize = getEnemySizeForMode(constants.DARK_BLUE_ENEMY_SIZE, 'darkblue');
-  let pos;
-  let attempts = 0;
-  const maxAttempts = 20;
-
-  // 장애물이 없는 위치를 찾을 때까지 반복
-  do {
-    const angle = randRange(0, Math.PI * 2);
-    const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
-    pos = vector(
-      state.playerPos.x + Math.cos(angle) * radius,
-      state.playerPos.y + Math.sin(angle) * radius,
-    );
-    attempts++;
-  } while (collidesWithObstacles(pos.x, pos.y, enemySize) && attempts < maxAttempts);
-
-  // 최대 시도 횟수를 초과하면 기본 위치 사용 (장애물과 겹치더라도)
-  if (attempts >= maxAttempts) {
-    const angle = randRange(0, Math.PI * 2);
-    const radius = constants.SPAWN_RADIUS_MAX;
-    pos = vector(
-      state.playerPos.x + Math.cos(angle) * radius,
-      state.playerPos.y + Math.sin(angle) * radius,
-    );
-  }
-
-  const baseSpeed = constants.DARK_BLUE_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.DARK_BLUE_ENEMY_SPEED;
-  state.enemies.push({
-    id: enemyIdCounter++,
-    pos,
-    speed: baseSpeed * getStageSpeedMultiplier(),
-    health: constants.DARK_BLUE_ENEMY_HEALTH,
-    size: enemySize,
-    sprite: sprites.darkBlueEnemy,
-    fireTimer: randRange(0, constants.DARK_BLUE_ENEMY_FIRE_INTERVAL),
-    type: 'darkBlue',
-    xpReward: constants.XP_REWARD_DARK_BLUE,
-    scoreReward: 20
-  });
-}
-
-function spawnBlackDustGroup() {
-  const count = randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
-  const baseAngle = randRange(0, Math.PI * 2);
-  const enemySize = getEnemySizeForMode(constants.BLACK_DUST_SIZE);
-
-  for (let i = 0; i < count; i++) {
-    const angle = baseAngle + randRange(-Math.PI / 4, Math.PI / 4);
-    const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
-    const pos = vector(
-      state.playerPos.x + Math.cos(angle) * radius,
-      state.playerPos.y + Math.sin(angle) * radius,
-    );
-
-    const baseSpeed = constants.BLACK_DUST_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BLACK_DUST_SPEED;
-    state.enemies.push({
-      id: enemyIdCounter++,
-      pos,
-      speed: baseSpeed * getStageSpeedMultiplier(),
-      health: constants.BLACK_DUST_HEALTH,
-      size: enemySize,
-      sprite: sprites.blackDust,
-      type: 'blackDust',
-      xpReward: constants.XP_REWARD_BLACK_DUST,
-      scoreReward: 15
-    });
-  }
-}
-
-function spawnOrangeLadybug() {
-  // 플레이어 주변에서 먼 곳에 스폰
-  const angle = randRange(0, Math.PI * 2);
-  const radius = randRange(constants.SPAWN_RADIUS_MIN * 1.5, constants.SPAWN_RADIUS_MAX * 1.2);
-  const pos = vector(
-    state.playerPos.x + Math.cos(angle) * radius,
-    state.playerPos.y + Math.sin(angle) * radius,
-  );
-
-  const baseSpeed = constants.ORANGE_LADYBUG_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ORANGE_LADYBUG_SPEED;
-  const enemySize = getEnemySizeForMode(constants.ORANGE_LADYBUG_SIZE);
-
-  state.enemies.push({
-    id: enemyIdCounter++,
-    pos,
-    speed: baseSpeed * getStageSpeedMultiplier(),
-    health: constants.ORANGE_LADYBUG_HEALTH,
-    size: enemySize,
-    sprite: sprites.orangeLadybug,
-    type: 'orangeLadybug',
-    xpReward: constants.XP_REWARD_ORANGE_LADYBUG,
-    scoreReward: 100,
-    // 지그재그 이동을 위한 추가 속성들
-    zigzagTime: 0,
-    zigzagPhase: Math.random() * Math.PI * 2,
-    baseDirection: angleTowards(pos, state.playerPos),
-    canPassObstacles: true
-  });
-}
-
-function spawnBigEnemy() {
-  const angle = randRange(0, Math.PI * 2);
-  const radius = randRange(constants.SPAWN_RADIUS_MIN, constants.SPAWN_RADIUS_MAX);
-  const pos = vector(
-    state.playerPos.x + Math.cos(angle) * radius,
-    state.playerPos.y + Math.sin(angle) * radius,
-  );
-  const baseSpeed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
-  const enemySize = getEnemySizeForMode(constants.BIG_ENEMY_SIZE, 'purple');
-  state.enemies.push({
-    id: enemyIdCounter++,
-    pos,
-    speed: baseSpeed * getStageSpeedMultiplier(),
-    health: constants.BIG_ENEMY_HEALTH,
-    size: enemySize,
-    sprite: sprites.bigEnemy,
-    xpReward: constants.XP_REWARD_PURPLE,
-    scoreReward: 15,
-    type: 'purple'
-  });
-}
-
-function spawnBoss() {
-  const angle = randRange(0, Math.PI * 2);
-  const distance = 600;
-  const bossPos = vector(
-    state.playerPos.x + Math.cos(angle) * distance,
-    state.playerPos.y + Math.sin(angle) * distance,
-  );
-  state.boss = {
-    pos: bossPos,
-    health: constants.BOSS_HEALTH,
-    state: 'idle',
-    direction: vector(0, 0),
-    attackTarget: vectorCopy(bossPos),
-    attackTimer: constants.BOSS_ATTACK_INTERVAL,
-    windupTimer: 0,
-    facingAngle: 0,
-    xpReward: constants.XP_REWARD_BOSS,
-    scoreReward: 100,
-  };
-  state.enemies.length = 0;
 }
 
 function updateBoss(dt) {
@@ -2572,6 +2435,16 @@ function update(dt) {
     }
   }
 
+  // 타임어택 모드 보스 타이머
+  if (state.gameMode === 'timeattack' && activePlay && !state.boss) {
+    state.timeAttackBossTimer += dt;
+    // 3분(180초)마다 보스 등장
+    if (state.timeAttackBossTimer >= 180) {
+      spawnTimeAttackBoss(vectorCopy);
+      state.timeAttackBossTimer = 0;
+    }
+  }
+
   if (state.stage === 2 && !state.stageThreeActive && !state.boss && !state.victory && state.elapsed >= constants.BOSS_SPAWN_TIME) {
     enterStageThree();
   }
@@ -2586,7 +2459,12 @@ function update(dt) {
   state.levelBlastTimer = Math.max(0, state.levelBlastTimer - dt);
   state.toothpasteFlashTimer = Math.max(0, state.toothpasteFlashTimer - dt);
   state.toothpasteGlowPhase = (state.toothpasteGlowPhase + dt * 4) % (Math.PI * 2);
-  state.hpBarTimer = Math.max(0, state.hpBarTimer - dt);
+  if (state.gameMode === 'timeattack') {
+    state.hpBarTimer = Math.max(1, state.hpBarTimer);
+  } else {
+    state.hpBarTimer = Math.max(0, state.hpBarTimer - dt);
+  }
+  state.specialBurstEffectTimer = Math.max(0, state.specialBurstEffectTimer - dt);
   if (state.bossWarningTimer > 0) {
     state.bossWarningTimer = Math.max(0, state.bossWarningTimer - dt);
   }
@@ -2630,20 +2508,21 @@ function update(dt) {
 
   if (state.blackDustSpawnTimer <= 0) {
     if (!state.boss && Math.random() < constants.BLACK_DUST_SPAWN_CHANCE * (1 + state.elapsed * 0.01)) {
-      spawnBlackDustGroup();
+      spawnBlackDustGroup(sprites);
     }
     state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
   }
 
   if (state.stageThreeActive && state.orangeLadybugSpawnTimer <= 0) {
     if (!state.boss) {
-      spawnOrangeLadybug();
+      spawnOrangeLadybug(sprites);
     }
     state.orangeLadybugSpawnTimer = randRange(constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MIN, constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MAX);
   }
 
   handleMovement(dt);
   handleShooting(dt);
+  processSpecialBurst(dt);
   handleBullets(dt);
   handleTornadoes(dt);
   handleSprinkles(dt);
@@ -2670,6 +2549,14 @@ function handleMovement(dt) {
       move = vectorScale(vectorNormalize(move), currentPlayerSpeed * dt);
     }
   }
+
+  // 이동 방향 업데이트
+  if (vectorLengthSq(move) > 0) {
+    const normalizedMove = vectorNormalize(move);
+    state.moveDirection = normalizedMove;
+    state.lastMoveDirection = vectorCopy(normalizedMove);
+  }
+
   state.playerPos = moveWithCollision(state.playerPos, move, constants.PLAYER_SIZE);
   clampWorldPosition(state.playerPos);
   ensureChunksAroundPlayer();
@@ -2705,11 +2592,11 @@ function handleMovement(dt) {
       for (let i = 0; i < batch; i++) {
         // 테스트용: 남색 세균을 시작부터 등장 (30% 확률)
         if(state.stage >= 2 && Math.random() < 0.3) {
-          spawnDarkBlueEnemy();
+          spawnDarkBlueEnemy(sprites, collidesWithObstacles);
         } else if (state.elapsed >= constants.BIG_ENEMY_SPAWN_TIME && Math.random() < constants.BIG_ENEMY_SPAWN_CHANCE) {
-          spawnBigEnemy();
+          spawnBigEnemy(sprites);
         } else {
-          spawnEnemy();
+          spawnEnemy(sprites);
         }
       }
     }
@@ -2790,16 +2677,25 @@ function spawnTornado() {
 
 // 사용하지 않는 함수 제거됨
 
-function spawnProjectile(direction) {
+function spawnProjectile(direction, options = {}) {
   const norm = vectorNormalize(direction);
   if (vectorLengthSq(norm) === 0) return;
-  const bulletSize = state.hasKimBugak ? Math.round(constants.BULLET_SIZE * 2) : constants.BULLET_SIZE;
+  let bulletSize;
+  if (state.hasKimBugak) {
+    bulletSize = Math.round(constants.BULLET_SIZE * 2);
+  } else if (state.gameMode === 'timeattack') {
+    bulletSize = Math.round(constants.BULLET_SIZE * timeAttackConstants.TIME_ATTACK_BASE_BULLET_SCALE);
+  } else {
+    bulletSize = constants.BULLET_SIZE;
+  }
   const bulletSprite = state.hasKimBugak ? sprites.kimBugakBullet : sprites.bullet;
+
+  const rangeMultiplier = options.rangeMultiplier ?? 1;
 
   // 타임어택 모드에서 김공격 사정거리 조정
   const bulletLifetime = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_BULLET_RANGE / constants.BULLET_SPEED
-    : constants.BULLET_LIFETIME;
+    ? (timeAttackConstants.TIME_ATTACK_BULLET_RANGE * rangeMultiplier) / constants.BULLET_SPEED
+    : constants.BULLET_LIFETIME * rangeMultiplier;
 
   state.bullets.push({
     pos: vectorCopy(state.playerPos),
@@ -2812,12 +2708,12 @@ function spawnProjectile(direction) {
   });
 }
 
-function fireDirections(directions, doubleShotLevel) {
+function fireDirections(directions, doubleShotLevel, options = {}) {
   for (const dir of directions) {
     const baseAngle = Math.atan2(dir.y, dir.x);
 
     if (doubleShotLevel <= 0) {
-      spawnProjectile(dir);
+      spawnProjectile(dir, options);
       continue;
     }
 
@@ -2828,8 +2724,61 @@ function fireDirections(directions, doubleShotLevel) {
       const angle = baseAngle + i * step;
       const vx = Math.cos(angle);
       const vy = Math.sin(angle);
-      spawnProjectile(vector(vx, vy));
+      spawnProjectile(vector(vx, vy), options);
     }
+  }
+}
+
+function triggerSemiCircleBurst(targetDir, multiShotLevel) {
+  const arcCount = multiShotLevel >= 5 ? 7 : 4;
+  if (arcCount <= 0) return;
+
+  let dir = targetDir;
+  if (!dir || (dir.x === 0 && dir.y === 0)) {
+    dir = state.lastMoveDirection || vector(1, 0);
+  }
+
+  const baseAngle = Math.atan2(dir.y, dir.x);
+  const span = Math.PI; // 180도 반원
+  const startAngle = baseAngle + span / 2;
+  const step = arcCount === 1 ? 0 : span / (arcCount - 1);
+  const doubleShot = state.upgradeLevels.double_shot;
+
+  const queue = [];
+  for (let i = 0; i < arcCount; i++) {
+    const angle = startAngle - step * i; // 왼쪽(+)에서 오른쪽(-)으로 순서대로
+    queue.push({
+      dir: vector(Math.cos(angle), Math.sin(angle)),
+      doubleShotLevel: doubleShot,
+      rangeMultiplier: 1.5,
+    });
+  }
+
+  state.specialBurstQueue = queue;
+  state.specialBurstTimer = 0;
+  state.specialBurstEffectTimer = SPECIAL_BURST_EFFECT_DURATION;
+  state.specialBurstProgress = 0;
+  processSpecialBurst(0);
+}
+
+function processSpecialBurst(dt) {
+  if (state.specialBurstQueue.length === 0) return;
+
+  state.specialBurstTimer -= dt;
+  if (state.specialBurstTimer > 0) return;
+
+  const next = state.specialBurstQueue.shift();
+  if (next) {
+    const level = Number.isFinite(next.doubleShotLevel) ? next.doubleShotLevel : state.upgradeLevels.double_shot;
+    const rangeMultiplier = Number.isFinite(next.rangeMultiplier) ? next.rangeMultiplier : 1;
+    fireDirections([next.dir], level, { rangeMultiplier });
+  }
+
+  if (state.specialBurstQueue.length > 0) {
+    const interval = state.specialBurstInterval > 0 ? state.specialBurstInterval : 0.07;
+    state.specialBurstTimer = interval;
+  } else {
+    state.specialBurstTimer = 0;
   }
 }
 
@@ -2843,50 +2792,31 @@ function handleShooting(dt) {
     state.lastEnemyTargetId = null;
   }
 
-  let targetInfo = null;
-
-  if (state.enemies.length > 0) {
-    const sorted = [...state.enemies].sort((a, b) => {
-      const da = vectorLengthSq(vectorSub(a.pos, state.playerPos));
-      const db = vectorLengthSq(vectorSub(b.pos, state.playerPos));
-      return da - db;
-    });
-    let chosen = sorted.find((enemy) => enemy.id !== state.lastEnemyTargetId);
-    if (!chosen) {
-      chosen = sorted[0];
-    }
-    const dir = vectorNormalize(vectorSub(chosen.pos, state.playerPos));
-    targetInfo = { type: 'enemy', target: chosen, direction: dir };
-  } else if (state.boss) {
-    const dir = vectorNormalize(vectorSub(state.boss.pos, state.playerPos));
-    targetInfo = { type: 'boss', target: state.boss, direction: dir };
-  }
-
-  if (!targetInfo) {
-    state.autoAimAngle = (state.autoAimAngle + dt * 120) % 360;
-    const radians = (state.autoAimAngle * Math.PI) / 180;
-    const sweepDir = vector(Math.cos(radians), Math.sin(radians));
-    targetInfo = { type: 'sweep', target: null, direction: sweepDir };
-  }
+  // 게임 모드에 따라 타겟 찾기
+  const targetInfo = state.gameMode === 'timeattack'
+    ? findTimeAttackTarget()
+    : findNormalModeTarget(dt);
 
   const targetDir = targetInfo.direction;
   if (!targetDir) return;
 
+  if (state.specialBurstQueue.length > 0) {
+    return;
+  }
+
+  const multiShotLevel = state.upgradeLevels.multi_shot;
+  const doubleShotLevel = state.upgradeLevels.double_shot;
+
   if (state.fireTimer <= 0) {
-    const baseAngle = Math.atan2(targetDir.y, targetDir.x);
-    const spreadStep = (Math.PI / 180) * 8;
-    const baseDirections = [];
-    for (let i = 0; i < bulletCount; i++) {
-      if (bulletCount === 1) {
-        baseDirections.push(targetDir);
-      } else {
-        const offset = i - (bulletCount - 1) / 2;
-        const angle = baseAngle + offset * spreadStep;
-        baseDirections.push(vector(Math.cos(angle), Math.sin(angle)));
-      }
+    if (state.specialBurstEnabled && state.specialBurstPending) {
+      triggerSemiCircleBurst(targetDir, multiShotLevel);
+      state.specialBurstPending = false;
+      state.fireTimer = currentFireInterval;
+      updateLastTargetId(targetInfo);
+      return;
     }
 
-    const doubleShotLevel = state.upgradeLevels.double_shot;
+    const baseDirections = calculateAttackDirections(targetDir, bulletCount);
     fireDirections(baseDirections, doubleShotLevel);
 
     if (state.hasDeulgireumRapid) {
@@ -2895,14 +2825,16 @@ function handleShooting(dt) {
       state.rapidFireTimer = RAPID_BURST_DELAY;
     }
 
-    state.fireTimer = currentFireInterval;
-    if (targetInfo.type === 'enemy' && targetInfo.target) {
-      state.lastEnemyTargetId = targetInfo.target.id;
-    } else if (targetInfo.type === 'boss') {
-      state.lastEnemyTargetId = null;
-    } else if (targetInfo.type === 'sweep') {
-      state.lastEnemyTargetId = null;
+    if (state.specialBurstEnabled) {
+      state.specialBurstProgress += 1;
+      if (state.specialBurstProgress >= 3) {
+        state.specialBurstProgress = 0;
+        state.specialBurstPending = true;
+      }
     }
+
+    state.fireTimer = currentFireInterval;
+    updateLastTargetId(targetInfo);
   }
 }
 
@@ -4306,6 +4238,48 @@ function drawSprite(sprite, worldPos, size) {
   ctx.drawImage(sprite, screen.x - size / 2, screen.y - size / 2, size, size);
 }
 
+function drawSpecialBurstEffect(screenX, screenY, playerSize) {
+  const timer = state.specialBurstEffectTimer;
+  if (timer <= 0) return;
+
+  const progress = clamp(1 - timer / SPECIAL_BURST_EFFECT_DURATION, 0, 1);
+  const fade = 1 - progress;
+  const orbCount = state.upgradeLevels.multi_shot >= 5 ? 7 : 4;
+  const baseRadius = playerSize * 0.7;
+  const extraRadius = playerSize * (state.upgradeLevels.multi_shot >= 5 ? 1.0 : 0.8);
+  const radius = baseRadius + extraRadius * progress;
+
+  ctx.save();
+  ctx.translate(screenX, screenY);
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let i = 0; i < orbCount; i++) {
+    const angle = (-Math.PI / 2) + (i / (orbCount - 1)) * Math.PI;
+    const wobble = Math.sin(performance.now() * 0.004 + i) * playerSize * 0.05 * fade;
+    const px = Math.cos(angle) * radius;
+    const py = Math.sin(angle) * radius + wobble;
+    const orbRadius = playerSize * (0.18 + 0.12 * fade);
+
+    const gradient = ctx.createRadialGradient(px, py, 0, px, py, orbRadius);
+    gradient.addColorStop(0, `rgba(255, 255, 210, ${0.6 * fade + 0.2})`);
+    gradient.addColorStop(0.5, `rgba(255, 180, 120, ${0.4 * fade + 0.1})`);
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(px, py, orbRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255, 230, 190, ${0.5 * fade})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(px, py, orbRadius * (0.55 + 0.25 * progress), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function drawPlayer() {
   const { halfW, halfH } = getWorldDims();
   const screenX = halfW;
@@ -4317,12 +4291,17 @@ function drawPlayer() {
   // 타임어택 모드에서도 플레이어는 원래 크기 유지
   let playerSize = constants.PLAYER_SIZE;
 
+  // 공격 방향 표시 (귀여운 화살표) - 캐릭터보다 먼저 그리기
+  drawAttackIndicator(ctx, screenX, screenY, playerSize);
+
+  drawSpecialBurstEffect(screenX, screenY, playerSize);
+
   if (state.playerInvuln > 0) {
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
     ctx.globalAlpha = clamp(alpha, 0.2, 1);
     ctx.drawImage(playerSprite, screenX - playerSize / 2, screenY - playerSize / 2, playerSize, playerSize);
     ctx.globalAlpha = 1;
-  } else if (state.playerHealth <= 2) {
+  } else if (state.playerHealth <= getPlayerMaxHealth() * 0.2) {
     const alpha = 0.3 + 0.7 * Math.sin(performance.now() * 0.008);
     ctx.globalAlpha = clamp(alpha, 0.3, 1);
     ctx.drawImage(playerSprite, screenX - playerSize / 2, screenY - playerSize / 2, playerSize, playerSize);
@@ -4635,7 +4614,7 @@ function drawBossWarning() {
 }
 
 function drawPlayerHPBar() {
-  if (state.hpBarTimer <= 0) return;
+  if (state.gameMode !== 'timeattack' && state.hpBarTimer <= 0) return;
 
   const { halfW, halfH } = getWorldDims();
   const screenX = halfW;
@@ -4647,7 +4626,7 @@ function drawPlayerHPBar() {
   const hpColor = '#ff4444';
   const fullColor = '#ff4444';
 
-  const alpha = Math.min(1, state.hpBarTimer);
+  const alpha = state.gameMode === 'timeattack' ? 1 : Math.min(1, state.hpBarTimer);
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -4655,10 +4634,10 @@ function drawPlayerHPBar() {
   ctx.fillStyle = bgColor;
   ctx.fillRect(screenX - barWidth / 2, screenY - barHeight / 2, barWidth, barHeight);
 
-  const hpRatio = state.playerHealth / constants.PLAYER_MAX_HEALTH;
+  const hpRatio = state.playerHealth / getPlayerMaxHealth();
   const fillWidth = barWidth * hpRatio;
 
-  if (state.playerHealth <= 2) {
+  if (state.playerHealth <= getPlayerMaxHealth() * 0.2) {
     const flash = 0.7 + 0.3 * Math.sin(performance.now() * 0.01);
     ctx.globalAlpha = alpha * flash;
   }
@@ -4759,12 +4738,12 @@ function updateHud() {
   }
 
   statScore.textContent = totalScore.toString().padStart(5, '0');
-  statHP.textContent = `${Math.max(0, state.playerHealth)} / ${constants.PLAYER_MAX_HEALTH}`;
+  statHP.textContent = `${Math.max(0, state.playerHealth)} / ${getPlayerMaxHealth()}`;
   statLevel.textContent = state.level;
 
   // Mirror to mobile top HUD if available
   if (mobileHud) {
-    if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${constants.PLAYER_MAX_HEALTH}`;
+    if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${getPlayerMaxHealth()}`;
     if (mobileScore) mobileScore.textContent = totalScore.toString().padStart(5, '0');
     if (mobileTime) {
       if (state.gameMode === 'timeattack') {
@@ -4779,8 +4758,19 @@ function updateHud() {
   if (state.boss) {
     statBoss.hidden = false;
     statBossHP.textContent = `HP ${Math.max(0, state.boss.health)} / ${constants.BOSS_HEALTH}`;
+
+    // 타임어택 보스 HP 바 업데이트
+    if (state.gameMode === 'timeattack') {
+      updateTimeAttackBossHP();
+    }
   } else {
     statBoss.hidden = true;
+
+    // 타임어택 보스 HP 바 숨기기
+    if (state.gameMode === 'timeattack') {
+      const bossHpElement = document.getElementById('timeattack-boss-hp');
+      if (bossHpElement) bossHpElement.style.display = 'none';
+    }
   }
 
   const progress = state.xpToNext > 0 ? clamp(state.xp / state.xpToNext, 0, 1) : 0;
@@ -4789,6 +4779,65 @@ function updateHud() {
   xpProgressText.textContent = `${state.xp} / ${state.xpToNext}`;
 }
 
+function updateTimeAttackBossHP() {
+  const bossHpElement = document.getElementById('timeattack-boss-hp');
+  const bossNameElement = document.getElementById('boss-name');
+  const bossHpBars = document.getElementById('boss-hp-bars');
+  const bossHpText = document.getElementById('boss-hp-text');
+
+  if (!bossHpElement || !state.boss) return;
+
+  // 보스 HP 바 표시
+  bossHpElement.style.display = 'block';
+
+  // 보스 이름 설정
+  const bossNames = {
+    'ladybug': '무당벌레',
+    'snail': '달팽이',
+    'ant': '개미',
+    'butterfly': '나비',
+    'cat': '고양이'
+  };
+  bossNameElement.textContent = bossNames[state.boss.bossType] || '보스';
+
+  // HP 텍스트 업데이트
+  const currentHP = Math.max(0, Math.ceil(state.boss.health));
+  const maxHP = state.boss.maxHealth;
+  bossHpText.textContent = `HP: ${currentHP}/${maxHP}`;
+
+  // 무지개색 HP 바 생성 (100HP당 한 단계)
+  // 색상: 빨(100) 주(200) 노(300) 초(400) 파(500)
+  const colors = ['#ff4444', '#ff8844', '#ffff44', '#44ff44', '#4444ff'];
+  const hpSegments = Math.ceil(maxHP / 100); // 총 몇 개의 100HP 단계인지
+  const currentSegment = Math.ceil(currentHP / 100); // 현재 몇 번째 단계인지
+
+  // HP 바 생성
+  bossHpBars.innerHTML = '';
+  for (let i = hpSegments; i >= 1; i--) {
+    const segmentDiv = document.createElement('div');
+    segmentDiv.style.flex = '1';
+    segmentDiv.style.height = '100%';
+    segmentDiv.style.transition = 'width 0.3s ease';
+
+    if (i > currentSegment) {
+      // 완전히 소진된 단계 - 보이지 않음
+      segmentDiv.style.width = '0%';
+      segmentDiv.style.backgroundColor = 'transparent';
+    } else if (i === currentSegment) {
+      // 현재 단계 - 남은 HP 비율만큼 표시
+      const segmentHP = currentHP - ((i - 1) * 100);
+      const segmentPercent = (segmentHP / 100) * 100;
+      segmentDiv.style.width = `${segmentPercent}%`;
+      segmentDiv.style.backgroundColor = colors[i - 1] || colors[colors.length - 1];
+    } else {
+      // 아직 소진되지 않은 단계 - 100% 표시
+      segmentDiv.style.width = '100%';
+      segmentDiv.style.backgroundColor = colors[i - 1] || colors[colors.length - 1];
+    }
+
+    bossHpBars.appendChild(segmentDiv);
+  }
+}
 
 function handleKeyDown(event) {
   const { code } = event;

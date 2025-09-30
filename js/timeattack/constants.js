@@ -53,34 +53,34 @@ export const TIME_ATTACK_ENEMY_SIZE_MULTIPLIER = 2.0; // 타임어택 적 크기
 export const TIME_ATTACK_ENEMY_SPAWN_MULTIPLIER = 1.5; // 타임어택 적 스폰 수 배율
 // 타임어택 모드 설정은 timeAttackConstants.js에서 관리
 
-// 적 설정
-export const ENEMY_SIZE = 20;
-export const ENEMY_BASE_SPEED = 48;
+// 적 설정 (플레이어 크기 40px 기준)
+export const ENEMY_SIZE = 36; // 플레이어의 90% (기본 적 더 크게)
+export const ENEMY_BASE_SPEED = 40;
 export const ENEMY_SPEED_SCALE = 0.02;
 
-// 핑크세균
+// 핑크세균 (기본 적)
 export const SPAWN_INTERVAL = 2.0;
 export const SPAWN_INTERVAL_FLOOR = 0.7;
 export const SPAWN_RADIUS_MIN = 420;
 export const SPAWN_RADIUS_MAX = 680;
 
-// 보라세균
-export const BIG_ENEMY_SIZE = ENEMY_SIZE * 2;
+// 보라세균 (큰 적)
+export const BIG_ENEMY_SIZE = 24; // 플레이어의 60%
 export const BIG_ENEMY_HEALTH = 3;
 export const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.8;
 export const BIG_ENEMY_SPAWN_TIME = 90;
 export const BIG_ENEMY_SPAWN_CHANCE = 0.35;
 
-// 남색세균 (스테이지 2+)
-export const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2;
+// 남색세균 (스테이지 2+, 원거리 공격)
+export const DARK_BLUE_ENEMY_SIZE = 32; // 플레이어의 80%
 export const DARK_BLUE_ENEMY_HEALTH = 8;
 export const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7;
 export const DARK_BLUE_ENEMY_FIRE_INTERVAL = 3.25;
-export const DARK_BLUE_PROJECTILE_SIZE = 8;
+export const DARK_BLUE_PROJECTILE_SIZE = 10;
 export const DARK_BLUE_PROJECTILE_SPEED = 140;
 
-// 검은 먼지 적 설정
-export const BLACK_DUST_SIZE = BIG_ENEMY_SIZE;
+// 검은 먼지 적 설정 (느리고 작음)
+export const BLACK_DUST_SIZE = 22; // 플레이어의 55%
 export const BLACK_DUST_HEALTH = 2;
 export const BLACK_DUST_SPEED = ENEMY_BASE_SPEED * 0.3;
 export const BLACK_DUST_SPAWN_CHANCE = 0.3;
@@ -88,8 +88,8 @@ export const BLACK_DUST_SPAWN_INTERVAL = 5.0;
 export const BLACK_DUST_MIN_COUNT = 3;
 export const BLACK_DUST_MAX_COUNT = 5;
 
-// 주황색 무당벌레 설정 (3스테이지 전용)
-export const ORANGE_LADYBUG_SIZE = ENEMY_SIZE;
+// 주황색 무당벌레 설정 (3스테이지 전용, 빠르고 작음)
+export const ORANGE_LADYBUG_SIZE = 28; // 플레이어의 70%
 export const ORANGE_LADYBUG_HEALTH = 10;
 export const ORANGE_LADYBUG_SPEED = ENEMY_BASE_SPEED * 1.2;
 export const ORANGE_LADYBUG_SPAWN_INTERVAL_MIN = 5.0;
@@ -104,7 +104,7 @@ export const BOSS_SPEED = 130;
 export const BOSS_CHARGE_SPEED = 480;
 export const BOSS_CHARGE_PREP = 1.0;
 export const BOSS_CHARGE_COOLDOWN = 6.0;
-export const BOSS_RADIUS = 60;
+export const BOSS_RADIUS = 52; // 살짝 축소
 export const BOSS_ATTACK_INTERVAL = 10;
 export const BOSS_ATTACK_CHANCE = 0.5;
 export const BOSS_WINDUP_TIME = 2.0;
@@ -158,7 +158,7 @@ export const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun 
 export const UPGRADE_DEFINITIONS = {
   speed: { title: '이속 증가', max: 5 },
   attack_speed: { title: '공속 증가', max: 5 },
-  multi_shot: { title: '김 추가', max: 3 },
+  multi_shot: { title: '김 추가', max: 5 },
   double_shot: { title: '더블 발사', max: 3 },
   sprinkle: { title: '스프링클', max: 3 },
   deulgireum_rapid: { title: '들기름', max: 1 },

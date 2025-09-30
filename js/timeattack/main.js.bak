@@ -24,9 +24,9 @@ import {
   startOverlay,
   nicknameInput,
   startButton
-} from './ui.js';
-import { checkAndSaveRanking } from './ranking.js';
-import { initializeDB } from './db.js';
+} from '../ui.js';
+import { checkAndSaveRanking } from '../ranking.js';
+import { initializeDB } from '../db.js';
 import {
   vector,
   vectorAdd,
@@ -1866,7 +1866,8 @@ function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
   if (scoreDelta > 0) {
     state.score += scoreDelta;
   }
-  if (xpDelta > 0 && state.level < 20) {
+  const maxLevel = state.gameMode === 'timeattack' ? 40 : 20;
+  if (xpDelta > 0 && state.level < maxLevel) {
     state.xp += xpDelta;
   }
 }
@@ -2054,8 +2055,13 @@ function getStageSpeedMultiplier() {
   return state.stage >= 3 ? 0.1 : 1;
 }
 
-function getEnemySizeForMode(baseSize) {
+function getEnemySizeForMode(baseSize, enemyType = 'default') {
   if (state.gameMode === 'timeattack') {
+    // 분홍세균(일반 적)은 30%만 줄임 (0.7배)
+    if (enemyType === 'pink' || baseSize === constants.ENEMY_SIZE) {
+      return baseSize * 0.7;
+    }
+    // 나머지 적들은 기존 배율 적용
     return baseSize * constants.TIME_ATTACK_ENEMY_SIZE_MULTIPLIER;
   }
   return baseSize;
@@ -2074,7 +2080,7 @@ function spawnEnemy() {
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
-  const size = getEnemySizeForMode(constants.ENEMY_SIZE);
+  const size = getEnemySizeForMode(constants.ENEMY_SIZE, 'pink');
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
@@ -2089,7 +2095,7 @@ function spawnEnemy() {
 }
 
 function spawnDarkBlueEnemy() {
-  const enemySize = getEnemySizeForMode(constants.DARK_BLUE_ENEMY_SIZE);
+  const enemySize = getEnemySizeForMode(constants.DARK_BLUE_ENEMY_SIZE, 'darkblue');
   let pos;
   let attempts = 0;
   const maxAttempts = 20;
@@ -2196,7 +2202,7 @@ function spawnBigEnemy() {
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const baseSpeed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
-  const enemySize = getEnemySizeForMode(constants.BIG_ENEMY_SIZE);
+  const enemySize = getEnemySizeForMode(constants.BIG_ENEMY_SIZE, 'purple');
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
