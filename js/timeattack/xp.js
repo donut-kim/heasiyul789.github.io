@@ -5,8 +5,7 @@ import {
   vectorScale,
   vectorSub,
   randRange,
-  vectorLengthSq,
-  clamp
+  vectorLengthSq
 } from './utils.js';
 
 let crumbIdCounter = 0;

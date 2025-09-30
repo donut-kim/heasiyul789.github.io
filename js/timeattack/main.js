@@ -88,6 +88,20 @@ const SPECIAL_BURST_EFFECT_DURATION = 0.5; // seconds
 // Toggle to force multi-shot upgrade to appear every roll during Time Attack testing
 const FORCE_TIMEATTACK_MULTI_SHOT = true;
 
+const TIME_ATTACK_SPRINKLE_COLORS = ['#ff8da1', '#ffd35c', '#8ad4ff', '#f5f5f5'];
+
+function hexToRgba(hex, alpha) {
+  let clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    clean = clean.split('').map((c) => c + c).join('');
+  }
+  const bigint = parseInt(clean, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function getPlayerMaxHealth() {
   return state.gameMode === 'timeattack'
     ? timeAttackConstants.TIME_ATTACK_PLAYER_MAX_HEALTH
@@ -1688,7 +1702,7 @@ const skillData = {
   magnet: {
     name: '빵가루 자석',
     title: '자동 흡수',
-    option: (next) => `흡수 범위 ${next * 50}px`,
+    option: (next) => `흡수 범위 ${next * 100}px`,
     description: '주변의 빵가루 경험치를 자동으로 빨아들여요.'
   },
   double_shot: {
@@ -1859,7 +1873,7 @@ function applyUpgrade(index) {
       break;
     case 'magnet':
       state.magnetLevel = state.upgradeLevels.magnet;
-      state.magnetRadius = state.magnetLevel * 50;
+      state.magnetRadius = state.magnetLevel > 0 ? 100 + (state.magnetLevel - 1) * 50 : 0;
       break;
     default:
       break;
@@ -1918,7 +1932,7 @@ function recomputePlayerStats() {
   currentSprinkleInterval = Math.max(0.2, constants.SPRINKLE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
 
   state.magnetLevel = state.upgradeLevels.magnet || 0;
-  state.magnetRadius = state.magnetLevel > 0 ? state.magnetLevel * 50 : 0;
+  state.magnetRadius = state.magnetLevel > 0 ? 100 + (state.magnetLevel - 1) * 50 : 0;
 }
 
 function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
@@ -2497,7 +2511,49 @@ function update(dt) {
 
   state.fireTimer -= dt;
   state.spawnTimer -= dt;
-  state.blackDustSpawnTimer -= dt;
+  // 블랙 더스트 스톰 관리 (기본 스폰은 비활성)
+  if (state.gameMode === 'timeattack') {
+    state.stormWarningTimer = Math.max(0, state.stormWarningTimer - dt);
+    state.sirenPhase = (state.sirenPhase || 0) + dt;
+
+    const stormInterval = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_INTERVAL;
+    const spawnInterval = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_DURATION / timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT;
+
+    if (!state.stormActive) {
+      state.stormTimer += dt;
+      if (state.stormTimer >= stormInterval) {
+        state.stormActive = true;
+        state.stormTimer = 0;
+        state.stormCountdown = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_DURATION;
+        state.stormSpawnedCount = 0;
+        state.stormWarningTimer = timeAttackConstants.TIME_ATTACK_BLACK_DUST_WARNING_DURATION;
+        state.blackDustSpawnTimer = 0;
+      }
+    }
+
+    if (state.stormActive) {
+      state.stormCountdown -= dt;
+      state.blackDustSpawnTimer -= dt;
+      if (state.blackDustSpawnTimer <= 0 && state.stormSpawnedCount < timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT) {
+        spawnBlackDustGroup(sprites, { overrideCount: 1, overrideHealth: 5, storm: true });
+        state.stormSpawnedCount += 1;
+        state.blackDustSpawnTimer += spawnInterval;
+      }
+
+      if (state.stormSpawnedCount >= timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT && state.stormCountdown <= 0) {
+        state.stormActive = false;
+        state.blackDustSpawnTimer = stormInterval;
+        state.stormTimer = 0;
+      }
+    }
+  } else {
+    state.blackDustSpawnTimer -= dt;
+    if (state.blackDustSpawnTimer <= 0) {
+      spawnBlackDustGroup(sprites);
+      state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
+    }
+  }
+
   if (state.stageThreeActive) {
     state.orangeLadybugSpawnTimer -= dt;
   }
@@ -2507,13 +2563,6 @@ function update(dt) {
   state.toothpasteTimer -= dt;
   if (state.toothpasteTimer <= 0) {
     tryDropToothpaste();
-  }
-
-  if (state.blackDustSpawnTimer <= 0) {
-    if (!state.boss && Math.random() < constants.BLACK_DUST_SPAWN_CHANCE * (1 + state.elapsed * 0.01)) {
-      spawnBlackDustGroup(sprites);
-    }
-    state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
   }
 
   if (state.stageThreeActive && state.orangeLadybugSpawnTimer <= 0) {
@@ -2635,7 +2684,7 @@ function recomputeBlades(dt) {
     for (let i = 0; i < bladeCount; i++) {
       const angle = state.bladeAngle + i * step;
       const bladeRadius = state.gameMode === 'timeattack'
-        ? constants.BLADE_RADIUS * timeAttackConstants.TIME_ATTACK_BLADE_RADIUS_MULTIPLIER
+        ? constants.BLADE_RADIUS * timeAttackConstants.TIME_ATTACK_BLADE_RADIUS_MULTIPLIER + timeAttackConstants.TIME_ATTACK_BLADE_EXTRA_RADIUS
         : constants.BLADE_RADIUS;
       const offset = vector(Math.cos(angle) * bladeRadius, Math.sin(angle) * bladeRadius);
       state.blades.push({
@@ -2973,6 +3022,7 @@ function fireSprinkleVolley() {
     const targetPos = vectorCopy(target.ref.pos);
     const dir = vectorNormalize(vectorSub(targetPos, pos));
     const fallbackDir = vectorLengthSq(dir) > 0 ? dir : vector(1, 0);
+    const color = TIME_ATTACK_SPRINKLE_COLORS[(i + state.sprinkles.length) % TIME_ATTACK_SPRINKLE_COLORS.length];
 
     state.sprinkles.push({
       pos,
@@ -2987,6 +3037,7 @@ function fireSprinkleVolley() {
       liftTimer: state.gameMode === 'timeattack' ? 0.18 : 0,
       trail: [],
       rocketBoost: state.gameMode === 'timeattack' ? 0 : 1,
+      color,
     });
   }
 
@@ -4604,6 +4655,7 @@ function drawSprinkleProjectile(projectile) {
   const size = projectile.size || constants.BULLET_SIZE * 1.2;
   const width = size * 0.6;
   const height = size * 1.6;
+  const color = projectile.color || '#f5f5f5';
 
   if (state.gameMode === 'timeattack' && projectile.trail && projectile.trail.length > 0) {
     ctx.save();
@@ -4612,7 +4664,7 @@ function drawSprinkleProjectile(projectile) {
       const lifeRatio = clamp(trail.life / 0.18, 0, 1);
       const trailScreen = worldToScreen(trail.pos);
       const trailSize = width * lifeRatio;
-      ctx.fillStyle = `rgba(255, 200, 120, ${0.4 * lifeRatio})`;
+      ctx.fillStyle = hexToRgba(color, 0.35 * lifeRatio + 0.05);
       ctx.beginPath();
       ctx.ellipse(trailScreen.x, trailScreen.y, trailSize, trailSize * 0.6, angle, 0, Math.PI * 2);
       ctx.fill();
@@ -4623,10 +4675,20 @@ function drawSprinkleProjectile(projectile) {
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.rotate(angle);
+
+  if (state.gameMode === 'timeattack') {
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.ellipse(-width * 0.1, 0, width * 0.95, height * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
   ctx.drawImage(sprite, -width / 2, -height / 2, width, height);
 
   if (state.gameMode === 'timeattack') {
-    ctx.fillStyle = 'rgba(255, 220, 160, 0.6)';
+    ctx.fillStyle = hexToRgba(color, 0.55);
     ctx.beginPath();
     ctx.ellipse(-width * 0.65, 0, width * 0.6, height * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -4661,7 +4723,7 @@ function drawBossEntity(boss) {
   let size = constants.BOSS_RADIUS * 2.4;
 
   if (state.gameMode === 'timeattack') {
-    size = constants.BOSS_RADIUS * 3.0;
+    size = constants.BOSS_RADIUS * 3.2;
   }
 
   ctx.save();

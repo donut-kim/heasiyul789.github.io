@@ -18,15 +18,15 @@ export function getEnemySizeForMode(baseSize, enemyType = 'default') {
       case 'pink':
         return baseSize * 1.6;
       case 'big':
-        return baseSize * 0.5;
-      case 'darkblue':
-        return baseSize * 0.75;
-      case 'blackDust':
         return baseSize * 0.7;
+      case 'darkblue':
+        return baseSize * 0.85;
+      case 'blackDust':
+        return baseSize * 0.75;
       case 'orange':
-        return baseSize * 0.8;
+        return baseSize * 0.85;
       default:
-        return baseSize * 0.8;
+        return baseSize * 0.85;
     }
   }
   return baseSize;
@@ -124,8 +124,11 @@ export function spawnDarkBlueEnemy(sprites, collidesWithObstacles) {
 }
 
 // 검은 먼지 그룹 생성
-export function spawnBlackDustGroup(sprites) {
-  const count = randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
+export function spawnBlackDustGroup(sprites, options = {}) {
+  if (state.gameMode === 'timeattack' && !options.storm) {
+    return;
+  }
+  const count = options.overrideCount ?? randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
   const baseAngle = randRange(0, Math.PI * 2);
   const enemySize = getEnemySizeForMode(constants.BLACK_DUST_SIZE, 'blackDust');
   const minRadius = state.gameMode === 'timeattack'
@@ -151,7 +154,7 @@ export function spawnBlackDustGroup(sprites) {
       id: enemyIdCounter++,
       pos,
       speed: baseSpeed * getStageSpeedMultiplier() * speedFactor,
-      health: constants.BLACK_DUST_HEALTH,
+      health: options.overrideHealth ?? constants.BLACK_DUST_HEALTH,
       size: enemySize,
       sprite: sprites.blackDust,
       type: 'blackDust',

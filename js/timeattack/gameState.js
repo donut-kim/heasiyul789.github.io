@@ -91,6 +91,12 @@ export const state = {
   xpCrumbs: [],
   magnetLevel: 0,
   magnetRadius: 0,
+  stormTimer: 0,
+  stormActive: false,
+  stormCountdown: 0,
+  stormSpawnedCount: 0,
+  stormWarningTimer: 0,
+  sirenPhase: 0,
 };
 
 export const keys = new Set();
@@ -180,6 +186,12 @@ export function resetGameplayState() {
   state.xpCrumbs = [];
   state.magnetLevel = 0;
   state.magnetRadius = 0;
+  state.stormTimer = 0;
+  state.stormActive = false;
+  state.stormCountdown = 0;
+  state.stormSpawnedCount = 0;
+  state.stormWarningTimer = 0;
+  state.sirenPhase = 0;
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {
