@@ -1,6 +1,6 @@
 // Sprite creation functions
 import { PLAYER_SIZE, ENEMY_SIZE, BIG_ENEMY_SIZE, BOSS_RADIUS, BLADE_SIZE, BULLET_SIZE, MINE_SIZE, GIM_VARIANTS, BLACK_DUST_SIZE } from './constants.js';
-import { roundRect } from './utils.js';
+import { roundRect, randRange } from './utils.js';
 
 // Donut styles configuration
 export const DONUT_STYLES = {
@@ -545,5 +545,90 @@ export const sprites = {
   bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
   blackDust: createBlackDustSprite(BLACK_DUST_SIZE),
   boss: createClampBossSprite(BOSS_RADIUS * 2.6),
+  bossSprites: {
+    ladybug: createLadybugBossSprite(BOSS_RADIUS * 2.4),
+    default: createClampBossSprite(BOSS_RADIUS * 2.6),
+  },
   // Additional sprites would be initialized here
 };
+function createLadybugBossSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+  const bodyRadius = size * 0.36;
+
+  ict.save();
+  ict.translate(center, center);
+
+  // Shadow
+  ict.fillStyle = 'rgba(0,0,0,0.18)';
+  ict.beginPath();
+  ict.ellipse(0, bodyRadius * 0.9, bodyRadius * 0.8, bodyRadius * 0.4, 0, 0, Math.PI * 2);
+  ict.fill();
+
+  // Body (red ellipse)
+  ict.fillStyle = '#ff4b4b';
+  ict.beginPath();
+  ict.ellipse(0, 0, bodyRadius, bodyRadius * 1.2, 0, 0, Math.PI * 2);
+  ict.fill();
+
+  // Center line
+  ict.strokeStyle = '#2b1a1a';
+  ict.lineWidth = size * 0.04;
+  ict.beginPath();
+  ict.moveTo(0, -bodyRadius * 1.2);
+  ict.lineTo(0, bodyRadius * 1.2);
+  ict.stroke();
+
+  // Spots
+  const spotPositions = [
+    { x: -bodyRadius * 0.5, y: -bodyRadius * 0.6 },
+    { x: bodyRadius * 0.45, y: -bodyRadius * 0.4 },
+    { x: -bodyRadius * 0.55, y: bodyRadius * 0.2 },
+    { x: bodyRadius * 0.4, y: bodyRadius * 0.5 }
+  ];
+  ict.fillStyle = '#1d1313';
+  for (const spot of spotPositions) {
+    ict.beginPath();
+    ict.ellipse(spot.x, spot.y, bodyRadius * 0.28, bodyRadius * 0.18, randRange(-0.4, 0.4), 0, Math.PI * 2);
+    ict.fill();
+  }
+
+  // Head
+  const headRadius = bodyRadius * 0.55;
+  ict.fillStyle = '#1f1b2e';
+  ict.beginPath();
+  ict.ellipse(0, -bodyRadius * 1.2, headRadius, headRadius * 0.75, 0, 0, Math.PI * 2);
+  ict.fill();
+
+  // Eyes
+  const eyeOffset = headRadius * 0.55;
+  const eyeRadius = headRadius * 0.28;
+  ict.fillStyle = '#ffffff';
+  ict.beginPath();
+  ict.arc(-eyeOffset, -bodyRadius * 1.25, eyeRadius, 0, Math.PI * 2);
+  ict.arc(eyeOffset, -bodyRadius * 1.25, eyeRadius, 0, Math.PI * 2);
+  ict.fill();
+
+  ict.fillStyle = '#2f2f2f';
+  ict.beginPath();
+  ict.arc(-eyeOffset, -bodyRadius * 1.25, eyeRadius * 0.45, 0, Math.PI * 2);
+  ict.arc(eyeOffset, -bodyRadius * 1.25, eyeRadius * 0.45, 0, Math.PI * 2);
+  ict.fill();
+
+  // Antennae
+  ict.strokeStyle = '#2f2f2f';
+  ict.lineWidth = size * 0.02;
+  ict.lineCap = 'round';
+  ict.beginPath();
+  ict.moveTo(-eyeOffset * 0.9, -bodyRadius * 1.7);
+  ict.quadraticCurveTo(-eyeOffset * 1.2, -bodyRadius * 2.1, -eyeOffset * 0.6, -bodyRadius * 2.25);
+  ict.moveTo(eyeOffset * 0.9, -bodyRadius * 1.7);
+  ict.quadraticCurveTo(eyeOffset * 1.2, -bodyRadius * 2.1, eyeOffset * 0.6, -bodyRadius * 2.25);
+  ict.stroke();
+
+  ict.restore();
+  return off;
+}

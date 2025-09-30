@@ -67,6 +67,7 @@ export const state = {
   pendingLevelBlast: 0,
   toothpasteGlowPhase: 0,
   hasGanjangGim: false,
+  hasKimBugak: false,
   hpBarTimer: 0,
   blackDustSpawnTimer: constants.BLACK_DUST_SPAWN_INTERVAL,
   orangeLadybugSpawnTimer: constants.ORANGE_LADYBUG_SPAWN_INTERVAL_MAX,
@@ -87,6 +88,9 @@ export const state = {
   specialBurstEnabled: false,
   specialBurstEffectTimer: 0,
   specialBurstInterval: 0,
+  xpCrumbs: [],
+  magnetLevel: 0,
+  magnetRadius: 0,
 };
 
 export const keys = new Set();
@@ -173,6 +177,9 @@ export function resetGameplayState() {
   state.specialBurstEnabled = false;
   state.specialBurstEffectTimer = 0;
   state.specialBurstInterval = 0;
+  state.xpCrumbs = [];
+  state.magnetLevel = 0;
+  state.magnetRadius = 0;
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {
