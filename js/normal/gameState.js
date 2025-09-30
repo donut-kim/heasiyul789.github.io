@@ -1,4 +1,5 @@
 import * as constants from './constants.js';
+import * as timeAttackConstants from './timeAttackConstants.js';
 import { vector, distance } from './utils.js';
 
 // 벡터 유틸리티 함수들은 utils.js에서 import
@@ -73,6 +74,8 @@ export const state = {
   joystickCenter: null,
   joystickActive: false,
   gameStartTime: null,
+  gameMode: 'normal', // 'normal' 또는 'timeattack'
+  timeAttackRemaining: 60 * 15, // 타임어택 모드 남은 시간 (15분)
 };
 
 export const keys = new Set();
@@ -84,7 +87,12 @@ export function setProcessingLevelChain(value) {
 
 // 게임 상태 초기화 함수
 export function resetGameplayState() {
-  state.playerPos = vector(0, 0);
+  // 타임어택 모드에서는 지정된 시작 위치 사용
+  if (state.gameMode === 'timeattack') {
+    state.playerPos = vector(timeAttackConstants.TIME_ATTACK_PLAYER_START_X, timeAttackConstants.TIME_ATTACK_PLAYER_START_Y);
+  } else {
+    state.playerPos = vector(0, 0);
+  }
   state.playerHealth = constants.PLAYER_MAX_HEALTH;
   state.playerInvuln = 0;
   state.score = 0;
@@ -145,6 +153,12 @@ export function resetGameplayState() {
   state.joystickCenter = null;
   state.joystickActive = false;
   state.gameStartTime = null;
+
+  // 타임어택 모드 리셋 (게임모드는 유지)
+  if (state.gameMode === 'timeattack') {
+    state.timeAttackRemaining = 60 * 15; // 15분 초기화
+  }
+
   keys.clear();
 }
 

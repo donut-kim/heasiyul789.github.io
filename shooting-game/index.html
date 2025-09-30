@@ -143,6 +143,89 @@
         box-shadow: 0 24px 38px rgba(255, 144, 104, 0.5);
       }
 
+      .nickname-section {
+        margin: 16px 0;
+      }
+
+      .nickname-section label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #c2d4f0;
+        text-align: left;
+      }
+
+      #nickname-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(110, 214, 255, 0.3);
+        border-radius: 8px;
+        background: rgba(18, 26, 36, 0.8);
+        color: #eef5ff;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s ease;
+      }
+
+      #nickname-input:focus {
+        border-color: rgba(110, 214, 255, 0.6);
+      }
+
+      #nickname-input::placeholder {
+        color: rgba(194, 212, 240, 0.6);
+      }
+
+      .game-mode-section {
+        margin: 20px 0;
+      }
+
+      .mode-title {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #c2d4f0;
+        text-align: left;
+      }
+
+      .mode-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .mode-button {
+        flex: 1;
+        padding: 12px 8px;
+        border: 2px solid rgba(110, 214, 255, 0.3);
+        border-radius: 8px;
+        background: rgba(18, 26, 36, 0.6);
+        color: #c2d4f0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+
+      .mode-button:hover {
+        border-color: rgba(110, 214, 255, 0.5);
+        background: rgba(18, 26, 36, 0.8);
+      }
+
+      .mode-button.active {
+        border-color: #70c8ff;
+        background: rgba(112, 200, 255, 0.2);
+        color: #eef5ff;
+      }
+
+      .mode-name {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .mode-description {
+        font-size: 11px;
+        opacity: 0.8;
+        line-height: 1.2;
+      }
+
       #game-over-overlay {
         position: absolute;
         inset: 0;
@@ -232,6 +315,7 @@
           <div class="hud-item">점수: <span id="score">0</span></div>
           <div class="hud-item">스테이지: <span id="stage">1</span></div>
           <div class="hud-item">레벨: <span id="level">1</span></div>
+          <div class="hud-item" id="timer-display" style="display: none;">시간: <span id="timer">15:00</span></div>
         </div>
       </div>
 
@@ -240,6 +324,26 @@
           <h1>🍩 도넛 슈팅</h1>
           <p>하늘에서 내려오는 몬스터들을 스프링클로 물리치세요!</p>
           <p>도넛이 자동으로 몬스터를 조준하여 스프링클을 발사합니다!</p>
+
+          <div class="nickname-section">
+            <label for="nickname-input">닉네임:</label>
+            <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요" maxlength="10">
+          </div>
+
+          <div class="game-mode-section">
+            <p class="mode-title">게임 모드 선택:</p>
+            <div class="mode-buttons">
+              <button class="mode-button active" data-mode="normal">
+                <div class="mode-name">노말 모드</div>
+                <div class="mode-description">일반적인 슈팅 게임</div>
+              </button>
+              <button class="mode-button" data-mode="timeattack">
+                <div class="mode-name">타임어택 모드</div>
+                <div class="mode-description">15분 생존 도전</div>
+              </button>
+            </div>
+          </div>
+
           <button id="start-button">게임 시작</button>
         </div>
       </div>

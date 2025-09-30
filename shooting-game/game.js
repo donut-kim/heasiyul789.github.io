@@ -55,6 +55,12 @@ class ShootingGame {
         this.lightningFlash = false;
         this.lightningDuration = 0;
 
+        // Game mode system
+        this.gameMode = 'normal'; // 'normal' or 'timeattack'
+        this.playerNickname = '';
+        this.timeAttackDuration = 15 * 60; // 15분 (초 단위)
+        this.timeAttackTimer = 0;
+
         // Input handling
         this.keys = {};
         this.setupInput();
@@ -63,6 +69,8 @@ class ShootingGame {
         this.scoreEl = document.getElementById('score');
         this.stageEl = document.getElementById('stage');
         this.levelEl = document.getElementById('level');
+        this.timerEl = document.getElementById('timer');
+        this.timerDisplayEl = document.getElementById('timer-display');
         this.startOverlay = document.getElementById('start-overlay');
         this.gameOverOverlay = document.getElementById('game-over-overlay');
         this.finalScoreEl = document.getElementById('final-score');
@@ -88,8 +96,23 @@ class ShootingGame {
     }
 
     setupEventListeners() {
+        // 게임 시작 버튼
         document.getElementById('start-button').addEventListener('click', () => {
+            const nicknameInput = document.getElementById('nickname-input');
+            this.playerNickname = nicknameInput.value.trim() || '익명';
             this.startGame();
+        });
+
+        // 모드 선택 버튼들
+        document.querySelectorAll('.mode-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // 모든 버튼에서 active 클래스 제거
+                document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+                // 클릭된 버튼에 active 클래스 추가
+                button.classList.add('active');
+                // 게임 모드 설정
+                this.gameMode = button.dataset.mode;
+            });
         });
     }
 
@@ -148,17 +171,44 @@ class ShootingGame {
         this.monsters = [];
         this.particles = [];
 
-        // 도넛 초기 위치 (도넛 바닥이 도마 윗면에 딱 맞춤)
+        // 게임 모드에 따른 초기화
+        if (this.gameMode === 'timeattack') {
+            this.timeAttackTimer = this.timeAttackDuration;
+            this.stage = 1; // 타임어택은 항상 1스테이지
+            this.maxStage = 1;
+        } else {
+            this.stage = 1;
+            this.maxStage = 20;
+        }
+
+        // 도넛 초기 위치
+        const donutSize = this.gameMode === 'timeattack' ? 20 : 40; // 타임어택에서 50% 작게
+        let donutY;
+        if (this.gameMode === 'timeattack') {
+            // 타임어택 모드에서는 도마가 없으므로 화면 하단에서 20px 위
+            donutY = this.canvas.height - 40;
+        } else {
+            // 노말 모드에서는 도마 윗면에 딱 맞춤
+            donutY = this.canvas.height - 60 - donutSize;
+        }
+
         this.donut = {
-            x: this.canvas.width / 2 - 20,
-            y: this.canvas.height - 60 - 40, // 도마 윗면(60px 위) - 도넛 높이(40px)
-            width: 40,
-            height: 40,
+            x: this.canvas.width / 2 - donutSize / 2,
+            y: donutY,
+            width: donutSize,
+            height: donutSize,
             speed: 4
         };
 
         this.lastSprinkleTime = Date.now();
         this.lastMonsterSpawn = Date.now();
+
+        // 타이머 표시 설정
+        if (this.gameMode === 'timeattack') {
+            this.timerDisplayEl.style.display = 'block';
+        } else {
+            this.timerDisplayEl.style.display = 'none';
+        }
 
         this.startOverlay.classList.add('hidden');
         this.gameOverOverlay.classList.remove('active');
@@ -171,14 +221,25 @@ class ShootingGame {
 
         const now = Date.now();
 
+        // 타임어택 모드 타이머 업데이트
+        if (this.gameMode === 'timeattack') {
+            this.timeAttackTimer -= 16 / 1000; // 16ms 기준으로 계산 (약 60fps)
+            if (this.timeAttackTimer <= 0) {
+                this.timeAttackComplete();
+                return;
+            }
+        }
+
         // 자동 스프링클 발사 (가장 가까운 몬스터를 향해)
         if (now - this.lastSprinkleTime > this.sprinkleInterval) {
             this.shootSprinkleAtNearestMonster();
             this.lastSprinkleTime = now;
         }
 
-        // 보스 체크 및 생성
-        this.checkBossStage();
+        // 보스 체크 및 생성 (타임어택 모드에서는 보스 없음)
+        if (this.gameMode !== 'timeattack') {
+            this.checkBossStage();
+        }
 
         // 몬스터 생성
         if (!this.isBossStage && now - this.lastMonsterSpawn > this.monsterSpawnRate) {
@@ -246,11 +307,14 @@ class ShootingGame {
             // 스프링클 각도 계산
             const angle = Math.atan2(dy, dx);
 
+            // 타임어택 모드에서는 스프링클 크기도 50% 작게
+            const sprinkleSize = this.gameMode === 'timeattack' ? 2 : 4;
+
             this.sprinkles.push({
-                x: startX - 2,
-                y: startY - 2,
-                width: 4,
-                height: 4,
+                x: startX - sprinkleSize / 2,
+                y: startY - sprinkleSize / 2,
+                width: sprinkleSize,
+                height: sprinkleSize,
                 vx: vx,
                 vy: vy,
                 angle: angle
@@ -273,11 +337,13 @@ class ShootingGame {
     }
 
     spawnMonster() {
+        // 타임어택 모드에서는 몬스터 크기 50% 작게
+        const size = this.gameMode === 'timeattack' ? 15 : 30;
         const monster = {
-            x: Math.random() * (this.canvas.width - 30),
-            y: -30,
-            width: 30,
-            height: 30,
+            x: Math.random() * (this.canvas.width - size),
+            y: -size,
+            width: size,
+            height: size,
             speed: this.monsterSpeed + Math.random() * 0.2, // 0.3 ~ 0.5 속도
             hp: 1
         };
@@ -696,6 +762,12 @@ class ShootingGame {
         }
     }
 
+    timeAttackComplete() {
+        this.gameState = 'gameover';
+        this.finalScoreEl.textContent = `🎉 타임어택 완료! 최종 점수: ${this.score}`;
+        this.gameOverOverlay.classList.add('active');
+    }
+
     nextStage() {
         if (this.stage < this.maxStage) {
             this.stage++;
@@ -714,8 +786,10 @@ class ShootingGame {
 
         if (this.gameState !== 'playing') return;
 
-        // 도마 그리기 (하단 벽)
-        this.drawCuttingBoard();
+        // 도마 그리기 (하단 벽) - 타임어택 모드에서는 제거
+        if (this.gameMode !== 'timeattack') {
+            this.drawCuttingBoard();
+        }
 
         // HP 바 그리기 (도마 아래)
         this.drawPlayerHP();
@@ -1429,6 +1503,13 @@ class ShootingGame {
         this.scoreEl.textContent = this.score;
         this.stageEl.textContent = this.stage;
         this.levelEl.textContent = this.level;
+
+        // 타임어택 모드에서 타이머 업데이트
+        if (this.gameMode === 'timeattack' && this.timerEl) {
+            const minutes = Math.floor(this.timeAttackTimer / 60);
+            const seconds = Math.floor(this.timeAttackTimer % 60);
+            this.timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
     }
 
     gameOver() {

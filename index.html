@@ -52,6 +52,8 @@
         --panel-bg: #121a24;
         --panel-border: #405268;
         --accent: #70c8ff;
+        --timeattack-width: 600px;
+        --timeattack-height: 1000px;
       }
 
       * {
@@ -86,6 +88,15 @@
         height: var(--playfield-height);
         background: var(--background);
       }
+
+      /* 타임어택 모드일 때 wrapper 크기 조정 (PC만) */
+      @media (min-width: 769px) {
+        body.timeattack-mode #game-wrapper {
+          width: calc(var(--timeattack-width) + var(--panel-width));
+          height: var(--timeattack-height);
+        }
+      }
+
 
       #side-panel {
         width: var(--panel-width);
@@ -165,6 +176,21 @@
         background: rgba(30, 36, 46, 0.85);
         overflow: hidden;
         border: 1px solid rgba(90, 118, 150, 0.5);
+      }
+
+      /* 타임어택 모드일 때 XP 바 크기 조정 (PC만) */
+      @media (min-width: 769px) {
+        body.timeattack-mode #xp-bar-wrapper {
+          width: calc(var(--timeattack-width) - 40px);
+        }
+      }
+
+      /* 모바일에서는 양쪽 10px 패딩으로 조정 */
+      @media (max-width: 768px) {
+        body.timeattack-mode #xp-bar-wrapper {
+          left: 10px;
+          width: calc(100vw - 20px);
+        }
       }
 
       #xp-bar-fill {
@@ -360,29 +386,32 @@
       }
 
       .start-card {
-        width: 420px;
-        padding: 32px 36px;
+        width: 380px; /* 너비 줄임 */
+        max-height: 85vh; /* 화면 높이의 85%로 더 제한 */
+        padding: 16px 24px; /* 패딩 더 줄임 */
         border-radius: 18px;
         background: linear-gradient(180deg, rgba(22, 28, 40, 0.95), rgba(12, 18, 26, 0.95));
         border: 1px solid rgba(110, 214, 255, 0.35);
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 8px; /* 간격 더 줄임 */
         text-align: center;
+        overflow-y: auto; /* 스크롤 가능 */
       }
 
       .start-card h1 {
         margin: 0;
-        font-size: 36px;
+        font-size: 28px; /* 폰트 사이즈 줄임 */
         color: #fdf9ff;
         text-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
       }
 
       .start-card p {
         margin: 0;
-        font-size: 16px;
+        font-size: 14px; /* 폰트 사이즈 줄임 */
         color: #c2d4f0;
+        line-height: 1.3; /* 줄 간격 줄임 */
       }
 
       .start-card label {
@@ -432,32 +461,32 @@
 
       /* 캐릭터 선택 스타일 */
       .character-section {
-        margin: 16px 0;
+        margin: 8px 0; /* 마진 줄임 */
       }
       .character-section label {
         display: block;
-        font-size: 13px;
+        font-size: 12px; /* 폰트 사이즈 줄임 */
         color: #8ea5c8;
         text-align: left;
-        margin-bottom: 8px;
+        margin-bottom: 6px; /* 마진 줄임 */
       }
       .character-options {
         display: flex;
-        gap: 12px;
+        gap: 8px; /* 간격 줄임 */
         justify-content: center;
       }
       .character-option {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 6px;
-        padding: 12px;
+        gap: 4px; /* 간격 줄임 */
+        padding: 8px; /* 패딩 줄임 */
         border: 1px solid rgba(120, 150, 190, 0.3);
         border-radius: 12px;
         background: rgba(12, 16, 24, 0.5);
         cursor: pointer;
         transition: all 0.2s;
-        min-width: 100px;
+        min-width: 80px; /* 최소 너비 줄임 */
       }
       .character-option:hover {
         border-color: #6ed6ff;
@@ -471,23 +500,66 @@
       .character-preview {
         border-radius: 50%;
         background: rgba(255, 255, 255, 0.1);
-        width: 60px;
-        height: 60px;
+        width: 48px; /* 크기 줄임 */
+        height: 48px; /* 크기 줄임 */
         display: block;
       }
       .character-name {
-        font-size: 12px;
+        font-size: 10px; /* 폰트 사이즈 줄임 */
         color: #c2d4f0;
         font-weight: 500;
         text-align: center;
       }
       .nickname-section {
-        margin: 16px 0;
+        margin: 8px 0; /* 마진 줄임 */
       }
       .nickname-section label {
         font-size: 13px;
         color: #8ea5c8;
         text-align: left;
+      }
+      .game-mode-section {
+        margin: 8px 0; /* 마진 더 줄임 */
+      }
+      .mode-title {
+        margin: 0 0 8px 0; /* 마진 줄임 */
+        font-size: 12px; /* 폰트 사이즈 줄임 */
+        color: #8ea5c8;
+        text-align: left;
+      }
+      .mode-buttons {
+        display: flex;
+        gap: 8px;
+      }
+      .mode-button {
+        flex: 1;
+        padding: 12px 8px;
+        border: 2px solid rgba(70, 130, 180, 0.3);
+        border-radius: 8px;
+        background: rgba(16, 18, 24, 0.6);
+        color: #c2d4f0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+      .mode-button:hover {
+        border-color: rgba(70, 130, 180, 0.5);
+        background: rgba(16, 18, 24, 0.8);
+      }
+      .mode-button.active {
+        border-color: #4682b4;
+        background: rgba(70, 130, 180, 0.2);
+        color: #eef5ff;
+      }
+      .mode-name {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .mode-description {
+        font-size: 11px;
+        opacity: 0.8;
+        line-height: 1.2;
       }
       .page-wrap {
         display: flex;
@@ -593,6 +665,7 @@
       #side-panel {
         display: none !important; /* 모바일: 오른쪽 위젯 제거 */
       }
+
       .top-hud {
         display: flex;            /* 모바일: 상단 HUD 표시 */
         top: calc(env(safe-area-inset-top, 0px) + 8px);
@@ -634,8 +707,24 @@
       }
       .card-level, .card-desc, .card-hint { font-size: 13px; }
       .start-card {
-        width: min(88vw, 420px);
-        padding: 24px 22px;
+        width: min(95vw, 420px); /* 너비를 더 넓게 */
+        max-height: 85vh; /* 모바일에서 높이 더 제한 */
+        padding: 16px 20px; /* 패딩 더 줄임 */
+        gap: 10px; /* 간격 더 줄임 */
+      }
+
+
+      /* 모바일에서 모드 버튼 크기 줄임 */
+      .mode-button {
+        padding: 10px 6px; /* 패딩 줄임 */
+      }
+
+      .mode-name {
+        font-size: 12px; /* 폰트 사이즈 줄임 */
+      }
+
+      .mode-description {
+        font-size: 10px; /* 폰트 사이즈 줄임 */
       }
 
       /* 모바일에서 모달 개선 */
@@ -756,11 +845,11 @@
             <label>캐릭터 선택</label>
             <div class="character-options">
               <div class="character-option selected" data-character="signature_knotted">
-                <canvas class="character-preview" width="60" height="60"></canvas>
+                <canvas class="character-preview" width="48" height="48"></canvas>
                 <span class="character-name">스프링클 도넛</span>
               </div>
               <div class="character-option" data-character="glazed_ring">
-                <canvas class="character-preview" width="60" height="60"></canvas>
+                <canvas class="character-preview" width="48" height="48"></canvas>
                 <span class="character-name">글레이즈드 도넛</span>
               </div>
             </div>
@@ -772,8 +861,22 @@
             <input id="nickname-input" type="text" maxlength="12" autocomplete="off" placeholder="예: SweetDonut" />
           </div>
 
+          <div class="game-mode-section">
+            <p class="mode-title">게임 모드 선택:</p>
+            <div class="mode-buttons">
+              <button class="mode-button active" data-mode="normal">
+                <div class="mode-name">노말 모드</div>
+                <div class="mode-description">일반적인 도넛라이크 게임</div>
+              </button>
+              <button class="mode-button" data-mode="timeattack">
+                <div class="mode-name">타임어택 모드</div>
+                <div class="mode-description">15분 생존 도전 (작은 크기, 장애물 없음)</div>
+              </button>
+            </div>
+          </div>
+
           <!-- 패치 내용 버튼 -->
-          <button id="patch-notes-button" type="button" style="background: #7c3aed; margin-bottom: 10px; font-size: 14px; padding: 8px 16px;">📝 패치내용 for Discord</button>
+          <button id="patch-notes-button" type="button" style="background: #7c3aed; margin-bottom: 6px; font-size: 12px; padding: 6px 12px;">📝 패치내용 for Discord</button>
 
           <button id="start-button" type="button" disabled>게임 시작</button>
         </div>
@@ -807,6 +910,16 @@
       };
     </script>
 
-    <script src="js/main.js" type="module"></script>
+    <script type="module">
+      // 게임 모드에 따라 적절한 폴더의 main.js를 동적으로 로드
+      const gameMode = sessionStorage.getItem('gameMode') || 'normal';
+      const scriptPath = gameMode === 'timeattack'
+        ? './js/timeattack/main.js'
+        : './js/normal/main.js';
+
+      import(scriptPath).catch(err => {
+        console.error('Failed to load game script:', err);
+      });
+    </script>
   </body>
 </html>
