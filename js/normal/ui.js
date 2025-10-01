@@ -10,12 +10,13 @@ export function initializeUIElements() {
   startButton = document.getElementById('start-button');
 }
 
-export function showModal(title, message, { showRestart = false, showRanking = false, extraHTML = '' } = {}) {
+export function showModal(title, message, { showRestart = false, showRanking = false, extraHTML = '', showConfirm = false, onConfirm = null, onCancel = null, autoClose = false } = {}) {
   modalOverlay.innerHTML = '';
   const titleEl = document.createElement('h1');
   titleEl.textContent = title;
   const messageEl = document.createElement('p');
   messageEl.textContent = message;
+  messageEl.style.whiteSpace = 'pre-line'; // 줄바꿈 지원
   modalOverlay.appendChild(titleEl);
   modalOverlay.appendChild(messageEl);
   if (extraHTML) {
@@ -25,7 +26,7 @@ export function showModal(title, message, { showRestart = false, showRanking = f
     modalOverlay.appendChild(wrapper);
   }
 
-  if (showRestart || showRanking) {
+  if (showRestart || showRanking || showConfirm) {
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
     buttonContainer.style.gap = '10px';
@@ -49,9 +50,40 @@ export function showModal(title, message, { showRestart = false, showRanking = f
       buttonContainer.appendChild(rankingButton);
     }
 
+    if (showConfirm) {
+      const confirmButton = document.createElement('button');
+      confirmButton.className = 'overlay-button';
+      confirmButton.type = 'button';
+      confirmButton.textContent = '확인';
+      confirmButton.style.background = 'linear-gradient(90deg, #4ade80, #22c55e)';
+      confirmButton.addEventListener('click', () => {
+        hideModal();
+        if (onConfirm) onConfirm();
+      });
+      buttonContainer.appendChild(confirmButton);
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'overlay-button';
+      cancelButton.type = 'button';
+      cancelButton.textContent = '취소';
+      cancelButton.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+      cancelButton.addEventListener('click', () => {
+        hideModal();
+        if (onCancel) onCancel();
+      });
+      buttonContainer.appendChild(cancelButton);
+    }
+
     modalOverlay.appendChild(buttonContainer);
   }
   modalOverlay.classList.add('active');
+
+  // 자동 닫기 옵션 (버튼 없는 에러 메시지용)
+  if (autoClose) {
+    setTimeout(() => {
+      hideModal();
+    }, 1000);
+  }
 }
 
 export async function showRankingModal() {

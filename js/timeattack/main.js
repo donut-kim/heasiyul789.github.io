@@ -87,6 +87,7 @@ import {
   drawGameStartMessage,
   drawTimeAttackBossHP
 } from './banner.js';
+import { drawDonutShopBackground } from './background.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -1491,9 +1492,7 @@ function ensureChunksAroundPlayer() {
 function handleVictory() {
   if (state.victory) return;
 
-  // 스테이지 진행
-  state.stage += 1;
-  state.elapsed = 0; // 시간을 다시 흐르게 함
+  // 타임어택 모드에서는 보스 클리어 후 스킬 선택
   state.boss = null;
   state.bossWarningTimer = 0;
 
@@ -1501,16 +1500,11 @@ function handleVictory() {
   state.enemies = [];
   state.enemyProjectiles = [];
 
-  // 성공 메시지 표시
-  showModal('스테이지 클리어!', `스테이지 ${state.stage - 1} 완료! 스테이지 ${state.stage}가 시작됩니다.`, {
-    showRestart: false,
-  });
+  // 보스 클리어 플래그 설정
+  state.bossCleared = true;
 
-  // 2초 후 모달 닫기 및 다음 스테이지 시작
-  setTimeout(() => {
-    hideModal();
-    state.paused = false;
-  }, 2000);
+  // 레벨업 처리하여 스킬 선택창 표시
+  state.xp += state.xpToNext;
 }
 
 function enterStageThree() {
@@ -1632,9 +1626,35 @@ function startGame() {
 function attemptStart() {
   const trimmed = nicknameInput.value.trim();
   if (!isNicknameValid(trimmed)) {
-    showModal('닉네임 오류', '닉네임은 2글자 이상이어야 합니다.', { showRestart: false });
+    showModal('닉네임 오류', '닉네임은 2글자 이상이어야 합니다.', { showRestart: false, autoClose: true });
     return;
   }
+
+  // 로그인 여부 확인
+  const isLoggedIn = window.firebaseAuth?.currentUser;
+  if (!isLoggedIn) {
+    showModal(
+      '⚠️ 비회원 플레이',
+      '비회원일 경우 랭킹에 등록되지 않습니다.\n\n계속하시겠습니까?',
+      {
+        showConfirm: true,
+        onConfirm: () => {
+          // 확인 클릭 시 게임 시작
+          state.nickname = trimmed;
+          const gameMode = sessionStorage.getItem('gameMode') || 'normal';
+          state.gameMode = gameMode;
+          startOverlay.classList.remove('active');
+          nicknameInput.blur();
+          startGame();
+        },
+        onCancel: () => {
+          // 취소 클릭 시 아무것도 하지 않음 (시작 화면 유지)
+        }
+      }
+    );
+    return;
+  }
+
   state.nickname = trimmed;
 
   // 선택된 게임 모드 저장 (sessionStorage에서 읽기)
@@ -1669,13 +1689,16 @@ const skillData = {
       if (next <= 3) return '김 + 1';
       return next === 4 ? '반원 공격 준비!' : '반원 공격 강화!';
     },
-    description: '김이 점점 늘어나고, 4레벨부터는 반원으로 퍼지는 귀여운 특공을 준비해요.'
+    description: (next) => {
+      if (next <= 3) return '김 한장을 추가';
+      return '김부자가되어 흥이 넘친다.';
+    }
   },
   magnet: {
     name:'No잼 자석',
     title: '자동 흡수',
     option: (next) => `흡수 범위 ${next * 100}px`,
-    description: '주변의 빵가루 경험치를 자동으로 빨아들여요.'
+    description: '자동식사가능ㅋ'
   },
   double_shot: {
     name: '더블 발사',
@@ -1687,7 +1710,7 @@ const skillData = {
     name: '스프링클',
     title: '유도탄',
     option: '유도스프링클 + 2',
-    description: '이거 아마 방부제가 들어갔을걸...?'
+    description: '이거 아마 방부제가 들어갔을걸?'
   },
   deulgireum_rapid: {
     name: '들기름',
@@ -1699,7 +1722,7 @@ const skillData = {
     name: '킴스클럽',
     title: '블레이드',
     option: '회전 블레이드 김 + 1',
-    description: '브랜드 김! 이제 방부제를 곁드린....'
+    description: '브랜드 김! 이제 방부제를 곁드린..'
   },
   em_field: {
     name: '슈크림',
@@ -1717,10 +1740,10 @@ const skillData = {
     name: '김부각',
     title: '기본공격 업그레이드',
     option: '장애물 무시',
-    description: '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!'
+    description: '쌀가루로 튀긴 김부각! 더 바삭하다고!!'
   },
   hp_increase: {
-    name: '최대 HP 증가',
+    name: 'HP 증가',
     title: '탄수화물',
     option: (next) => `최대 HP +2 (총 +${next * 2})`,
     description: '탄수화물 먹으면 쌀찜ㅠ'
@@ -1765,10 +1788,19 @@ function openUpgradeSelection() {
 }
 
 function renderUpgradeOverlay() {
-  // 레벨 1일 때는 "레벨업!" 텍스트 숨기기
+  // 보스 클리어 또는 레벨 1일 때 제목 변경
   const levelUpTitle = document.querySelector('#upgrade-overlay h1');
   if (levelUpTitle) {
-    levelUpTitle.style.display = state.level === 1 ? 'none' : 'block';
+    if (state.bossCleared) {
+      levelUpTitle.textContent = '보스 클리어!';
+      levelUpTitle.style.display = 'block';
+      state.bossCleared = false; // 플래그 초기화
+    } else if (state.level === 1) {
+      levelUpTitle.style.display = 'none';
+    } else {
+      levelUpTitle.textContent = '레벨업!';
+      levelUpTitle.style.display = 'block';
+    }
   }
 
   upgradeCardsWrapper.innerHTML = '';
@@ -1786,7 +1818,7 @@ function renderUpgradeOverlay() {
     const skillName = skill.name;
     const skillTitle = skill.title;
     const skillOption = typeof skill.option === 'function' ? skill.option(next) : skill.option;
-    const skillDescription = skill.description;
+    const skillDescription = typeof skill.description === 'function' ? skill.description(next) : skill.description;
     const skillLevel = `Lv.${next} / ${def.max}`;
 
     const titleStyle = isSpecialSkill ? 'color: #4ade80;' : 'color: #f0f6ff;';
@@ -2433,10 +2465,10 @@ function update(dt) {
     }
   }
 
-  // 타임어택 모드 보스 타이머
+  // 타임어택 모드 보스 타이머 (3분마다)
   if (activePlay && !state.boss) {
     state.timeAttackBossTimer += dt;
-    // 3분(180초)마다 보스 등장
+    // 180초(3분)마다 보스 등장
     if (state.timeAttackBossTimer >= 180) {
       spawnTimeAttackBoss(vectorCopy);
       state.timeAttackBossTimer = 0;
@@ -2465,7 +2497,7 @@ function update(dt) {
 
       // 보스 스폰 시간(180초의 배수)과 겹치는지 체크
       const nextBossSpawnIn = 180 - state.timeAttackBossTimer;
-      const isBossSpawnSoon = nextBossSpawnIn <= 10; // 보스 스폰 10초 전
+      const isBossSpawnSoon = nextBossSpawnIn <= 5; // 보스 스폰 5초 전
 
       if (state.nextBlackDustSpawn <= 3 && state.nextBlackDustSpawn > 0 && !isBossSpawnSoon) {
         // 3초 전부터 경고 표시 (보스 스폰이 임박하지 않은 경우만)
@@ -2536,9 +2568,10 @@ function update(dt) {
     .map((ef) => ({ ...ef, timer: ef.timer - dt }))
     .filter((ef) => ef.timer > 0);
 
-  if (!state.boss && !state.victory && state.stage < 3 && state.elapsed >= constants.BOSS_SPAWN_TIME) {
-    spawnBoss();
-  }
+  // 타임어택 모드에서는 별도의 보스 타이머를 사용하므로 이 로직 비활성화
+  // if (!state.boss && !state.victory && state.stage < 3 && state.elapsed >= constants.BOSS_SPAWN_TIME) {
+  //   spawnBoss();
+  // }
 
   if (!activePlay) return;
 
@@ -3767,25 +3800,8 @@ function drawBackground() {
     drawGrasslandBackground();
     return;
   }
-  const { worldW, worldH, halfW, halfH } = getWorldDims();
-
-  // ===== 나무쟁반 배경 =====
-  const centerX = halfW;
-  const centerY = halfH;
-
-  // 떡갈나무 베이스 그라디언트 (진한 갈색과 황갈색)
-  const oakGrad = ctx.createRadialGradient(centerX, centerY, Math.min(halfW, halfH) * 0.15, centerX, centerY, Math.max(worldW, worldH) * 0.9);
-  oakGrad.addColorStop(0.0, '#d4a574');  // 떡갈나무 밝은 중심 (황갈색)
-  oakGrad.addColorStop(0.25, '#c7956a');  // 중간 황갈색
-  oakGrad.addColorStop(0.5, '#b5835d');   // 진한 황갈색
-  oakGrad.addColorStop(0.75, '#a0714f');  // 갈색으로 전환
-  oakGrad.addColorStop(1.0, '#8b5e3c');   // 가장자리 진한 갈색
-  ctx.fillStyle = oakGrad;
-  ctx.fillRect(0, 0, worldW, worldH);
-
-  // 타임어택 모드에서만 격자무늬와 아이템들 그리기
-  drawGridPattern();
-  drawTrayItems();
+  // 도넛 가게 배경 그리기
+  drawDonutShopBackground(ctx, state, getWorldDims, worldToScreen, vector, clamp, timeAttackConstants);
 
 }
 
@@ -3826,255 +3842,6 @@ function drawNormalModeGrid() {
   }
 
   ctx.globalAlpha = 1;
-}
-
-function drawGridPattern() {
-  const { worldW, worldH } = getWorldDims();
-  const gridSize = 50;
-
-  // 월드 좌표계에서 화면에 보이는 범위 계산
-  const startWorldX = state.playerPos.x - worldW / 2;
-  const endWorldX = state.playerPos.x + worldW / 2;
-  const startWorldY = state.playerPos.y - worldH / 2;
-  const endWorldY = state.playerPos.y + worldH / 2;
-
-  // 첫 번째 격자선의 월드 좌표 계산
-  const firstLineX = Math.floor(startWorldX / gridSize) * gridSize;
-  const firstLineY = Math.floor(startWorldY / gridSize) * gridSize;
-
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-  ctx.lineWidth = 1;
-
-  // 세로 격자선
-  for (let worldX = firstLineX; worldX <= endWorldX + gridSize; worldX += gridSize) {
-    const screenX = worldToScreen(vector(worldX, 0)).x;
-    ctx.beginPath();
-    ctx.moveTo(screenX, 0);
-    ctx.lineTo(screenX, worldH);
-    ctx.stroke();
-  }
-
-  // 가로 격자선
-  for (let worldY = firstLineY; worldY <= endWorldY + gridSize; worldY += gridSize) {
-    const screenY = worldToScreen(vector(0, worldY)).y;
-    ctx.beginPath();
-    ctx.moveTo(0, screenY);
-    ctx.lineTo(worldW, screenY);
-    ctx.stroke();
-  }
-}
-
-function drawTrayItems() {
-  const { worldW, worldH } = getWorldDims();
-  const bounds = getCurrentWorldBounds();
-  const gridSpacing = 180;
-  const jitterRange = gridSpacing * 0.35;
-  const placementChance = 0.35;
-
-  // 배경 아이템을 한 번만 생성 (경계가 바뀌면 다시 생성)
-  if (!timeAttackBackgroundItems || timeAttackBackgroundBounds !== bounds) {
-    // 시드 기반 랜덤 함수 (일관된 배치를 위해)
-    function seededRandom(seed) {
-      const x = Math.sin(seed) * 10000;
-      return x - Math.floor(x);
-    }
-
-    let seedCounter = 1000;
-    const cakeTypes = ['croissant', 'cupcake', 'bread', 'muffin', 'tiramisu', 'cheesecake'];
-    timeAttackBackgroundItems = [];
-
-    const limitX = timeAttackConstants.TIME_ATTACK_WORLD_BOUNDS;
-    const limitY = timeAttackConstants.TIME_ATTACK_WORLD_BOUNDS;
-    const minX = -limitX;
-    const maxX = limitX;
-    const minY = -limitY;
-    const maxY = limitY;
-
-    // 흰색 경계선 전체에 gridSpacing 간격으로 빵/케이크 배치
-    for (let x = minX; x <= maxX; x += gridSpacing) {
-      for (let y = minY; y <= maxY; y += gridSpacing) {
-        const placementRoll = seededRandom(seedCounter++);
-        if (placementRoll > placementChance) {
-          continue;
-        }
-        const randomX = clamp(
-          x + (seededRandom(seedCounter++) - 0.5) * 2 * jitterRange,
-          minX,
-          maxX
-        );
-        const randomY = clamp(
-          y + (seededRandom(seedCounter++) - 0.5) * 2 * jitterRange,
-          minY,
-          maxY
-        );
-        const typeIndex = Math.floor(seededRandom(seedCounter++) * cakeTypes.length);
-        const scale = 0.8 + seededRandom(seedCounter++) * 0.4; // 0.8~1.2 크기
-
-        timeAttackBackgroundItems.push({
-          worldX: randomX,
-          worldY: randomY,
-          type: cakeTypes[typeIndex],
-          scale
-        });
-      }
-    }
-
-    timeAttackBackgroundBounds = bounds;
-  }
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, worldW, worldH);
-  ctx.clip();
-
-  // 모든 배경 아이템 그리기 (나무배경 영역 밖은 잘라냄)
-  timeAttackBackgroundItems.forEach(item => {
-    const screenPos = worldToScreen(vector(item.worldX, item.worldY));
-
-    // 화면 범위 내에 있는 아이템만 그리기
-    if (screenPos.x > -100 && screenPos.x < worldW + 100 &&
-        screenPos.y > -100 && screenPos.y < worldH + 100) {
-
-      ctx.save();
-      ctx.globalAlpha = 0.3; // 배경처럼 보이게 반투명
-      ctx.translate(screenPos.x, screenPos.y);
-      ctx.scale(item.scale, item.scale);
-
-      switch (item.type) {
-        case 'croissant':
-          drawCroissant(0, 0);
-          break;
-        case 'cupcake':
-          drawCupcake(0, 0);
-          break;
-        case 'bread':
-          drawBread(0, 0);
-          break;
-        case 'muffin':
-          drawMuffin(0, 0);
-          break;
-        case 'tiramisu':
-          drawTiramisu(0, 0);
-          break;
-        case 'cheesecake':
-          drawCheesecake(0, 0);
-          break;
-      }
-
-      ctx.restore();
-    }
-  });
-
-  ctx.restore();
-}
-
-// 크루아상
-function drawCroissant(x, y) {
-  ctx.fillStyle = '#d4a574';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 30, 15, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 겉면 레이어 표현
-  ctx.strokeStyle = '#b8925e';
-  ctx.lineWidth = 1.5;
-  for (let i = -2; i <= 2; i++) {
-    ctx.beginPath();
-    ctx.arc(x + i * 6, y, 8, 0, Math.PI);
-    ctx.stroke();
-  }
-}
-
-// 컵케이크
-function drawCupcake(x, y) {
-  // 컵 부분
-  ctx.fillStyle = '#ff9999';
-  ctx.beginPath();
-  ctx.moveTo(x - 15, y + 10);
-  ctx.lineTo(x - 12, y - 5);
-  ctx.lineTo(x + 12, y - 5);
-  ctx.lineTo(x + 15, y + 10);
-  ctx.closePath();
-  ctx.fill();
-
-  // 크림 부분
-  ctx.fillStyle = '#ffe4e1';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 10, 18, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 체리
-  ctx.fillStyle = '#ff0000';
-  ctx.beginPath();
-  ctx.arc(x, y - 18, 4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// 식빵
-function drawBread(x, y) {
-  ctx.fillStyle = '#f5deb3';
-  ctx.fillRect(x - 20, y - 12, 40, 24);
-
-  // 윗면 (갈색)
-  ctx.fillStyle = '#d2b48c';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 12, 20, 8, 0, 0, Math.PI, true);
-  ctx.fill();
-}
-
-// 머핀
-function drawMuffin(x, y) {
-  // 머핀 몸통
-  ctx.fillStyle = '#c49a6c';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 20, 18, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 윗부분 (부푼 모양)
-  ctx.fillStyle = '#b08968';
-  ctx.beginPath();
-  ctx.arc(x - 8, y - 8, 10, 0, Math.PI * 2);
-  ctx.arc(x + 8, y - 8, 10, 0, Math.PI * 2);
-  ctx.arc(x, y - 12, 12, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// 티라미수
-function drawTiramisu(x, y) {
-  // 아래층 (스펀지)
-  ctx.fillStyle = '#c9a87c';
-  ctx.fillRect(x - 18, y + 5, 36, 10);
-
-  // 크림층
-  ctx.fillStyle = '#f5f5dc';
-  ctx.fillRect(x - 18, y - 5, 36, 10);
-
-  // 윗층 (코코아)
-  ctx.fillStyle = '#6b4423';
-  ctx.fillRect(x - 18, y - 15, 36, 10);
-}
-
-// 치즈케이크
-function drawCheesecake(x, y) {
-  // 케이크 본체
-  ctx.fillStyle = '#fff8dc';
-  ctx.beginPath();
-  ctx.moveTo(x - 20, y + 10);
-  ctx.lineTo(x - 18, y - 10);
-  ctx.lineTo(x + 18, y - 10);
-  ctx.lineTo(x + 20, y + 10);
-  ctx.closePath();
-  ctx.fill();
-
-  // 딸기 토핑
-  ctx.fillStyle = '#ff6b6b';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 12, 15, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 크러스트
-  ctx.fillStyle = '#d2b48c';
-  ctx.fillRect(x - 20, y + 10, 40, 5);
 }
 
 function drawGrasslandBackground() {
@@ -5192,6 +4959,9 @@ window.state = state;
 
 // 초기화
 async function initialize() {
+  // 타임어택 모드는 항상 모바일 UI 사용
+  document.body.classList.add('timeattack-mode');
+
   await initializeDB(); // DB 초기화
   initializeUIElements(); // UI 요소 초기화
 

@@ -97,8 +97,8 @@ export const ORANGE_LADYBUG_SPAWN_INTERVAL_MAX = 10.0;
 export const ORANGE_LADYBUG_ZIGZAG_AMPLITUDE = 80;
 export const ORANGE_LADYBUG_ZIGZAG_FREQUENCY = 2.0;
 
-// 보스 설정
-export const BOSS_SPAWN_TIME = 180.0;
+// 보스 설정 (테스트용 10초)
+export const BOSS_SPAWN_TIME = 10.0;
 export const BOSS_HEALTH = 200;
 export const BOSS_SPEED = 130;
 export const BOSS_CHARGE_SPEED = 480;

@@ -2,6 +2,7 @@
 import { firebaseConfig } from './firebase-config.js';
 
 let db = null;
+let auth = null;
 let isFirebaseReady = false;
 
 // Firebase 초기화
@@ -19,16 +20,23 @@ async function initializeFirebase() {
       collection,
       addDoc,
       getDocs,
+      getDoc,
       query,
       orderBy,
       limit,
       where,
       updateDoc,
       doc,
-      setDoc
+      setDoc,
+      serverTimestamp
     } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
 
     db = getFirestore(app);
+
+    // Firebase Auth 초기화
+    auth = window.firebase.getAuth(app);
+    window.firebaseAuth = auth;
+    window.firebaseApp = app;
 
     // 전역에서 사용할 수 있도록 설정
     window.firestoreDB = {
@@ -36,17 +44,30 @@ async function initializeFirebase() {
       collection,
       addDoc,
       getDocs,
+      getDoc,
       query,
       orderBy,
       limit,
       where,
       updateDoc,
       doc,
-      setDoc
+      setDoc,
+      serverTimestamp
     };
 
     isFirebaseReady = true;
-    console.log('Firebase Firestore 초기화 완료');
+    console.log('Firebase Firestore & Auth 초기화 완료');
+
+    // 구글 로그인 초기화
+    console.log('window.initGoogleAuth 확인:', typeof window.initGoogleAuth);
+    if (window.initGoogleAuth) {
+      console.log('window.initGoogleAuth 호출 시작');
+      window.initGoogleAuth();
+      console.log('window.initGoogleAuth 호출 완료');
+    } else {
+      console.error('window.initGoogleAuth 함수를 찾을 수 없습니다');
+    }
+
     return true;
   } catch (error) {
     console.error('Firebase 초기화 실패:', error);
@@ -54,7 +75,7 @@ async function initializeFirebase() {
   }
 }
 
-// 랭킹 데이터 저장 (Firestore) - 닉네임별 최고 점수만 업데이트
+// 랭킹 데이터 저장 (Firestore) - 로그인한 사용자만 저장, create only
 export async function saveRankingToFirebase(nickname, character, stage, survivalTime, finalScore) {
   try {
     if (!isFirebaseReady) {
@@ -64,38 +85,46 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
       }
     }
 
-    const { collection, getDocs, query, where, setDoc, doc } = window.firestoreDB;
-    const cleanNickname = nickname.trim();
+    // 로그인 여부 확인 - 비회원은 저장하지 않음
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
+      console.log('비회원은 랭킹에 저장되지 않습니다.');
+      return false;
+    }
 
-    // 기존 해당 닉네임의 기록 찾기
+    const { collection, getDocs, query, where, addDoc, serverTimestamp } = window.firestoreDB;
+    const cleanNickname = nickname.trim();
+    const userId = currentUser.uid;
+
+    // 기존 해당 사용자의 최고 기록 찾기 (UID 기반)
     const existingQuery = query(
       collection(db, 'rankings'),
-      where('nickname', '==', cleanNickname)
+      where('uid', '==', userId),
+      where('gameType', '==', 'normal')
     );
 
     const existingSnapshot = await getDocs(existingQuery);
 
     const newScore = parseInt(finalScore);
     let shouldSave = false;
-    let docId = cleanNickname; // 닉네임을 document ID로 사용
 
     if (existingSnapshot.empty) {
-      // 해당 닉네임이 없으면 새로 저장
+      // 해당 사용자가 없으면 새로 저장
       shouldSave = true;
-      console.log('새로운 닉네임, 랭킹 저장:', cleanNickname);
+      console.log('새로운 사용자, 랭킹 저장:', userId);
     } else {
       // 기존 기록이 있으면 점수 비교
       let maxExistingScore = 0;
       existingSnapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        if (data.finalScore > maxExistingScore) {
-          maxExistingScore = data.finalScore;
+        if (data.score > maxExistingScore) {
+          maxExistingScore = data.score;
         }
       });
 
       if (newScore > maxExistingScore) {
         shouldSave = true;
-        console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 업데이트`);
+        console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 새로 생성`);
       } else {
         console.log(`기존 최고점수(${maxExistingScore}) >= 새 점수(${newScore}), 저장 안함`);
         return false;
@@ -103,18 +132,19 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
     }
 
     if (shouldSave) {
+      // Security Rules에 맞는 필드만 사용
       const rankingData = {
         nickname: cleanNickname,
-        character,
         stage: parseInt(stage),
-        survivalTime: parseFloat(survivalTime),
-        finalScore: newScore,
-        timestamp: Date.now(),
-        date: new Date().toISOString()
+        gameTime: parseFloat(survivalTime),
+        score: newScore,
+        gameType: 'normal',
+        uid: userId,
+        createdAt: serverTimestamp()
       };
 
-      // 닉네임을 document ID로 사용하여 upsert
-      await setDoc(doc(db, 'rankings', docId), rankingData);
+      // create만 허용되므로 addDoc 사용 (자동 생성된 ID)
+      await addDoc(collection(db, 'rankings'), rankingData);
 
       console.log('Firestore에 랭킹 저장 완료:', rankingData);
       return true;
@@ -137,13 +167,12 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
       }
     }
 
-    const { collection, getDocs, query, orderBy, limit } = window.firestoreDB;
+    const { collection, getDocs, query, where } = window.firestoreDB;
 
-    // finalScore 기준으로 내림차순 정렬하여 상위 랭킹 가져오기
+    // 노말 모드 게임 타입만 필터링 (클라이언트에서 정렬)
     const rankingsQuery = query(
       collection(db, 'rankings'),
-      orderBy('finalScore', 'desc'),
-      limit(limitCount)
+      where('gameType', '==', 'normal')
     );
 
     const querySnapshot = await getDocs(rankingsQuery);
@@ -159,21 +188,74 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
       rankings.push({
         id: doc.id,
         nickname: data.nickname || '익명',
-        character: data.character || 'signature_knotted',
+        character: 'signature_knotted', // character 필드가 없으므로 기본값
         stage: data.stage || 1,
-        survivalTime: data.survivalTime || 0,
-        finalScore: data.finalScore || 0,
-        timestamp: data.timestamp || Date.now(),
-        date: data.date
+        survivalTime: data.gameTime || 0,
+        finalScore: data.score || 0,
+        timestamp: data.createdAt?.toMillis() || Date.now(),
+        date: data.createdAt?.toDate().toISOString() || new Date().toISOString()
       });
     });
 
-    console.log('Firestore에서 랭킹 로드 완료:', rankings.length, '개');
-    return rankings;
+    // 클라이언트에서 score 기준 내림차순 정렬 후 상위 limitCount개만 반환
+    rankings.sort((a, b) => b.finalScore - a.finalScore);
+    const topRankings = rankings.slice(0, limitCount);
+
+    console.log('Firestore에서 랭킹 로드 완료:', topRankings.length, '개');
+    return topRankings;
 
   } catch (error) {
     console.error('Firestore 랭킹 로딩 실패:', error);
     return [];
+  }
+}
+
+// 사용자 닉네임 조회
+export async function getUserNickname(uid) {
+  try {
+    if (!isFirebaseReady) {
+      const initialized = await initializeFirebase();
+      if (!initialized) {
+        throw new Error('Firebase 초기화 실패');
+      }
+    }
+
+    const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
+    const userDoc = await getDoc(doc(db, 'users', uid));
+
+    if (userDoc.exists()) {
+      return userDoc.data().nickname;
+    }
+    return null;
+  } catch (error) {
+    console.error('닉네임 조회 실패:', error);
+    return null;
+  }
+}
+
+// 사용자 닉네임 저장
+export async function saveUserNickname(uid, nickname) {
+  try {
+    if (!isFirebaseReady) {
+      const initialized = await initializeFirebase();
+      if (!initialized) {
+        throw new Error('Firebase 초기화 실패');
+      }
+    }
+
+    const { doc, setDoc, serverTimestamp } = window.firestoreDB;
+
+    await setDoc(doc(db, 'users', uid), {
+      uid,
+      nickname: nickname.trim(),
+      createdAt: serverTimestamp()
+    });
+
+    console.log('닉네임 저장 완료:', nickname);
+    return true;
+  } catch (error) {
+    console.error('닉네임 저장 실패:', error);
+    return false;
   }
 }
 

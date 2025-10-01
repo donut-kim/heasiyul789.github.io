@@ -226,8 +226,8 @@ export function spawnTimeAttackBoss(vectorCopy) {
     state.playerPos.y + Math.sin(angle) * distance,
   );
 
-  // HP는 보스 순서에 따라 100씩 증가
-  const bossHP = 100 * (state.timeAttackBossIndex + 1);
+  // HP는 테스트용으로 10으로 설정
+  const bossHP = 10;
 
   state.boss = {
     pos: bossPos,

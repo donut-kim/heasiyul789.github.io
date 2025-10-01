@@ -1500,9 +1500,33 @@ function startGame() {
 function attemptStart() {
   const trimmed = nicknameInput.value.trim();
   if (!isNicknameValid(trimmed)) {
-    showModal('닉네임 오류', '닉네임은 2글자 이상이어야 합니다.', { showRestart: false });
+    showModal('닉네임 오류', '닉네임은 2글자 이상이어야 합니다.', { showRestart: false, autoClose: true });
     return;
   }
+
+  // 로그인 여부 확인
+  const isLoggedIn = window.firebaseAuth?.currentUser;
+  if (!isLoggedIn) {
+    showModal(
+      '⚠️ 비회원 플레이',
+      '비회원일 경우 랭킹에 등록되지 않습니다.\n\n계속하시겠습니까?',
+      {
+        showConfirm: true,
+        onConfirm: () => {
+          // 확인 클릭 시 게임 시작
+          state.nickname = trimmed;
+          startOverlay.classList.remove('active');
+          nicknameInput.blur();
+          startGame();
+        },
+        onCancel: () => {
+          // 취소 클릭 시 아무것도 하지 않음 (시작 화면 유지)
+        }
+      }
+    );
+    return;
+  }
+
   state.nickname = trimmed;
   startOverlay.classList.remove('active');
   nicknameInput.blur();
