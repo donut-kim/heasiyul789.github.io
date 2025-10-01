@@ -1,0 +1,9 @@
+  // 타임어택 모드 보스 타이머
+  if (state.gameMode === 'timeattack' && activePlay && !state.boss) {
+    state.timeAttackBossTimer += dt;
+    // 3분(180초)마다 보스 등장
+    if (state.timeAttackBossTimer >= 180) {
+      spawnTimeAttackBoss();
+      state.timeAttackBossTimer = 0;
+    }
+  }
