@@ -24,9 +24,9 @@ import {
   startOverlay,
   nicknameInput,
   startButton
-} from '../ui.js';
-import { checkAndSaveRanking } from '../ranking.js';
-import { initializeDB } from '../db.js';
+} from './ui.js';
+import { checkAndSaveRanking } from './ranking.js';
+import { initializeDB } from './db.js';
 import {
   vector,
   vectorAdd,
@@ -1665,8 +1665,8 @@ function attemptStart() {
   }
   state.nickname = trimmed;
 
-  // 선택된 게임 모드 저장
-  const gameMode = window.selectedGameMode || 'normal';
+  // 선택된 게임 모드 저장 (sessionStorage에서 읽기)
+  const gameMode = sessionStorage.getItem('gameMode') || 'normal';
   state.gameMode = gameMode;
 
   startOverlay.classList.remove('active');
@@ -5110,25 +5110,7 @@ async function initialize() {
   });
   startButton.addEventListener('click', attemptStart);
 
-  // 게임 모드 선택 기능
-  window.selectedGameMode = 'normal'; // 기본값은 노말 모드
-
-  const modeButtons = document.querySelectorAll('.mode-button');
-  modeButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      // 모든 버튼에서 active 클래스 제거
-      modeButtons.forEach(btn => btn.classList.remove('active'));
-      // 클릭된 버튼에 active 클래스 추가
-      button.classList.add('active');
-      // 선택된 모드 저장
-      window.selectedGameMode = button.dataset.mode;
-      sessionStorage.setItem('gameMode', button.dataset.mode);
-      // 모드 변경 시 페이지 새로고침
-      if (button.dataset.mode !== 'timeattack') {
-        window.location.reload();
-      }
-    });
-  });
+  // 모드 선택은 index.html에서 처리됨
 
   // 패치 노트 버튼 이벤트 리스너
   const patchNotesButton = document.getElementById('patch-notes-button');

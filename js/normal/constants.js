@@ -46,13 +46,6 @@ export const XP_REWARD_BOSS = 5000;
 // 특별 스테이지 설정
 export const STAGE_THREE_SURVIVAL_TIME = 60 * 15; // 15분
 
-// 타임어택 모드 설정
-export const TIME_ATTACK_DURATION = 60 * 15; // 15분
-export const TIME_ATTACK_OBJECT_SCALE = 0.5; // 오브젝트 50% 크기
-export const TIME_ATTACK_ENEMY_SIZE_MULTIPLIER = 2.0; // 타임어택 적 크기 배율
-export const TIME_ATTACK_ENEMY_SPAWN_MULTIPLIER = 1.5; // 타임어택 적 스폰 수 배율
-// 타임어택 모드 설정은 timeAttackConstants.js에서 관리
-
 // 적 설정
 export const ENEMY_SIZE = 20;
 export const ENEMY_BASE_SPEED = 48;

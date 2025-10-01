@@ -919,9 +919,44 @@
       };
     </script>
 
+    <script>
+      // 모드 선택 버튼 핸들러 (게임 스크립트 로드 전에 실행)
+      document.addEventListener('DOMContentLoaded', () => {
+        const modeButtons = document.querySelectorAll('.mode-button');
+
+        // 저장된 모드가 있으면 해당 버튼 활성화
+        const savedMode = sessionStorage.getItem('gameMode') || 'normal';
+        modeButtons.forEach(btn => {
+          if (btn.dataset.mode === savedMode) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+
+        modeButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            // 모든 버튼에서 active 클래스 제거
+            modeButtons.forEach(btn => btn.classList.remove('active'));
+            // 클릭된 버튼에 active 클래스 추가
+            button.classList.add('active');
+            // 선택된 모드 저장
+            const newMode = button.dataset.mode;
+            sessionStorage.setItem('gameMode', newMode);
+
+            // 모드가 변경되었으면 페이지 새로고침
+            if (newMode !== savedMode) {
+              window.location.reload();
+            }
+          });
+        });
+      });
+    </script>
+
     <script type="module">
       // 게임 모드에 따라 적절한 폴더의 main.js를 동적으로 로드
       const gameMode = sessionStorage.getItem('gameMode') || 'normal';
+      console.log('모드 : ', gameMode)
       const scriptPath = gameMode === 'timeattack'
         ? './js/timeattack/main.js'
         : './js/normal/main.js';

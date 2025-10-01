@@ -1,6 +1,5 @@
 // 모듈 imports
 import * as constants from './constants.js';
-import * as timeAttackConstants from './timeAttackConstants.js';
 import {
   state,
   resetGameplayState,
@@ -24,9 +23,9 @@ import {
   startOverlay,
   nicknameInput,
   startButton
-} from '../ui.js';
-import { checkAndSaveRanking } from '../ranking.js';
-import { initializeDB } from '../db.js';
+} from './ui.js';
+import { checkAndSaveRanking } from './ranking.js';
+import { initializeDB } from './db.js';
 import {
   vector,
   vectorAdd,
@@ -58,91 +57,12 @@ const ctx = canvas.getContext('2d');
 const mediaPortrait = window.matchMedia('(max-width: 820px), (orientation: portrait)');
 const BASE_LANDSCAPE = { w: 960, h: 540 };
 const BASE_PORTRAIT  = { w: 360, h: 640 };
-const BASE_TIME_ATTACK = { w: 600, h: 1000 };
 
 function sizeCanvasToCss() {
-  const rootStyle = document.documentElement?.style;
-
-  // 타임어택 모드일 때 처리
-  if (state.gameMode === 'timeattack') {
-    // 모바일인지 확인
-    const isMobile = window.innerWidth <= 768;
-
-    if (isMobile) {
-      // 모바일에서는 노말모드와 동일한 캔버스 크기 처리
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const displayW = Math.max(1, Math.round(rect.width  * dpr));
-      const displayH = Math.max(1, Math.round(rect.height * dpr));
-      if (canvas.width !== displayW || canvas.height !== displayH) {
-        canvas.width  = displayW;
-        canvas.height = displayH;
-      }
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      // 게임 월드는 타임어택 크기(600x1000) 유지, 화면 표시만 조정
-      const worldW = BASE_TIME_ATTACK.w;
-      const worldH = BASE_TIME_ATTACK.h;
-      const sx = rect.width  / worldW;
-      const sy = rect.height / worldH;
-      const s = Math.min(sx, sy);
-      let offsetX = (rect.width  - worldW * s) * 0.5;
-      let offsetY = (rect.height - worldH * s) * 0.5;
-
-      if (rect.width > 0 && rect.height > 0) {
-        rootStyle?.setProperty('--timeattack-width', `${rect.width}px`);
-        rootStyle?.setProperty('--timeattack-height', `${rect.height}px`);
-      }
-
-      // 모바일 HUD(상단)와 XP 바(하단)가 가리는 영역을 고려해 플레이어가 중앙에 오도록 보정
-      const hudRect = mobileHud?.offsetParent ? mobileHud.getBoundingClientRect() : null;
-      const xpRect = xpBarWrapper?.getBoundingClientRect() || null;
-      if (hudRect && xpRect && rect.width > 0 && rect.height > 0) {
-        const canvasRect = rect;
-        const topOverlap = Math.max(0, hudRect.bottom - canvasRect.top);
-        const bottomOverlap = Math.max(0, canvasRect.bottom - xpRect.top);
-        const visibleStart = topOverlap;
-        const visibleEnd = canvasRect.height - bottomOverlap;
-        if (visibleEnd > visibleStart) {
-          const desiredCenter = (visibleStart + visibleEnd) * 0.5;
-          const currentCenter = offsetY + (worldH * s) * 0.5;
-          offsetY += desiredCenter - currentCenter;
-        }
-      }
-
-      window.__renderScale = { s, worldW, worldH, offsetX, offsetY };
-    } else {
-      // PC에서는 고정 크기
-      const targetW = BASE_TIME_ATTACK.w;
-      const targetH = BASE_TIME_ATTACK.h;
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = targetW * dpr;
-      canvas.height = targetH * dpr;
-      canvas.style.width = targetW + 'px';
-      canvas.style.height = targetH + 'px';
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      rootStyle?.setProperty('--timeattack-width', `${targetW}px`);
-      rootStyle?.setProperty('--timeattack-height', `${targetH}px`);
-
-      window.__renderScale = {
-        s: 1,
-        worldW: targetW,
-        worldH: targetH,
-        offsetX: 0,
-        offsetY: 0
-      };
-    }
-    return;
-  }
-
-  rootStyle?.setProperty('--timeattack-width', `${BASE_TIME_ATTACK.w}px`);
-  rootStyle?.setProperty('--timeattack-height', `${BASE_TIME_ATTACK.h}px`);
-
-  // 노말 모드의 기존 로직
+  // 1) CSS로 보이는 크기
   const rect = canvas.getBoundingClientRect();
+
+  // 2) DPR 반영한 실제 비트맵 크기
   const dpr = window.devicePixelRatio || 1;
   const displayW = Math.max(1, Math.round(rect.width  * dpr));
   const displayH = Math.max(1, Math.round(rect.height * dpr));
@@ -151,16 +71,20 @@ function sizeCanvasToCss() {
     canvas.height = displayH;
   }
 
+  // 3) 컨텍스트를 DPR에 맞추기
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+  // 4) 게임의 “논리 좌표계”를 세팅(가로/세로 모드별)
   const target = mediaPortrait.matches ? BASE_PORTRAIT : BASE_LANDSCAPE;
   const sx = rect.width  / target.w;
   const sy = rect.height / target.h;
-  const s = Math.min(sx, sy);
+  const s = Math.min(sx, sy); // 균등 스케일로 왜곡 방지
   const offsetX = (rect.width  - target.w * s) * 0.5;
   const offsetY = (rect.height - target.h * s) * 0.5;
 
+  // 렌더 시 참조할 수 있게 전역에 저장
   window.__renderScale = { s, worldW: target.w, worldH: target.h, offsetX, offsetY };
+  // Helper: getWorldDims 함수는 전역에서 정의됨
 }
 
 window.addEventListener('load', sizeCanvasToCss);
@@ -186,7 +110,6 @@ const isMobile = ('ontouchstart' in window) || window.matchMedia('(pointer: coar
 
 // Mobile HUD elements (shown on portrait/mobile)
 const mobileHud = document.getElementById('top-hud');
-const xpBarWrapper = document.getElementById('xp-bar-wrapper');
 const mobileHP = document.getElementById('mobile-hp');
 const mobileScore = document.getElementById('mobile-score');
 const mobileTime = document.getElementById('mobile-time');
@@ -1359,10 +1282,6 @@ const generatedChunks = new Set();
 const obstacles = [];
 let enemyIdCounter = 1;
 
-// 타임어택 모드 배경 오브젝트 (한 번만 생성)
-let timeAttackBackgroundItems = null;
-let timeAttackBackgroundBounds = null;
-
 function chunkKey(cx, cy) {
   return `${cx}:${cy}`;
 }
@@ -1418,11 +1337,6 @@ function ensureChunk(cx, cy) {
   generatedChunks.add(key);
 
   if (state.stage >= 3) {
-    return;
-  }
-
-  // 타임어택 모드에서는 장애물 생성 안함
-  if (state.gameMode === 'timeattack') {
     return;
   }
 
@@ -1538,22 +1452,6 @@ function handleStageThreeVictory() {
   });
 }
 
-function handleTimeAttackVictory() {
-  if (state.victory) return;
-  state.victory = true;
-  state.gameOver = true;
-  state.paused = true;
-
-  const details = computeFinalScoreDetails();
-  checkAndSaveRanking(state, computeFinalScoreDetails);
-
-  showModal('타임어택 성공!', '15분 동안 생존에 성공했습니다!', {
-    showRestart: true,
-    showRanking: true,
-    extraHTML: buildResultHtml(details),
-  });
-}
-
 // 랭킹 시스템
 
 // checkAndSaveRanking 함수는 ranking.js에서 import
@@ -1587,26 +1485,16 @@ function restartGame() {
 function startGame() {
   resetGameplayState();
   recomputePlayerStats(); // 탄환 갯수 포함 플레이어 스탯 초기화
-
-  // 타임어택 모드일 때 CSS 클래스 추가
-  if (state.gameMode === 'timeattack') {
-    document.body.classList.add('timeattack-mode');
-  } else {
-    document.body.classList.remove('timeattack-mode');
-  }
-
-  // 캔버스 크기 다시 계산
-  sizeCanvasToCss();
-
   obstacles.length = 0;
   generatedChunks.clear();
-  timeAttackBackgroundItems = null; // 타임어택 배경 아이템 초기화
-  timeAttackBackgroundBounds = null;
   ensureChunksAroundPlayer();
   updateHud(); // reset HUD to reflect fresh state (score, time, skills)
   state.started = true;
   state.paused = false;
   state.gameStartTime = performance.now();
+
+  // 게임 시작 시 캔버스 크기 재조정
+  sizeCanvasToCss();
 }
 
 function attemptStart() {
@@ -1616,11 +1504,6 @@ function attemptStart() {
     return;
   }
   state.nickname = trimmed;
-
-  // 선택된 게임 모드 저장
-  const gameMode = window.selectedGameMode || 'normal';
-  state.gameMode = gameMode;
-
   startOverlay.classList.remove('active');
   nicknameInput.blur();
   startGame();
@@ -1838,7 +1721,6 @@ let currentFireInterval = constants.PLAYER_FIRE_INTERVAL;
 let bulletCount = 1;
 let currentBladeRotationSpeed = constants.BLADE_ROTATION_SPEED;
 let currentEmInterval = constants.EM_FIELD_BASE_INTERVAL;
-let currentSprinkleInterval = constants.SPRINKLE_INTERVAL;
 
 function recomputePlayerStats() {
   currentPlayerSpeed = constants.PLAYER_SPEED * (1 + 0.12 * state.upgradeLevels.speed);
@@ -1846,20 +1728,13 @@ function recomputePlayerStats() {
   bulletCount = 1 + state.upgradeLevels.multi_shot;
 
   // 공속 업그레이드가 블레이드 회전속도에도 영향
-  let baseRotationSpeed = constants.BLADE_ROTATION_SPEED;
-  if (state.gameMode === 'timeattack') {
-    baseRotationSpeed *= timeAttackConstants.TIME_ATTACK_BLADE_ROTATION_SPEED_MULTIPLIER;
-  }
-  currentBladeRotationSpeed = baseRotationSpeed * (1 + 0.3 * state.upgradeLevels.attack_speed);
+  currentBladeRotationSpeed = constants.BLADE_ROTATION_SPEED * (1 + 0.3 * state.upgradeLevels.attack_speed);
 
   // 공속 업그레이드가 슈크림 발사 간격에도 영향
   currentEmInterval = Math.max(
     constants.EM_FIELD_MIN_INTERVAL,
     constants.EM_FIELD_BASE_INTERVAL * Math.pow(0.85, state.upgradeLevels.attack_speed)
   );
-
-  // 공속 업그레이드가 스프링클 간격에도 영향
-  currentSprinkleInterval = Math.max(0.2, constants.SPRINKLE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
 }
 
 function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
@@ -1894,8 +1769,7 @@ function grantRewardForEnemy(enemy) {
 }
 
 function triggerLevelBlast() {
-  const blastRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.LEVEL_BLAST_RADIUS;
-  const radiusSq = blastRadius * blastRadius;
+  const radiusSq = constants.LEVEL_BLAST_RADIUS * constants.LEVEL_BLAST_RADIUS;
   const removedEnemies = [];
   const survivors = [];
   for (const enemy of state.enemies) {
@@ -2054,13 +1928,6 @@ function getStageSpeedMultiplier() {
   return state.stage >= 3 ? 0.1 : 1;
 }
 
-function getEnemySizeForMode(baseSize) {
-  if (state.gameMode === 'timeattack') {
-    return baseSize * constants.TIME_ATTACK_ENEMY_SIZE_MULTIPLIER;
-  }
-  return baseSize;
-}
-
 function getCurrentWorldBounds() {
   return state.stage >= 3 ? constants.STAGE_THREE_WORLD_BOUNDS : constants.WORLD_BOUNDS;
 }
@@ -2074,13 +1941,12 @@ function spawnEnemy() {
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
-  const size = getEnemySizeForMode(constants.ENEMY_SIZE);
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
     speed: baseSpeed * getStageSpeedMultiplier(),
     health: 1,
-    size,
+    size: constants.ENEMY_SIZE,
     sprite: sprites.enemy,
     xpReward: constants.XP_REWARD_PINK,
     scoreReward: 10,
@@ -2089,7 +1955,6 @@ function spawnEnemy() {
 }
 
 function spawnDarkBlueEnemy() {
-  const enemySize = getEnemySizeForMode(constants.DARK_BLUE_ENEMY_SIZE);
   let pos;
   let attempts = 0;
   const maxAttempts = 20;
@@ -2103,7 +1968,7 @@ function spawnDarkBlueEnemy() {
       state.playerPos.y + Math.sin(angle) * radius,
     );
     attempts++;
-  } while (collidesWithObstacles(pos.x, pos.y, enemySize) && attempts < maxAttempts);
+  } while (collidesWithObstacles(pos.x, pos.y, constants.DARK_BLUE_ENEMY_SIZE) && attempts < maxAttempts);
 
   // 최대 시도 횟수를 초과하면 기본 위치 사용 (장애물과 겹치더라도)
   if (attempts >= maxAttempts) {
@@ -2121,7 +1986,7 @@ function spawnDarkBlueEnemy() {
     pos,
     speed: baseSpeed * getStageSpeedMultiplier(),
     health: constants.DARK_BLUE_ENEMY_HEALTH,
-    size: enemySize,
+    size: constants.DARK_BLUE_ENEMY_SIZE,
     sprite: sprites.darkBlueEnemy,
     fireTimer: randRange(0, constants.DARK_BLUE_ENEMY_FIRE_INTERVAL),
     type: 'darkBlue',
@@ -2133,7 +1998,6 @@ function spawnDarkBlueEnemy() {
 function spawnBlackDustGroup() {
   const count = randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
   const baseAngle = randRange(0, Math.PI * 2);
-  const enemySize = getEnemySizeForMode(constants.BLACK_DUST_SIZE);
 
   for (let i = 0; i < count; i++) {
     const angle = baseAngle + randRange(-Math.PI / 4, Math.PI / 4);
@@ -2149,7 +2013,7 @@ function spawnBlackDustGroup() {
       pos,
       speed: baseSpeed * getStageSpeedMultiplier(),
       health: constants.BLACK_DUST_HEALTH,
-      size: enemySize,
+      size: constants.BLACK_DUST_SIZE,
       sprite: sprites.blackDust,
       type: 'blackDust',
       xpReward: constants.XP_REWARD_BLACK_DUST,
@@ -2168,14 +2032,13 @@ function spawnOrangeLadybug() {
   );
 
   const baseSpeed = constants.ORANGE_LADYBUG_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ORANGE_LADYBUG_SPEED;
-  const enemySize = getEnemySizeForMode(constants.ORANGE_LADYBUG_SIZE);
 
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
     speed: baseSpeed * getStageSpeedMultiplier(),
     health: constants.ORANGE_LADYBUG_HEALTH,
-    size: enemySize,
+    size: constants.ORANGE_LADYBUG_SIZE,
     sprite: sprites.orangeLadybug,
     type: 'orangeLadybug',
     xpReward: constants.XP_REWARD_ORANGE_LADYBUG,
@@ -2196,13 +2059,12 @@ function spawnBigEnemy() {
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const baseSpeed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
-  const enemySize = getEnemySizeForMode(constants.BIG_ENEMY_SIZE);
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
     speed: baseSpeed * getStageSpeedMultiplier(),
     health: constants.BIG_ENEMY_HEALTH,
-    size: enemySize,
+    size: constants.BIG_ENEMY_SIZE,
     sprite: sprites.bigEnemy,
     xpReward: constants.XP_REWARD_PURPLE,
     scoreReward: 15,
@@ -2557,16 +2419,6 @@ function update(dt) {
     state.elapsed += dt;
   }
 
-  // 타임어택 모드 시간 관리
-  if (state.gameMode === 'timeattack' && activePlay) {
-    state.timeAttackRemaining = Math.max(0, state.timeAttackRemaining - dt);
-    if (state.timeAttackRemaining <= 0) {
-      // 타임어택 시간 종료 - 승리 처리
-      handleTimeAttackVictory();
-      return;
-    }
-  }
-
   if (state.stage === 2 && !state.stageThreeActive && !state.boss && !state.victory && state.elapsed >= constants.BOSS_SPAWN_TIME) {
     enterStageThree();
   }
@@ -2671,8 +2523,7 @@ function handleMovement(dt) {
 
   if (state.mine.active) {
     const distSq = vectorLengthSq(vectorSub(state.playerPos, state.mine.pos));
-    const mineRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.MINE_TRIGGER_RADIUS;
-    if (distSq <= mineRadius * mineRadius) detonateMine();
+    if (distSq <= constants.MINE_TRIGGER_RADIUS * constants.MINE_TRIGGER_RADIUS) detonateMine();
   }
   // Toothpaste pickup: sprite-overlap (circle vs circle) using actual sprite radii
   if (state.toothpasteItems.length > 0) {
@@ -2693,10 +2544,7 @@ function handleMovement(dt) {
   );
   if (state.spawnTimer <= 0) {
     if (!state.boss) {
-      let batch = 1 + Math.floor(state.elapsed / 30);
-      if (state.gameMode === 'timeattack') {
-        batch = Math.max(1, Math.round(batch * constants.TIME_ATTACK_ENEMY_SPAWN_MULTIPLIER));
-      }
+      const batch = 1 + Math.floor(state.elapsed / 30);
       for (let i = 0; i < batch; i++) {
         // 테스트용: 남색 세균을 시작부터 등장 (30% 확률)
         if(state.stage >= 2 && Math.random() < 0.3) {
@@ -2731,10 +2579,7 @@ function recomputeBlades(dt) {
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
       const angle = state.bladeAngle + i * step;
-      const bladeRadius = state.gameMode === 'timeattack'
-        ? constants.BLADE_RADIUS * timeAttackConstants.TIME_ATTACK_BLADE_RADIUS_MULTIPLIER
-        : constants.BLADE_RADIUS;
-      const offset = vector(Math.cos(angle) * bladeRadius, Math.sin(angle) * bladeRadius);
+      const offset = vector(Math.cos(angle) * constants.BLADE_RADIUS, Math.sin(angle) * constants.BLADE_RADIUS);
       state.blades.push({
         pos: vectorAdd(state.playerPos, offset),
         spriteIndex: Math.min(i, sprites.blades.length - 1),
@@ -2791,15 +2636,10 @@ function spawnProjectile(direction) {
   const bulletSize = state.hasKimBugak ? Math.round(constants.BULLET_SIZE * 2) : constants.BULLET_SIZE;
   const bulletSprite = state.hasKimBugak ? sprites.kimBugakBullet : sprites.bullet;
 
-  // 타임어택 모드에서 김공격 사정거리 조정
-  const bulletLifetime = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_BULLET_RANGE / constants.BULLET_SPEED
-    : constants.BULLET_LIFETIME;
-
   state.bullets.push({
     pos: vectorCopy(state.playerPos),
     dir: norm,
-    lifetime: bulletLifetime,
+    lifetime: constants.BULLET_LIFETIME,
     pierce: state.hasGanjangGim ? 1 : 0,
     penetratesObstacles: state.hasKimBugak,
     size: bulletSize,
@@ -2981,7 +2821,7 @@ function handleBullets(dt) {
 
 function fireSprinkleVolley() {
   if (state.upgradeLevels.sprinkle <= 0) {
-    state.sprinkleTimer = currentSprinkleInterval;
+    state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
     return;
   }
 
@@ -2997,7 +2837,7 @@ function fireSprinkleVolley() {
   }
 
   if (targets.length === 0) {
-    state.sprinkleTimer = currentSprinkleInterval;
+    state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
     return;
   }
 
@@ -3025,7 +2865,7 @@ function fireSprinkleVolley() {
     });
   }
 
-  state.sprinkleTimer = currentSprinkleInterval;
+  state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
 }
 
 function resolveSprinkleTarget(sprinkle) {
@@ -3071,7 +2911,7 @@ function resolveSprinkleTarget(sprinkle) {
 function handleSprinkles(dt) {
   if (state.upgradeLevels.sprinkle <= 0) {
     state.sprinkles.length = 0;
-    state.sprinkleTimer = currentSprinkleInterval;
+    state.sprinkleTimer = constants.SPRINKLE_INTERVAL;
     return;
   }
 
@@ -3477,11 +3317,6 @@ function handleEnemyProjectiles(dt) {
 }
 
 function getWorldDims() {
-  if (state.gameMode === 'timeattack') {
-    const worldW = timeAttackConstants.TIME_ATTACK_WIDTH;
-    const worldH = timeAttackConstants.TIME_ATTACK_HEIGHT;
-    return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
-  }
   const worldW = (window.__renderScale && window.__renderScale.worldW) || constants.WIDTH;
   const worldH = (window.__renderScale && window.__renderScale.worldH) || constants.HEIGHT;
   return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
@@ -3497,16 +3332,12 @@ function worldToScreen(pos) {
 
 
 function render() {
-  // DPR을 고려한 캔버스 상태 초기화
-  const dpr = window.devicePixelRatio || 1;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  // Clear the full canvas (DPR-aware) - 더 확실하게 지우기
+  ctx.save();
+  // Clear the full canvas (DPR-aware)
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = constants.BACKGROUND_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.save();
   //균등 스케일 + 중앙 정렬 적용
   if (window.__renderScale) {
     const { s, offsetX, offsetY } = window.__renderScale;
@@ -3520,14 +3351,7 @@ function render() {
   drawWorldBounds();
 
   if (state.mine.active) {
-    let mineSize = constants.MINE_SIZE;
-
-    // 타임어택 모드에서는 지뢰 크기 50% 축소
-    if (state.gameMode === 'timeattack') {
-      mineSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-    }
-
-    drawSprite(sprites.mine, state.mine.pos, mineSize);
+    drawSprite(sprites.mine, state.mine.pos, constants.MINE_SIZE);
   }
   if (state.toothpasteItems.length > 0) {
     for (const item of state.toothpasteItems) {
@@ -3537,8 +3361,7 @@ function render() {
 
   for (const enemy of state.enemies) {
     const spr = enemy.sprite || sprites.enemy;
-    let sz = enemy.size || constants.ENEMY_SIZE;
-
+    const sz = enemy.size || constants.ENEMY_SIZE;
     drawSprite(spr, enemy.pos, sz);
 
     // 감전 효과 그리기
@@ -3570,41 +3393,20 @@ function render() {
 
   // 적 발사체 그리기
   for (const projectile of state.enemyProjectiles) {
-    let projectileSize = projectile.size;
-
-    // 타임어택 모드에서는 적 발사체 크기 50% 축소
-    if (state.gameMode === 'timeattack') {
-      projectileSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-    }
-
-    drawSprite(sprites.enemyProjectile, projectile.pos, projectileSize);
+    drawSprite(sprites.enemyProjectile, projectile.pos, projectile.size);
   }
 
   if (state.blades.length > 0) {
     for (const blade of state.blades) {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
-      let bladeSize = constants.BLADE_SIZE;
-
-      // 타임어택 모드에서는 블레이드 크기 50% 축소
-      if (state.gameMode === 'timeattack') {
-        bladeSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-      }
-
-      drawSprite(sprite, blade.pos, bladeSize);
+      drawSprite(sprite, blade.pos, constants.BLADE_SIZE);
     }
   }
 
   // 토네이도 렌더링
   if (state.tornadoes.length > 0) {
     for (const tornado of state.tornadoes) {
-      let tornadoSize = tornado.size;
-
-      // 타임어택 모드에서는 토네이도 크기 50% 축소
-      if (state.gameMode === 'timeattack') {
-        tornadoSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-      }
-
-      drawSprite(sprites.tornado, tornado.pos, tornadoSize);
+      drawSprite(sprites.tornado, tornado.pos, tornado.size);
     }
   }
 
@@ -3655,305 +3457,61 @@ function drawBackground() {
   ctx.fillStyle = oakGrad;
   ctx.fillRect(0, 0, worldW, worldH);
 
-  // 노말모드 격자 그리기
-  if (state.gameMode !== 'timeattack') {
-    drawNormalModeGrid();
-  }
+  // 떡갈나무 나무결 패턴 (더 뚜렷하고 불규칙한 결)
+  const oakGrain = ctx.createLinearGradient(0, 0, worldW, 0);
+  oakGrain.addColorStop(0.0, 'rgba(101,68,42,0.25)');  // 진한 갈색 결
+  oakGrain.addColorStop(0.15, 'rgba(101,68,42,0.08)');
+  oakGrain.addColorStop(0.3, 'rgba(101,68,42,0.32)');
+  oakGrain.addColorStop(0.45, 'rgba(101,68,42,0.12)');
+  oakGrain.addColorStop(0.6, 'rgba(101,68,42,0.28)');
+  oakGrain.addColorStop(0.75, 'rgba(101,68,42,0.15)');
+  oakGrain.addColorStop(0.9, 'rgba(101,68,42,0.35)');
+  oakGrain.addColorStop(1.0, 'rgba(101,68,42,0.18)');
+  ctx.fillStyle = oakGrain;
+  ctx.fillRect(0, 0, worldW, worldH);
 
-  // 타임어택 모드에서만 격자무늬와 아이템들 그리기
-  if (state.gameMode === 'timeattack') {
-    drawGridPattern();
-    drawTrayItems();
-  }
 
-}
+  // 나무판자 경계선들 (쟁반 느낌)
+  const plankWidth = 140;
+  const offsetX = state.playerPos.x % plankWidth;
+  const offsetY = state.playerPos.y % plankWidth;
 
-function drawNormalModeGrid() {
-  const { worldW, worldH } = getWorldDims();
-  const gridSize = 100; // 노말모드는 더 큰 격자
-
-  // 월드 좌표계에서 화면에 보이는 범위 계산
-  const startWorldX = state.playerPos.x - worldW / 2;
-  const endWorldX = state.playerPos.x + worldW / 2;
-  const startWorldY = state.playerPos.y - worldH / 2;
-  const endWorldY = state.playerPos.y + worldH / 2;
-
-  // 첫 번째 격자선의 월드 좌표 계산
-  const firstLineX = Math.floor(startWorldX / gridSize) * gridSize;
-  const firstLineY = Math.floor(startWorldY / gridSize) * gridSize;
-
-  ctx.strokeStyle = constants.GRID_COLOR;
   ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = 'rgba(101,68,42,0.3)';
 
-  // 세로 격자선
-  for (let worldX = firstLineX; worldX <= endWorldX + gridSize; worldX += gridSize) {
-    const screenX = worldToScreen(vector(worldX, 0)).x;
+  // 세로 나무결 선 (떡갈나무 색상)
+  for (let x = -plankWidth - offsetX; x < worldW; x += plankWidth) {
     ctx.beginPath();
-    ctx.moveTo(screenX, 0);
-    ctx.lineTo(screenX, worldH);
+    ctx.moveTo(x + halfW, 0);
+    ctx.lineTo(x + halfW, worldH);
     ctx.stroke();
   }
 
-  // 가로 격자선
-  for (let worldY = firstLineY; worldY <= endWorldY + gridSize; worldY += gridSize) {
-    const screenY = worldToScreen(vector(0, worldY)).y;
+  // 가로 나무결 선 (더 연하게)
+  ctx.strokeStyle = 'rgba(101,68,42,0.18)';
+  for (let y = -plankWidth - offsetY; y < worldH; y += plankWidth) {
     ctx.beginPath();
-    ctx.moveTo(0, screenY);
-    ctx.lineTo(worldW, screenY);
+    ctx.moveTo(0, y + halfH);
+    ctx.lineTo(worldW, y + halfH);
     ctx.stroke();
   }
 
+  // 떡갈나무 쟁반의 은은한 하이라이트 효과
+  ctx.strokeStyle = 'rgba(212,165,116,0.2)';
+  ctx.globalAlpha = 0.3;
+  for (let x = -plankWidth - offsetX; x < worldW; x += plankWidth) {
+    ctx.beginPath();
+    ctx.moveTo(x + halfW + 0.5, 0);
+    ctx.lineTo(x + halfW + 0.5, worldH);
+    ctx.stroke();
+  }
+  for (let y = -plankWidth - offsetY; y < worldH; y += plankWidth) {
+    ctx.beginPath();
+    ctx.moveTo(0, y + halfH + 0.5);
+    ctx.lineTo(worldW, y + halfH + 0.5);
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
-}
-
-function drawGridPattern() {
-  const { worldW, worldH } = getWorldDims();
-  const gridSize = 50;
-
-  // 월드 좌표계에서 화면에 보이는 범위 계산
-  const startWorldX = state.playerPos.x - worldW / 2;
-  const endWorldX = state.playerPos.x + worldW / 2;
-  const startWorldY = state.playerPos.y - worldH / 2;
-  const endWorldY = state.playerPos.y + worldH / 2;
-
-  // 첫 번째 격자선의 월드 좌표 계산
-  const firstLineX = Math.floor(startWorldX / gridSize) * gridSize;
-  const firstLineY = Math.floor(startWorldY / gridSize) * gridSize;
-
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-  ctx.lineWidth = 1;
-
-  // 세로 격자선
-  for (let worldX = firstLineX; worldX <= endWorldX + gridSize; worldX += gridSize) {
-    const screenX = worldToScreen(vector(worldX, 0)).x;
-    ctx.beginPath();
-    ctx.moveTo(screenX, 0);
-    ctx.lineTo(screenX, worldH);
-    ctx.stroke();
-  }
-
-  // 가로 격자선
-  for (let worldY = firstLineY; worldY <= endWorldY + gridSize; worldY += gridSize) {
-    const screenY = worldToScreen(vector(0, worldY)).y;
-    ctx.beginPath();
-    ctx.moveTo(0, screenY);
-    ctx.lineTo(worldW, screenY);
-    ctx.stroke();
-  }
-}
-
-function drawTrayItems() {
-  const { worldW, worldH } = getWorldDims();
-  const bounds = getCurrentWorldBounds();
-  const gridSpacing = 180;
-  const jitterRange = gridSpacing * 0.35;
-  const placementChance = 0.35;
-
-  // 배경 아이템을 한 번만 생성 (경계가 바뀌면 다시 생성)
-  if (!timeAttackBackgroundItems || timeAttackBackgroundBounds !== bounds) {
-    // 시드 기반 랜덤 함수 (일관된 배치를 위해)
-    function seededRandom(seed) {
-      const x = Math.sin(seed) * 10000;
-      return x - Math.floor(x);
-    }
-
-    let seedCounter = 1000;
-    const cakeTypes = ['croissant', 'cupcake', 'bread', 'muffin', 'tiramisu', 'cheesecake'];
-    timeAttackBackgroundItems = [];
-
-    const limitX = timeAttackConstants.TIME_ATTACK_WORLD_BOUNDS;
-    const limitY = timeAttackConstants.TIME_ATTACK_WORLD_BOUNDS;
-    const minX = -limitX;
-    const maxX = limitX;
-    const minY = -limitY;
-    const maxY = limitY;
-
-    // 흰색 경계선 전체에 gridSpacing 간격으로 빵/케이크 배치
-    for (let x = minX; x <= maxX; x += gridSpacing) {
-      for (let y = minY; y <= maxY; y += gridSpacing) {
-        const placementRoll = seededRandom(seedCounter++);
-        if (placementRoll > placementChance) {
-          continue;
-        }
-        const randomX = clamp(
-          x + (seededRandom(seedCounter++) - 0.5) * 2 * jitterRange,
-          minX,
-          maxX
-        );
-        const randomY = clamp(
-          y + (seededRandom(seedCounter++) - 0.5) * 2 * jitterRange,
-          minY,
-          maxY
-        );
-        const typeIndex = Math.floor(seededRandom(seedCounter++) * cakeTypes.length);
-        const scale = 0.8 + seededRandom(seedCounter++) * 0.4; // 0.8~1.2 크기
-
-        timeAttackBackgroundItems.push({
-          worldX: randomX,
-          worldY: randomY,
-          type: cakeTypes[typeIndex],
-          scale
-        });
-      }
-    }
-
-    timeAttackBackgroundBounds = bounds;
-  }
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, worldW, worldH);
-  ctx.clip();
-
-  // 모든 배경 아이템 그리기 (나무배경 영역 밖은 잘라냄)
-  timeAttackBackgroundItems.forEach(item => {
-    const screenPos = worldToScreen(vector(item.worldX, item.worldY));
-
-    // 화면 범위 내에 있는 아이템만 그리기
-    if (screenPos.x > -100 && screenPos.x < worldW + 100 &&
-        screenPos.y > -100 && screenPos.y < worldH + 100) {
-
-      ctx.save();
-      ctx.globalAlpha = 0.3; // 배경처럼 보이게 반투명
-      ctx.translate(screenPos.x, screenPos.y);
-      ctx.scale(item.scale, item.scale);
-
-      switch (item.type) {
-        case 'croissant':
-          drawCroissant(0, 0);
-          break;
-        case 'cupcake':
-          drawCupcake(0, 0);
-          break;
-        case 'bread':
-          drawBread(0, 0);
-          break;
-        case 'muffin':
-          drawMuffin(0, 0);
-          break;
-        case 'tiramisu':
-          drawTiramisu(0, 0);
-          break;
-        case 'cheesecake':
-          drawCheesecake(0, 0);
-          break;
-      }
-
-      ctx.restore();
-    }
-  });
-
-  ctx.restore();
-}
-
-// 크루아상
-function drawCroissant(x, y) {
-  ctx.fillStyle = '#d4a574';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 30, 15, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 겉면 레이어 표현
-  ctx.strokeStyle = '#b8925e';
-  ctx.lineWidth = 1.5;
-  for (let i = -2; i <= 2; i++) {
-    ctx.beginPath();
-    ctx.arc(x + i * 6, y, 8, 0, Math.PI);
-    ctx.stroke();
-  }
-}
-
-// 컵케이크
-function drawCupcake(x, y) {
-  // 컵 부분
-  ctx.fillStyle = '#ff9999';
-  ctx.beginPath();
-  ctx.moveTo(x - 15, y + 10);
-  ctx.lineTo(x - 12, y - 5);
-  ctx.lineTo(x + 12, y - 5);
-  ctx.lineTo(x + 15, y + 10);
-  ctx.closePath();
-  ctx.fill();
-
-  // 크림 부분
-  ctx.fillStyle = '#ffe4e1';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 10, 18, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 체리
-  ctx.fillStyle = '#ff0000';
-  ctx.beginPath();
-  ctx.arc(x, y - 18, 4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// 식빵
-function drawBread(x, y) {
-  ctx.fillStyle = '#f5deb3';
-  ctx.fillRect(x - 20, y - 12, 40, 24);
-
-  // 윗면 (갈색)
-  ctx.fillStyle = '#d2b48c';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 12, 20, 8, 0, 0, Math.PI, true);
-  ctx.fill();
-}
-
-// 머핀
-function drawMuffin(x, y) {
-  // 머핀 몸통
-  ctx.fillStyle = '#c49a6c';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 20, 18, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 윗부분 (부푼 모양)
-  ctx.fillStyle = '#b08968';
-  ctx.beginPath();
-  ctx.arc(x - 8, y - 8, 10, 0, Math.PI * 2);
-  ctx.arc(x + 8, y - 8, 10, 0, Math.PI * 2);
-  ctx.arc(x, y - 12, 12, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// 티라미수
-function drawTiramisu(x, y) {
-  // 아래층 (스펀지)
-  ctx.fillStyle = '#c9a87c';
-  ctx.fillRect(x - 18, y + 5, 36, 10);
-
-  // 크림층
-  ctx.fillStyle = '#f5f5dc';
-  ctx.fillRect(x - 18, y - 5, 36, 10);
-
-  // 윗층 (코코아)
-  ctx.fillStyle = '#6b4423';
-  ctx.fillRect(x - 18, y - 15, 36, 10);
-}
-
-// 치즈케이크
-function drawCheesecake(x, y) {
-  // 케이크 본체
-  ctx.fillStyle = '#fff8dc';
-  ctx.beginPath();
-  ctx.moveTo(x - 20, y + 10);
-  ctx.lineTo(x - 18, y - 10);
-  ctx.lineTo(x + 18, y - 10);
-  ctx.lineTo(x + 20, y + 10);
-  ctx.closePath();
-  ctx.fill();
-
-  // 딸기 토핑
-  ctx.fillStyle = '#ff6b6b';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 12, 15, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 크러스트
-  ctx.fillStyle = '#d2b48c';
-  ctx.fillRect(x - 20, y + 10, 40, 5);
 }
 
 function drawGrasslandBackground() {
@@ -4175,11 +3733,6 @@ function drawSpaceBackground() {
 }
 
 function drawObstacles() {
-  // 타임어택 모드에서는 장애물 그리지 않음
-  if (state.gameMode === 'timeattack') {
-    return;
-  }
-
   for (const obs of obstacles) {
     const style = DONUT_STYLES[obs.type] || DONUT_STYLES.boston_creme;
     const center = worldToScreen(obs.center);
@@ -4309,21 +3862,18 @@ function drawPlayer() {
   // 선택된 캐릭터에 따라 스프라이트 선택
   const playerSprite = state.selectedCharacter === 'glazed_ring' ? sprites.glazedDonut : sprites.player;
 
-  // 타임어택 모드에서도 플레이어는 원래 크기 유지
-  let playerSize = constants.PLAYER_SIZE;
-
   if (state.playerInvuln > 0) {
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
     ctx.globalAlpha = clamp(alpha, 0.2, 1);
-    ctx.drawImage(playerSprite, screenX - playerSize / 2, screenY - playerSize / 2, playerSize, playerSize);
+    ctx.drawImage(playerSprite, screenX - constants.PLAYER_SIZE / 2, screenY - constants.PLAYER_SIZE / 2, constants.PLAYER_SIZE, constants.PLAYER_SIZE);
     ctx.globalAlpha = 1;
   } else if (state.playerHealth <= 2) {
     const alpha = 0.3 + 0.7 * Math.sin(performance.now() * 0.008);
     ctx.globalAlpha = clamp(alpha, 0.3, 1);
-    ctx.drawImage(playerSprite, screenX - playerSize / 2, screenY - playerSize / 2, playerSize, playerSize);
+    ctx.drawImage(playerSprite, screenX - constants.PLAYER_SIZE / 2, screenY - constants.PLAYER_SIZE / 2, constants.PLAYER_SIZE, constants.PLAYER_SIZE);
     ctx.globalAlpha = 1;
   } else {
-    ctx.drawImage(playerSprite, screenX - playerSize / 2, screenY - playerSize / 2, playerSize, playerSize);
+    ctx.drawImage(playerSprite, screenX - constants.PLAYER_SIZE / 2, screenY - constants.PLAYER_SIZE / 2, constants.PLAYER_SIZE, constants.PLAYER_SIZE);
   }
 }
 
@@ -4552,13 +4102,7 @@ function drawBulletSprite(bullet) {
   const screen = worldToScreen(bullet.pos);
   const angle = Math.atan2(bullet.dir.y, bullet.dir.x);
   const bulletSprite = bullet.sprite || sprites.bullet;
-  let bulletSize = bullet.size || constants.BULLET_SIZE;
-
-  // 타임어택 모드에서는 총알 크기 50% 축소
-  if (state.gameMode === 'timeattack') {
-    bulletSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-  }
-
+  const bulletSize = bullet.size || constants.BULLET_SIZE;
   const width = bulletSize * 0.9;
   const height = bulletSize * 1.6;
 
@@ -4571,13 +4115,7 @@ function drawBulletSprite(bullet) {
 
 function drawBossEntity(boss) {
   const screen = worldToScreen(boss.pos);
-  let size = constants.BOSS_RADIUS * 2.4;
-
-  // 타임어택 모드에서는 보스 크기 50% 축소
-  if (state.gameMode === 'timeattack') {
-    size *= constants.TIME_ATTACK_OBJECT_SCALE;
-  }
-
+  const size = constants.BOSS_RADIUS * 2.4;
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.rotate(boss.facingAngle || 0);
@@ -4666,8 +4204,7 @@ function drawPlayerHPBar() {
 
 function drawMineFlash() {
   const ratio = state.mineFlashTimer / constants.MINE_FLASH_DURATION;
-  const mineRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.MINE_TRIGGER_RADIUS;
-  const radius = mineRadius * (1 + ratio * 1.5);
+  const radius = constants.MINE_TRIGGER_RADIUS * (1 + ratio * 1.5);
   const screen = worldToScreen(state.mine.pos);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, 'rgba(255,200,120,0.6)');
@@ -4680,8 +4217,7 @@ function drawMineFlash() {
 
 function drawToothpasteFlash() {
   const ratio = state.toothpasteFlashTimer / constants.TOOTHPASTE_FLASH_DURATION;
-  const pickupRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.TOOTHPASTE_PICKUP_RADIUS;
-  const radius = pickupRadius * (1 + ratio * 1.2);
+  const radius = constants.TOOTHPASTE_PICKUP_RADIUS * (1 + ratio * 1.2);
   const screen = worldToScreen(state.playerPos);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, 'rgba(140,220,255,0.45)');
@@ -4694,15 +4230,7 @@ function drawToothpasteFlash() {
 
 function drawToothpasteItem(item) {
   const screen = worldToScreen(item.pos);
-  let glowRadius = 28 + 4 * Math.sin(state.toothpasteGlowPhase);
-  let toothpasteSize = 44;
-
-  // 타임어택 모드에서는 치약 아이템 크기 50% 축소
-  if (state.gameMode === 'timeattack') {
-    glowRadius *= constants.TIME_ATTACK_OBJECT_SCALE;
-    toothpasteSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-  }
-
+  const glowRadius = 28 + 4 * Math.sin(state.toothpasteGlowPhase);
   const glowGradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, glowRadius);
   glowGradient.addColorStop(0, 'rgba(120, 230, 255, 0.45)');
   glowGradient.addColorStop(1, 'rgba(120, 230, 255, 0)');
@@ -4715,15 +4243,14 @@ function drawToothpasteItem(item) {
   ctx.beginPath();
   ctx.arc(screen.x, screen.y, glowRadius * 0.62, 0, Math.PI * 2);
   ctx.stroke();
-  drawSprite(sprites.toothpaste, item.pos, toothpasteSize);
+  drawSprite(sprites.toothpaste, item.pos, 44);
 }
 
 function drawLevelBlast() {
   const ratio = state.levelBlastTimer / constants.LEVEL_BLAST_DURATION;
   if (ratio <= 0) return;
   const screen = worldToScreen(state.playerPos);
-  const blastRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.LEVEL_BLAST_RADIUS;
-  const radius = blastRadius * (0.8 + (1 - ratio) * 0.7);
+  const radius = constants.LEVEL_BLAST_RADIUS * (0.8 + (1 - ratio) * 0.7);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, `rgba(255, 245, 170, ${0.5 * ratio + 0.3})`);
   gradient.addColorStop(0.55, `rgba(255, 214, 90, ${0.35 * ratio})`);
@@ -4745,14 +4272,7 @@ function updateHud() {
   const totalScore = calculateTotalScore();
 
   statNickname.textContent = state.nickname || '---';
-
-  // 타임어택 모드일 때는 남은 시간을 표시
-  if (state.gameMode === 'timeattack') {
-    statTime.textContent = `남은 시간: ${formatTime(state.timeAttackRemaining)}`;
-  } else {
-    statTime.textContent = formatTime(state.elapsed);
-  }
-
+  statTime.textContent = formatTime(state.elapsed);
   statScore.textContent = totalScore.toString().padStart(5, '0');
   statHP.textContent = `${Math.max(0, state.playerHealth)} / ${constants.PLAYER_MAX_HEALTH}`;
   statLevel.textContent = state.level;
@@ -4761,13 +4281,7 @@ function updateHud() {
   if (mobileHud) {
     if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${constants.PLAYER_MAX_HEALTH}`;
     if (mobileScore) mobileScore.textContent = totalScore.toString().padStart(5, '0');
-    if (mobileTime) {
-      if (state.gameMode === 'timeattack') {
-        mobileTime.textContent = `남은 시간: ${formatTime(state.timeAttackRemaining)}`;
-      } else {
-        mobileTime.textContent = formatTime(state.elapsed);
-      }
-    }
+    if (mobileTime) mobileTime.textContent = formatTime(state.elapsed);
   }
 
 
@@ -4888,26 +4402,6 @@ async function initialize() {
     }
   });
   startButton.addEventListener('click', attemptStart);
-
-  // 게임 모드 선택 기능
-  window.selectedGameMode = 'normal'; // 기본값은 노말 모드
-
-  const modeButtons = document.querySelectorAll('.mode-button');
-  modeButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      // 모든 버튼에서 active 클래스 제거
-      modeButtons.forEach(btn => btn.classList.remove('active'));
-      // 클릭된 버튼에 active 클래스 추가
-      button.classList.add('active');
-      // 선택된 모드 저장
-      window.selectedGameMode = button.dataset.mode;
-      sessionStorage.setItem('gameMode', button.dataset.mode);
-      // 모드 변경 시 페이지 새로고침
-      if (button.dataset.mode !== 'normal') {
-        window.location.reload();
-      }
-    });
-  });
 
   // 패치 노트 버튼 이벤트 리스너
   const patchNotesButton = document.getElementById('patch-notes-button');
