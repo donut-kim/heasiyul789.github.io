@@ -2544,7 +2544,7 @@ function update(dt) {
     openUpgradeSelection();
   }
 
-  state.toothpasteGlowPhase = (state.toothpasteGlowPhase + dt * 4) % (Math.PI * 2);
+  // 경량화: toothpasteGlowPhase 애니메이션 제거
   state.hpBarTimer = Math.max(1, state.hpBarTimer);
   state.specialBurstEffectTimer = Math.max(0, state.specialBurstEffectTimer - dt);
   if (state.bossWarningTimer > 0) {
@@ -3653,13 +3653,12 @@ function render() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
-  //균등 스케일 + 중앙 정렬 적용
+  // 균등 스케일 + 중앙 정렬 적용
   if (window.__renderScale) {
     const { s, offsetX, offsetY } = window.__renderScale;
     ctx.translate(offsetX, offsetY);
     ctx.scale(s, s);
   }
-
 
   drawBackground();
   drawObstacles();
@@ -4676,14 +4675,12 @@ function drawToothpasteFlash() {
 }
 
 function drawToothpasteItem(item) {
+  // 경량화: 움직이는 애니메이션 제거, 단순 글로우만 표시
   const screen = worldToScreen(item.pos);
-  let glowRadius = 28 + 4 * Math.sin(state.toothpasteGlowPhase);
-  let toothpasteSize = 44;
+  const glowRadius = 28 * constants.TIME_ATTACK_OBJECT_SCALE;
+  const toothpasteSize = 44 * constants.TIME_ATTACK_OBJECT_SCALE;
 
-  // 타임어택 모드에서는 치약 아이템 크기 50% 축소
-  glowRadius *= constants.TIME_ATTACK_OBJECT_SCALE;
-  toothpasteSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-
+  // 단순 글로우 (애니메이션 제거)
   const glowGradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, glowRadius);
   glowGradient.addColorStop(0, 'rgba(120, 230, 255, 0.45)');
   glowGradient.addColorStop(1, 'rgba(120, 230, 255, 0)');
@@ -4691,11 +4688,7 @@ function drawToothpasteItem(item) {
   ctx.beginPath();
   ctx.arc(screen.x, screen.y, glowRadius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(30, 140, 220, 0.6)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(screen.x, screen.y, glowRadius * 0.62, 0, Math.PI * 2);
-  ctx.stroke();
+
   drawSprite(sprites.toothpaste, item.pos, toothpasteSize);
 }
 
@@ -4778,9 +4771,7 @@ function drawOffScreenToothpasteIndicators() {
     ctx.translate(indicatorX, indicatorY);
     ctx.rotate(angle);
 
-    // 펄스 애니메이션
-    const pulseScale = 1 + Math.sin(state.toothpasteGlowPhase * 2) * 0.15;
-    ctx.scale(pulseScale, pulseScale);
+    // 경량화: 펄스 애니메이션 제거
 
     // 외곽 글로우 효과
     const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, indicatorSize * 1.5);
@@ -4824,12 +4815,7 @@ function drawOffScreenToothpasteIndicators() {
     // 하얀 테두리
     ctx.stroke();
 
-    // 반짝이 효과 (작은 별)
-    const sparkleOffset = Math.sin(state.toothpasteGlowPhase * 3) * 3;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(indicatorSize * -1.2 + sparkleOffset, indicatorSize * -0.6, 2, 0, Math.PI * 2);
-    ctx.fill();
+    // 경량화: 반짝이 애니메이션 제거
 
     ctx.restore();
   }

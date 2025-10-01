@@ -187,6 +187,24 @@ export function spawnBigEnemy(sprites) {
   });
 }
 
+// 보스 생성 헬퍼 함수 (중복 제거)
+function createBossAtPosition(bossPos, health, bossType, scoreMultiplier = 1) {
+  return {
+    pos: bossPos,
+    health,
+    maxHealth: health,
+    state: 'idle',
+    direction: vector(0, 0),
+    attackTarget: vector(bossPos.x, bossPos.y),
+    attackTimer: constants.BOSS_ATTACK_INTERVAL,
+    windupTimer: 0,
+    facingAngle: 0,
+    xpReward: constants.XP_REWARD_BOSS,
+    scoreReward: 100 * scoreMultiplier,
+    bossType,
+  };
+}
+
 // 노말 모드 보스 생성 (타임어택에서는 사용 안 함)
 export function spawnBoss() {
   const angle = randRange(0, Math.PI * 2);
@@ -195,27 +213,13 @@ export function spawnBoss() {
     state.playerPos.x + Math.cos(angle) * distance,
     state.playerPos.y + Math.sin(angle) * distance,
   );
-  state.boss = {
-    pos: bossPos,
-    health: constants.BOSS_HEALTH,
-    maxHealth: constants.BOSS_HEALTH,
-    state: 'idle',
-    direction: vector(0, 0),
-    attackTarget: vector(bossPos.x, bossPos.y),
-    attackTimer: constants.BOSS_ATTACK_INTERVAL,
-    windupTimer: 0,
-    facingAngle: 0,
-    xpReward: constants.XP_REWARD_BOSS,
-    scoreReward: 100,
-    bossType: 'cat',
-  };
+  state.boss = createBossAtPosition(bossPos, constants.BOSS_HEALTH, 'cat', 1);
   state.bossWarningTimer = constants.BOSS_WARNING_DURATION;
   state.enemies.length = 0;
 }
 
 // 타임어택 모드 보스 생성
 export function spawnTimeAttackBoss(vectorCopy) {
-  // 보스 타입 결정 (인덱스에 따라)
   const bossTypes = ['ladybug', 'ant', 'butterfly', 'cat', 'dog'];
   const bossType = bossTypes[state.timeAttackBossIndex % bossTypes.length];
 
@@ -229,27 +233,19 @@ export function spawnTimeAttackBoss(vectorCopy) {
   // HP는 테스트용으로 10으로 설정
   const bossHP = 10;
 
-  state.boss = {
-    pos: bossPos,
-    health: bossHP,
-    maxHealth: bossHP,
-    state: 'idle',
-    direction: vector(0, 0),
-    attackTarget: vectorCopy(bossPos),
-    attackTimer: constants.BOSS_ATTACK_INTERVAL,
-    windupTimer: 0,
-    facingAngle: 0,
-    xpReward: constants.XP_REWARD_BOSS,
-    scoreReward: 100 * (state.timeAttackBossIndex + 1),
-    bossType: bossType,
-  };
-
+  state.boss = createBossAtPosition(bossPos, bossHP, bossType, state.timeAttackBossIndex + 1);
   state.timeAttackBossIndex++;
   state.bossWarningTimer = constants.BOSS_WARNING_DURATION;
 }
 
 // 치약 아이템 생성
 export function spawnToothpasteItem(getCurrentWorldBounds, collidesWithObstacles) {
+  // 경량화: 최대 5개로 제한 (오래된 것부터 제거)
+  const MAX_TOOTHPASTE = 5;
+  if (state.toothpasteItems.length >= MAX_TOOTHPASTE) {
+    state.toothpasteItems.shift(); // 가장 오래된 아이템 제거
+  }
+
   const attempts = 24;
   const margin = 40;
   const toothpasteSize = 44;

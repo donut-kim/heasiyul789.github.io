@@ -65,7 +65,7 @@ export const state = {
   toothpasteTimer: constants.TOOTHPASTE_DROP_INTERVAL,
   toothpasteFlashTimer: 0,
   pendingLevelBlast: 0,
-  toothpasteGlowPhase: 0,
+  // 경량화: toothpasteGlowPhase 제거 (애니메이션 불필요)
   hasGanjangGim: false,
   hasKimBugak: false,
   hpBarTimer: 0,
@@ -171,7 +171,7 @@ export function resetGameplayState() {
   state.toothpasteTimer = constants.TOOTHPASTE_DROP_INTERVAL;
   state.toothpasteFlashTimer = 0;
   state.pendingLevelBlast = 0;
-  state.toothpasteGlowPhase = 0;
+  // 경량화: toothpasteGlowPhase 제거
   state.hasGanjangGim = false;
   state.hasKimBugak = false;
   state.hpBarTimer = 0;
