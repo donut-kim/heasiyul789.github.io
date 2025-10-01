@@ -230,8 +230,8 @@ export function spawnTimeAttackBoss(vectorCopy) {
     state.playerPos.y + Math.sin(angle) * distance,
   );
 
-  // HP는 테스트용으로 10으로 설정
-  const bossHP = 10;
+  // 보스 HP: 3분(100), 6분(200), 9분(300), 12분(400), 15분(500)
+  const bossHP = (state.timeAttackBossIndex + 1) * 100;
 
   state.boss = createBossAtPosition(bossPos, bossHP, bossType, state.timeAttackBossIndex + 1);
   state.timeAttackBossIndex++;

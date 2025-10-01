@@ -1630,31 +1630,7 @@ function attemptStart() {
     return;
   }
 
-  // 로그인 여부 확인
-  const isLoggedIn = window.firebaseAuth?.currentUser;
-  if (!isLoggedIn) {
-    showModal(
-      '⚠️ 비회원 플레이',
-      '비회원일 경우 랭킹에 등록되지 않습니다.\n\n계속하시겠습니까?',
-      {
-        showConfirm: true,
-        onConfirm: () => {
-          // 확인 클릭 시 게임 시작
-          state.nickname = trimmed;
-          const gameMode = sessionStorage.getItem('gameMode') || 'normal';
-          state.gameMode = gameMode;
-          startOverlay.classList.remove('active');
-          nicknameInput.blur();
-          startGame();
-        },
-        onCancel: () => {
-          // 취소 클릭 시 아무것도 하지 않음 (시작 화면 유지)
-        }
-      }
-    );
-    return;
-  }
-
+  // 비회원도 랭킹 등록 가능하므로 바로 게임 시작
   state.nickname = trimmed;
 
   // 선택된 게임 모드 저장 (sessionStorage에서 읽기)
@@ -1695,7 +1671,7 @@ const skillData = {
     }
   },
   magnet: {
-    name:'No잼 자석',
+    name:'잼 자석',
     title: '자동 흡수',
     option: (next) => `흡수 범위 ${next * 100}px`,
     description: '자동식사가능ㅋ'
@@ -2465,13 +2441,13 @@ function update(dt) {
     }
   }
 
-  // 타임어택 모드 보스 타이머 (3분마다)
+  // 타임어택 모드 보스 스폰 (게임 시간 기준: 3분, 6분, 9분, 12분, 15분)
   if (activePlay && !state.boss) {
-    state.timeAttackBossTimer += dt;
-    // 180초(3분)마다 보스 등장
-    if (state.timeAttackBossTimer >= 180) {
+    const bossSpawnTimes = [180, 360, 540, 720, 900]; // 3분, 6분, 9분, 12분, 15분
+    const currentBossTime = bossSpawnTimes[state.timeAttackBossIndex];
+
+    if (currentBossTime && state.elapsed >= currentBossTime) {
       spawnTimeAttackBoss(vectorCopy);
-      state.timeAttackBossTimer = 0;
       // 보스 스폰 시 검은먼지 타이머도 리셋 (충돌 방지)
       state.nextBlackDustSpawn = 60;
       state.blackDustWarningActive = false;

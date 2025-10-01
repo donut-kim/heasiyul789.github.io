@@ -85,21 +85,17 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
       }
     }
 
-    // 로그인 여부 확인 - 비회원은 저장하지 않음
+    // 비회원도 랭킹 등록 가능 (닉네임 기반)
     const currentUser = auth?.currentUser;
-    if (!currentUser) {
-      console.log('비회원은 랭킹에 저장되지 않습니다.');
-      return false;
-    }
+    const cleanNickname = nickname.trim();
+    const userId = currentUser?.uid || `guest_${cleanNickname}`; // 비회원은 guest_ 접두사 사용
 
     const { collection, getDocs, query, where, addDoc, serverTimestamp } = window.firestoreDB;
-    const cleanNickname = nickname.trim();
-    const userId = currentUser.uid;
 
-    // 기존 해당 사용자의 최고 기록 찾기 (UID 기반)
+    // 기존 해당 닉네임의 최고 기록 찾기 (닉네임 기반)
     const existingQuery = query(
       collection(db, 'rankings'),
-      where('uid', '==', userId),
+      where('nickname', '==', cleanNickname),
       where('gameType', '==', 'timeattack')
     );
 

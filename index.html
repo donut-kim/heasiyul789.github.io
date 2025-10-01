@@ -905,17 +905,15 @@
             </div>
           </div>
 
-          <!-- 닉네임 입력 (비로그인 시) -->
+          <!-- 닉네임 입력/표시 -->
           <div class="nickname-section" id="nickname-input-section">
             <label for="nickname-input">닉네임 (2~9자)</label>
-            <input id="nickname-input" type="text" maxlength="12" autocomplete="off" placeholder="예: SweetDonut" />
+            <input id="nickname-input" type="text" maxlength="9" autocomplete="off" placeholder="예: SweetDonut" />
           </div>
-
-          <!-- 닉네임 표시 (로그인 시) -->
           <div class="nickname-section" id="nickname-display-section" style="display: none;">
             <label>닉네임</label>
-            <div style="padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(120, 150, 190, 0.5); background: rgba(12, 16, 24, 0.9); color: #eef5ff; font-size: 15px;">
-              <span id="nickname-display">---</span>
+            <div style="text-align: center;">
+              <span id="nickname-display" style="color: #9fb4d8; font-weight: bold; font-size: 18px;"></span>
             </div>
           </div>
 
@@ -933,9 +931,8 @@
             </div>
           </div>
 
-          <!-- 로그인 및 패치 내용 버튼 -->
+          <!-- 패치 내용 버튼 -->
           <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-            <button id="google-login-button" type="button" style="flex: 1; background: #4285f4; font-size: 12px; padding: 6px 12px; border: none; border-radius: 999px; color: white; cursor: pointer; font-weight: 600;">🔐 구글 로그인</button>
             <button id="patch-notes-button" type="button" style="flex: 1; background: #7c3aed; font-size: 12px; padding: 6px 12px; border: none; border-radius: 999px; color: white; cursor: pointer; font-weight: 600;">📝 디스코드</button>
           </div>
 
@@ -961,193 +958,16 @@
 
     <!-- Firebase SDK -->
     <script type="module">
+      // Firebase는 랭킹용으로만 사용 (인증 제거)
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
       import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-      import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
 
-      // Firebase를 전역에서 사용할 수 있도록 설정
       window.firebase = {
         initializeApp,
-        getFirestore,
-        getAuth,
-        GoogleAuthProvider,
-        signInWithPopup,
-        onAuthStateChanged,
-        signOut
+        getFirestore
       };
 
-      // 구글 로그인 전역 함수 설정
-      window.initGoogleAuth = function() {
-        const googleLoginButton = document.getElementById('google-login-button');
-
-        const nicknameInputSection = document.getElementById('nickname-input-section');
-        const nicknameDisplaySection = document.getElementById('nickname-display-section');
-        const nicknameDisplay = document.getElementById('nickname-display');
-        const nicknameInput = document.getElementById('nickname-input');
-        let currentUser = null;
-        let userNickname = null;
-
-        // Firebase Auth 함수 가져오기
-        const { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = window.firebase;
-
-        // 닉네임 설정 모달 표시
-        async function showNicknameModal(user) {
-          const modal = document.createElement('div');
-          modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 30;';
-          modal.innerHTML = `
-            <div style="background: linear-gradient(180deg, rgba(22, 28, 40, 0.95), rgba(12, 18, 26, 0.95)); padding: 24px; border-radius: 16px; border: 1px solid rgba(110, 214, 255, 0.35); box-shadow: 0 30px 60px rgba(0,0,0,0.45); max-width: 400px; width: 90%;">
-              <h2 style="color: #f0f6ff; margin: 0 0 16px 0; font-size: 24px; text-align: center;">닉네임 설정</h2>
-              <p style="color: #c2d4f0; margin: 0 0 16px 0; font-size: 14px; text-align: center;">게임에서 사용할 닉네임을 입력해주세요 (2~9자)</p>
-              <input id="modal-nickname-input" type="text" maxlength="9" placeholder="닉네임 입력" style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(120, 150, 190, 0.5); background: rgba(12, 16, 24, 0.9); color: #eef5ff; font-size: 15px; margin-bottom: 16px; box-sizing: border-box;" />
-              <button id="modal-nickname-save" disabled style="width: 100%; padding: 12px; border: none; border-radius: 999px; background: linear-gradient(90deg, #4ade80, #22c55e); color: #0b101a; font-size: 16px; font-weight: 700; cursor: pointer;">저장</button>
-            </div>
-          `;
-          document.body.appendChild(modal);
-
-          const modalInput = modal.querySelector('#modal-nickname-input');
-          const saveButton = modal.querySelector('#modal-nickname-save');
-
-          // 입력 시 버튼 활성화/비활성화
-          modalInput.addEventListener('input', () => {
-            const trimmed = modalInput.value.trim();
-            saveButton.disabled = trimmed.length < 2 || trimmed.length > 9;
-          });
-
-          // 엔터키로도 저장 가능
-          modalInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !saveButton.disabled) {
-              e.preventDefault();
-              saveButton.click();
-            }
-          });
-
-          // 모달이 열리면 입력 필드에 포커스
-          setTimeout(() => modalInput.focus(), 100);
-
-          // 저장 버튼 클릭
-          saveButton.addEventListener('click', async () => {
-            const nickname = modalInput.value.trim();
-
-            if (nickname.length >= 2 && nickname.length <= 9) {
-              try {
-                // 현재 게임 모드에 맞는 모듈 import
-                const gameMode = sessionStorage.getItem('gameMode') || 'normal';
-                const modulePath = gameMode === 'timeattack'
-                  ? './js/timeattack/firebase-ranking.js'
-                  : './js/normal/firebase-ranking.js';
-
-                const { saveUserNickname } = await import(modulePath);
-                const success = await saveUserNickname(user.uid, nickname);
-
-                if (success) {
-                  userNickname = nickname;
-                  nicknameDisplay.textContent = nickname;
-                  // 로그인한 사용자는 닉네임 입력란 숨기고 표시란 보여주기
-                  nicknameInputSection.style.display = 'none';
-                  nicknameDisplaySection.style.display = 'block';
-                  // 닉네임 입력 필드에도 값 설정 (게임 시작 시 사용)
-                  const nicknameInputField = document.getElementById('nickname-input');
-                  if (nicknameInputField) {
-                    nicknameInputField.value = nickname;
-                  }
-                  // 게임 시작 버튼 활성화
-                  const startButton = document.getElementById('start-button');
-                  if (startButton) {
-                    startButton.disabled = false;
-                  }
-                  modal.remove();
-                  alert(`닉네임이 설정되었습니다: ${nickname}`);
-                } else {
-                  alert('닉네임 저장에 실패했습니다.');
-                }
-              } catch (error) {
-                console.error('닉네임 저장 오류:', error);
-                alert('닉네임 저장 중 오류가 발생했습니다: ' + error.message);
-              }
-            }
-          });
-        }
-
-        // 인증 상태 변경 감지
-        if (window.firebaseAuth) {
-          onAuthStateChanged(window.firebaseAuth, async (user) => {
-            currentUser = user;
-            if (user) {
-              // 로그인 상태
-              googleLoginButton.textContent = '🔓 로그아웃';
-              googleLoginButton.style.background = '#ea4335';
-
-              // 닉네임 확인
-              const gameMode = sessionStorage.getItem('gameMode') || 'normal';
-              const modulePath = gameMode === 'timeattack'
-                ? './js/timeattack/firebase-ranking.js'
-                : './js/normal/firebase-ranking.js';
-              const { getUserNickname } = await import(modulePath);
-              userNickname = await getUserNickname(user.uid);
-
-              if (userNickname) {
-                // 닉네임이 있으면 표시
-                nicknameDisplay.textContent = userNickname;
-                nicknameInputSection.style.display = 'none';
-                nicknameDisplaySection.style.display = 'block';
-                // 닉네임 입력 필드에도 값 설정 (게임 시작 시 사용)
-                const nicknameInputField = document.getElementById('nickname-input');
-                if (nicknameInputField) {
-                  nicknameInputField.value = userNickname;
-                }
-                // 게임 시작 버튼 활성화
-                const startButton = document.getElementById('start-button');
-                if (startButton) {
-                  startButton.disabled = false;
-                }
-              } else {
-                // 닉네임이 없으면 입력 모달 표시
-                showNicknameModal(user);
-              }
-            } else {
-              // 로그아웃 상태
-              googleLoginButton.textContent = '🔐 구글 로그인';
-              googleLoginButton.style.background = '#4285f4';
-              userNickname = null;
-              nicknameInputSection.style.display = 'block';
-              nicknameDisplaySection.style.display = 'none';
-              nicknameInput.value = '';
-            }
-          });
-        }
-
-        // 구글 로그인/로그아웃 버튼 클릭
-        if (googleLoginButton) {
-          googleLoginButton.addEventListener('click', async () => {
-            if (!window.firebaseApp || !window.firebaseAuth) {
-              alert('Firebase가 초기화되지 않았습니다.');
-              return;
-            }
-
-            try {
-              if (currentUser) {
-                // 로그아웃
-                await signOut(window.firebaseAuth);
-                alert('로그아웃되었습니다.');
-              } else {
-                // 로그인
-                const provider = new GoogleAuthProvider();
-                const result = await signInWithPopup(window.firebaseAuth, provider);
-                const user = result.user;
-                // onAuthStateChanged에서 닉네임 확인 처리
-              }
-            } catch (error) {
-              console.error('로그인 오류:', error);
-              alert('로그인 중 오류가 발생했습니다: ' + error.message);
-            }
-          });
-        }
-
-        // 전역에서 사용할 수 있도록 설정
-        window.getUserNickname = () => userNickname;
-      };
-
-      // 페이지 로드 시 Firebase 즉시 초기화
+      // 페이지 로드 시 Firebase 초기화 (랭킹용)
       window.addEventListener('DOMContentLoaded', async () => {
         try {
           const gameMode = sessionStorage.getItem('gameMode') || 'normal';
@@ -1158,8 +978,65 @@
           const { initFirebase } = await import(modulePath);
           await initFirebase();
         } catch (error) {
-          console.error('Firebase 수동 초기화 실패:', error);
+          console.error('Firebase 초기화 실패:', error);
         }
+      });
+    </script>
+
+    <script>
+      // 로컬스토리지에서 닉네임 관리
+      const NICKNAME_KEY = 'donutlike_nickname';
+
+      function saveNickname(nickname) {
+        localStorage.setItem(NICKNAME_KEY, nickname);
+      }
+
+      function loadNickname() {
+        return localStorage.getItem(NICKNAME_KEY);
+      }
+
+      // 페이지 로드 시 닉네임 확인 및 UI 초기화
+      document.addEventListener('DOMContentLoaded', () => {
+        const nicknameInput = document.getElementById('nickname-input');
+        const nicknameInputSection = document.getElementById('nickname-input-section');
+        const nicknameDisplaySection = document.getElementById('nickname-display-section');
+        const nicknameDisplay = document.getElementById('nickname-display');
+        const startButton = document.getElementById('start-button');
+
+        // 저장된 닉네임 불러오기
+        const savedNickname = loadNickname();
+
+        if (savedNickname) {
+          // 저장된 닉네임이 있으면 표시 모드로 전환
+          nicknameInput.value = savedNickname; // input에도 값 설정 (숨겨져 있지만 attemptStart에서 사용)
+          nicknameInputSection.style.display = 'none';
+          nicknameDisplaySection.style.display = 'block';
+          nicknameDisplay.textContent = savedNickname;
+          startButton.disabled = false;
+        } else {
+          // 저장된 닉네임이 없으면 입력 모드
+          nicknameInputSection.style.display = 'block';
+          nicknameDisplaySection.style.display = 'none';
+          startButton.disabled = true;
+        }
+
+        // 닉네임 입력 시 버튼 활성화/비활성화
+        nicknameInput.addEventListener('input', () => {
+          const trimmed = nicknameInput.value.trim();
+          startButton.disabled = trimmed.length < 2 || trimmed.length > 9;
+        });
+
+        // 게임 시작 버튼 클릭 시 닉네임 저장
+        startButton.addEventListener('click', () => {
+          const nickname = nicknameInput.value.trim();
+          if (nickname.length >= 2 && nickname.length <= 9) {
+            saveNickname(nickname);
+            // 표시 모드로 전환
+            nicknameInputSection.style.display = 'none';
+            nicknameDisplaySection.style.display = 'block';
+            nicknameDisplay.textContent = nickname;
+          }
+        });
       });
     </script>
 

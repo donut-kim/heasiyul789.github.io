@@ -106,7 +106,30 @@ export async function showRankingModal() {
     const rankings = await loadRankingData();
 
     if (rankings.length === 0) {
-      rankingHTML = '<div style="text-align: center; padding: 20px; color: #9fb4d8;">아직 랭킹 데이터가 없습니다.</div>';
+      // 더미 랭킹 데이터 표시
+      const dummyRankings = [
+        { nickname: '김콩실', survivalTime: 840 },
+        { nickname: '몽실이', survivalTime: 720 },
+        { nickname: '뮤리', survivalTime: 660 },
+        { nickname: '도넛킴', survivalTime: 600 },
+        { nickname: '츄르맨', survivalTime: 540 },
+        { nickname: '빵순이', survivalTime: 480 },
+        { nickname: '쿠키몬', survivalTime: 420 }
+      ];
+
+      rankingHTML = '<div style="max-height: min(60vh, 400px); overflow-y: auto; font-family: monospace;">';
+      dummyRankings.forEach((rank, index) => {
+        const survivalTime = formatSurvivalTime(rank.survivalTime);
+        const rankEmoji = index === 0 || index === 1 ? ' 🍗' : '';
+        rankingHTML += `
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px; align-items: center; padding: 8px 10px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 14px;">
+            <span style="font-weight: bold; color: #ffffff; text-align: center;">${index + 1}${rankEmoji}</span>
+            <span style="color: #9fb4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${rank.nickname}</span>
+            <span style="color: #fbbf24; text-align: center;">${survivalTime}</span>
+          </div>
+        `;
+      });
+      rankingHTML += '</div>';
     } else {
       rankingHTML = '<div style="max-height: min(60vh, 400px); overflow-y: auto; font-family: monospace;">';
       rankings.forEach((rank, index) => {
@@ -114,12 +137,10 @@ export async function showRankingModal() {
         const survivalTime = formatSurvivalTime(rank.survivalTime);
         const rankEmoji = index === 0 || index === 1 ? ' 🍗' : '';
         rankingHTML += `
-          <div style="display: grid; grid-template-columns: 40px 1fr 55px 65px 75px; gap: 6px; align-items: center; padding: 6px 8px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 13px;">
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px; align-items: center; padding: 8px 10px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 14px;">
             <span style="font-weight: bold; color: #ffffff; text-align: center;">${index + 1}${rankEmoji}</span>
             <span style="color: #9fb4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${nickname}</span>
-            <span style="color: #a3e635; text-align: center; font-size: 12px;">S${rank.stage}</span>
-            <span style="color: #fbbf24; text-align: center; font-size: 12px;">${survivalTime}</span>
-            <span style="color: #ffffff; font-weight: bold; text-align: right; font-size: 12px;">${rank.finalScore.toLocaleString()}</span>
+            <span style="color: #fbbf24; text-align: center;">${survivalTime}</span>
           </div>
         `;
       });
@@ -140,12 +161,10 @@ export async function showRankingModal() {
     extraHTML: `
       <div style="width: min(95vw, 600px); max-width: 600px;">
         ${localWarning}
-        <div style="display: grid; grid-template-columns: 40px 1fr 55px 65px 75px; gap: 6px; padding: 6px 8px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 13px;">
+        <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px; padding: 8px 10px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 14px;">
           <span style="text-align: center;">순위</span>
           <span>닉네임</span>
-          <span style="text-align: center;">스테이지</span>
           <span style="text-align: center;">시간</span>
-          <span style="text-align: right;">점수</span>
         </div>
         ${rankingHTML}
         <div style="text-align: center; margin-top: 20px;">

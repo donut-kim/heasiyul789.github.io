@@ -85,21 +85,17 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
       }
     }
 
-    // 로그인 여부 확인 - 비회원은 저장하지 않음
+    // 비회원도 랭킹 등록 가능 (닉네임 기반)
     const currentUser = auth?.currentUser;
-    if (!currentUser) {
-      console.log('비회원은 랭킹에 저장되지 않습니다.');
-      return false;
-    }
+    const cleanNickname = nickname.trim();
+    const userId = currentUser?.uid || `guest_${cleanNickname}`; // 비회원은 guest_ 접두사 사용
 
     const { collection, getDocs, query, where, addDoc, serverTimestamp } = window.firestoreDB;
-    const cleanNickname = nickname.trim();
-    const userId = currentUser.uid;
 
-    // 기존 해당 사용자의 최고 기록 찾기 (UID 기반)
+    // 기존 해당 닉네임의 최고 기록 찾기 (닉네임 기반)
     const existingQuery = query(
       collection(db, 'rankings'),
-      where('uid', '==', userId),
+      where('nickname', '==', cleanNickname),
       where('gameType', '==', 'normal')
     );
 
@@ -169,12 +165,8 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
 
     const { collection, getDocs, query, where } = window.firestoreDB;
 
-    // 노말 모드 게임 타입만 필터링 (클라이언트에서 정렬)
-    const rankingsQuery = query(
-      collection(db, 'rankings'),
-      where('gameType', '==', 'normal')
-    );
-
+    // 모든 랭킹 데이터 가져오기 (gameType 필터 없음 - 클라이언트에서 필터링)
+    const rankingsQuery = query(collection(db, 'rankings'));
     const querySnapshot = await getDocs(rankingsQuery);
 
     if (querySnapshot.empty) {
@@ -185,16 +177,19 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
     const rankings = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      rankings.push({
-        id: doc.id,
-        nickname: data.nickname || '익명',
-        character: 'signature_knotted', // character 필드가 없으므로 기본값
-        stage: data.stage || 1,
-        survivalTime: data.gameTime || 0,
-        finalScore: data.score || 0,
-        timestamp: data.createdAt?.toMillis() || Date.now(),
-        date: data.createdAt?.toDate().toISOString() || new Date().toISOString()
-      });
+      // gameType이 없거나 'normal'인 경우만 포함
+      if (!data.gameType || data.gameType === 'normal') {
+        rankings.push({
+          id: doc.id,
+          nickname: data.nickname || '익명',
+          character: 'signature_knotted', // character 필드가 없으므로 기본값
+          stage: data.stage || 1,
+          survivalTime: data.gameTime || 0,
+          finalScore: data.score || 0,
+          timestamp: data.createdAt?.toMillis() || Date.now(),
+          date: data.createdAt?.toDate().toISOString() || new Date().toISOString()
+        });
+      }
     });
 
     // 클라이언트에서 score 기준 내림차순 정렬 후 상위 limitCount개만 반환

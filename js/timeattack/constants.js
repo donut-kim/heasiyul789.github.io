@@ -148,8 +148,8 @@ export const GRID_COLOR = '#c6ccd4';
 
 // 경험치 설정
 export const XP_PER_KILL = 20;
-export const BASE_XP_TO_LEVEL = 200;
-export const XP_LEVEL_SCALE = 2.0;
+export const BASE_XP_TO_LEVEL = 150;    // 200 → 150 (시작 경험치 감소)
+export const XP_LEVEL_SCALE = 1.5;      // 2.0 → 1.5 (증가율 완화)
 
 // 폰트 설정
 export const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
@@ -159,7 +159,7 @@ export const UPGRADE_DEFINITIONS = {
   speed: { title: '이속 증가', max: 5 },
   attack_speed: { title: '공속 증가', max: 5 },
   multi_shot: { title: '김 추가', max: 5 },
-  magnet: { title: 'No잼 자석', max: 5 },
+  magnet: { title: '잼 자석', max: 5 },
   double_shot: { title: '더블 발사', max: 3 },
   sprinkle: { title: '스프링클', max: 3 },
   deulgireum_rapid: { title: '들기름', max: 1 },

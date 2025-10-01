@@ -1504,29 +1504,7 @@ function attemptStart() {
     return;
   }
 
-  // 로그인 여부 확인
-  const isLoggedIn = window.firebaseAuth?.currentUser;
-  if (!isLoggedIn) {
-    showModal(
-      '⚠️ 비회원 플레이',
-      '비회원일 경우 랭킹에 등록되지 않습니다.\n\n계속하시겠습니까?',
-      {
-        showConfirm: true,
-        onConfirm: () => {
-          // 확인 클릭 시 게임 시작
-          state.nickname = trimmed;
-          startOverlay.classList.remove('active');
-          nicknameInput.blur();
-          startGame();
-        },
-        onCancel: () => {
-          // 취소 클릭 시 아무것도 하지 않음 (시작 화면 유지)
-        }
-      }
-    );
-    return;
-  }
-
+  // 비회원도 랭킹 등록 가능하므로 바로 게임 시작
   state.nickname = trimmed;
   startOverlay.classList.remove('active');
   nicknameInput.blur();
