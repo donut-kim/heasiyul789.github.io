@@ -2,6 +2,13 @@
 import * as constants from './constants.js';
 import * as timeAttackConstants from './timeAttackConstants.js';
 import {
+  createLadybugBossSprite,
+  createAntBossSprite,
+  createButterflyBossSprite,
+  createCatBossSprite,
+  createDogBossSprite
+} from './bossSprites.js';
+import {
   state,
   resetGameplayState,
   calculateTotalScore,
@@ -74,6 +81,12 @@ import {
   updateXpCrumbs,
   drawXpCrumbs
 } from './xp.js';
+import {
+  drawTimeAttackBossWarning,
+  drawBlackDustWarning,
+  drawGameStartMessage,
+  drawTimeAttackBossHP
+} from './banner.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -103,23 +116,24 @@ function hexToRgba(hex, alpha) {
 }
 
 function getPlayerMaxHealth() {
-  return state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_PLAYER_MAX_HEALTH
-    : constants.PLAYER_MAX_HEALTH;
+  const baseHealth = timeAttackConstants.TIME_ATTACK_PLAYER_MAX_HEALTH;
+
+  // 최대 HP 증가 스킬 효과 (+2 per level)
+  const maxHealthBonus = (state.upgradeLevels.hp_increase || 0) * 2;
+
+  return baseHealth + maxHealthBonus;
 }
 
 function sizeCanvasToCss() {
   const rootStyle = document.documentElement?.style;
 
-  // 타임어택 모드일 때 처리
-  if (state.gameMode === 'timeattack') {
-    // 모바일인지 확인
-    const isMobile = window.innerWidth <= 768;
+  // 모바일인지 확인
+  const isMobile = window.innerWidth <= 768;
 
-    if (isMobile) {
-      // 모바일에서는 노말모드와 동일한 캔버스 크기 처리
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+  if (isMobile) {
+    // 모바일에서는 노말모드와 동일한 캔버스 크기 처리
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
       const displayW = Math.max(1, Math.round(rect.width  * dpr));
       const displayH = Math.max(1, Math.round(rect.height * dpr));
       if (canvas.width !== displayW || canvas.height !== displayH) {
@@ -161,54 +175,34 @@ function sizeCanvasToCss() {
 
       window.__renderScale = { s, worldW, worldH, offsetX, offsetY };
     } else {
-      // PC에서는 고정 크기
-      const targetW = BASE_TIME_ATTACK.w;
-      const targetH = BASE_TIME_ATTACK.h;
+      // PC에서는 화면에 맞게 조정하되, 월드맵 크기는 600x1000 유지
+      const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = targetW * dpr;
-      canvas.height = targetH * dpr;
-      canvas.style.width = targetW + 'px';
-      canvas.style.height = targetH + 'px';
+      const displayW = Math.max(1, Math.round(rect.width  * dpr));
+      const displayH = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== displayW || canvas.height !== displayH) {
+        canvas.width  = displayW;
+        canvas.height = displayH;
+      }
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      rootStyle?.setProperty('--timeattack-width', `${targetW}px`);
-      rootStyle?.setProperty('--timeattack-height', `${targetH}px`);
+      // 게임 월드는 타임어택 크기(600x1000) 유지, 화면 표시만 조정
+      const worldW = BASE_TIME_ATTACK.w;
+      const worldH = BASE_TIME_ATTACK.h;
+      const sx = rect.width  / worldW;
+      const sy = rect.height / worldH;
+      const s = Math.min(sx, sy);
+      const offsetX = (rect.width  - worldW * s) * 0.5;
+      const offsetY = (rect.height - worldH * s) * 0.5;
 
-      window.__renderScale = {
-        s: 1,
-        worldW: targetW,
-        worldH: targetH,
-        offsetX: 0,
-        offsetY: 0
-      };
+      if (rect.width > 0 && rect.height > 0) {
+        rootStyle?.setProperty('--timeattack-width', `${rect.width}px`);
+        rootStyle?.setProperty('--timeattack-height', `${rect.height}px`);
+      }
+
+      window.__renderScale = { s, worldW, worldH, offsetX, offsetY };
     }
-    return;
-  }
-
-  rootStyle?.setProperty('--timeattack-width', `${BASE_TIME_ATTACK.w}px`);
-  rootStyle?.setProperty('--timeattack-height', `${BASE_TIME_ATTACK.h}px`);
-
-  // 노말 모드의 기존 로직
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  const displayW = Math.max(1, Math.round(rect.width  * dpr));
-  const displayH = Math.max(1, Math.round(rect.height * dpr));
-  if (canvas.width !== displayW || canvas.height !== displayH) {
-    canvas.width  = displayW;
-    canvas.height = displayH;
-  }
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  const target = mediaPortrait.matches ? BASE_PORTRAIT : BASE_LANDSCAPE;
-  const sx = rect.width  / target.w;
-  const sy = rect.height / target.h;
-  const s = Math.min(sx, sy);
-  const offsetX = (rect.width  - target.w * s) * 0.5;
-  const offsetY = (rect.height - target.h * s) * 0.5;
-
-  window.__renderScale = { s, worldW: target.w, worldH: target.h, offsetX, offsetY };
 }
 
 window.addEventListener('load', sizeCanvasToCss);
@@ -971,6 +965,7 @@ function createClampBossSprite(size) {
   return off;
 }
 
+
 function createBacteriaSpriteDarkBlue(size) {
   const off = document.createElement('canvas');
   off.width = size;
@@ -1328,6 +1323,13 @@ const sprites = {
   blackDust: createBlackDustSprite(constants.BLACK_DUST_SIZE),
   orangeLadybug: createOrangeLadybugSprite(constants.ORANGE_LADYBUG_SIZE),
   boss: createClampBossSprite(constants.BOSS_RADIUS * 3.2),
+  bossSprites: {
+    ladybug: createLadybugBossSprite(constants.BOSS_RADIUS * 3.2),
+    ant: createAntBossSprite(constants.BOSS_RADIUS * 3.2),
+    butterfly: createButterflyBossSprite(constants.BOSS_RADIUS * 3.2),
+    cat: createCatBossSprite(constants.BOSS_RADIUS * 3.2),
+    dog: createDogBossSprite(constants.BOSS_RADIUS * 3.2),
+  },
   blades: constants.GIM_VARIANTS.map((label) => createGimSprite(constants.BLADE_SIZE, label)),
   bullet: createSeaweedSprite(constants.BULLET_SIZE),
   kimBugakBullet: createKimBugakSprite(Math.round(constants.BULLET_SIZE * 2)),
@@ -1337,6 +1339,7 @@ const sprites = {
   toothpaste: createToothpasteSprite(48),
   tornado: createTornadoSprite(48),
 };
+
 
 const DONUT_STYLES = {
   boston_creme: {
@@ -1470,37 +1473,7 @@ function ensureChunk(cx, cy) {
   }
 
   // 타임어택 모드에서는 장애물 생성 안함
-  if (state.gameMode === 'timeattack') {
-    return;
-  }
-
-  if (cx === 0 && cy === 0) {
-    baseObstacleTemplates.forEach((tpl, index) => {
-      const type = constants.DONUT_TYPES[index % constants.DONUT_TYPES.length];
-      obstacles.push(createDonutObstacle(tpl, type));
-    });
-    return;
-  }
-
-  const minX = cx * constants.CHUNK_SIZE;
-  const maxX = minX + constants.CHUNK_SIZE;
-  const minY = cy * constants.CHUNK_SIZE;
-  const maxY = minY + constants.CHUNK_SIZE;
-
-  const count = randInt(4, 9);
-  for (let i = 0; i < count; i++) {
-    const width = randInt(80, 160);
-    const height = randInt(60, 140);
-    const bounds = getCurrentWorldBounds();
-    const xMin = clamp(minX + 40, -bounds + 40, bounds - width - 40);
-    const xMax = clamp(maxX - width - 40, -bounds + 40, bounds - width - 40);
-    const yMin = clamp(minY + 40, -bounds + 40, bounds - height - 40);
-    const yMax = clamp(maxY - height - 40, -bounds + 40, bounds - height - 40);
-    if (xMax <= xMin || yMax <= yMin) continue;
-    const x = randInt(xMin, xMax);
-    const y = randInt(yMin, yMax);
-    obstacles.push(createDonutObstacle({ x, y, w: width, h: height }));
-  }
+  return;
 }
 
 function ensureChunksAroundPlayer() {
@@ -1636,12 +1609,8 @@ function startGame() {
   resetGameplayState();
   recomputePlayerStats(); // 탄환 갯수 포함 플레이어 스탯 초기화
 
-  // 타임어택 모드일 때 CSS 클래스 추가
-  if (state.gameMode === 'timeattack') {
-    document.body.classList.add('timeattack-mode');
-  } else {
-    document.body.classList.remove('timeattack-mode');
-  }
+  // 타임어택 모드 CSS 클래스 추가
+  document.body.classList.add('timeattack-mode');
 
   // 캔버스 크기 다시 계산
   sizeCanvasToCss();
@@ -1655,6 +1624,9 @@ function startGame() {
   state.started = true;
   state.paused = false;
   state.gameStartTime = performance.now();
+
+  // 게임 시작 시 즉시 렌더링
+  render();
 }
 
 function attemptStart() {
@@ -1700,7 +1672,7 @@ const skillData = {
     description: '김이 점점 늘어나고, 4레벨부터는 반원으로 퍼지는 귀여운 특공을 준비해요.'
   },
   magnet: {
-    name: '빵가루 자석',
+    name:'No잼 자석',
     title: '자동 흡수',
     option: (next) => `흡수 범위 ${next * 100}px`,
     description: '주변의 빵가루 경험치를 자동으로 빨아들여요.'
@@ -1747,16 +1719,22 @@ const skillData = {
     option: '장애물 무시',
     description: '쌀가루로 튀긴 김부각이다 ! 더 바삭하다고!!'
   },
-  full_heal: {
-    name: '부스러기 획득',
-    title: 'HP회복',
-    option: '체력 완전 회복',
-    description: '빠..빵가루가 필요해...!'
+  hp_increase: {
+    name: '최대 HP 증가',
+    title: '탄수화물',
+    option: (next) => `최대 HP +2 (총 +${next * 2})`,
+    description: '탄수화물 먹으면 쌀찜ㅠ'
+  },
+  electrocution: {
+    name: '감전',
+    title: '특수 스킬',
+    option: '2초간 감전 상태이상',
+    description: '슈크림이 미친듯이 달아졌어 으악 !'
   }
 };
 
 function rollUpgradeCards() {
-  const rareKeys = new Set(['ganjang_gim', 'kim_bugak', 'deulgireum_rapid']);
+  const rareKeys = new Set(['ganjang_gim', 'kim_bugak', 'deulgireum_rapid', 'electrocution']);
   const available = Object.entries(constants.UPGRADE_DEFINITIONS)
     .filter(([key, def]) => !rareKeys.has(key) && state.upgradeLevels[key] < def.max)
     .map(([key]) => key);
@@ -1767,21 +1745,13 @@ function rollUpgradeCards() {
   const count = Math.min(3, shuffled.length);
   const cards = shuffled.slice(0, count).map((key) => ({ key }));
 
-  if (
-    state.gameMode === 'timeattack' &&
-    state.upgradeLevels.magnet < (constants.UPGRADE_DEFINITIONS.magnet?.max ?? 0) &&
-    !cards.some((card) => card.key === 'magnet')
-  ) {
-    cards[cards.length - 1] = { key: 'magnet' };
-  }
+  // 특수 스킬 조건: 슈크림 만렙(3) + 자석 보유 시 10% 확률로 감전 스킬 추가
+  const hasMaxEmField = state.upgradeLevels.em_field >= 3;
+  const hasMagnet = state.upgradeLevels.magnet > 0;
+  const hasElectrocution = state.upgradeLevels.electrocution > 0;
 
-  if (
-    FORCE_TIMEATTACK_MULTI_SHOT &&
-    state.gameMode === 'timeattack' &&
-    state.upgradeLevels.multi_shot < constants.UPGRADE_DEFINITIONS.multi_shot.max &&
-    !cards.some((card) => card.key === 'multi_shot')
-  ) {
-    cards[0] = { key: 'multi_shot' };
+  if (hasMaxEmField && hasMagnet && !hasElectrocution && Math.random() < 0.1 && cards.length < 3) {
+    cards.push({ key: 'electrocution' });
   }
 
   return cards;
@@ -1795,13 +1765,19 @@ function openUpgradeSelection() {
 }
 
 function renderUpgradeOverlay() {
+  // 레벨 1일 때는 "레벨업!" 텍스트 숨기기
+  const levelUpTitle = document.querySelector('#upgrade-overlay h1');
+  if (levelUpTitle) {
+    levelUpTitle.style.display = state.level === 1 ? 'none' : 'block';
+  }
+
   upgradeCardsWrapper.innerHTML = '';
   state.upgradeChoices.forEach(({ key }, index) => {
     const def = constants.UPGRADE_DEFINITIONS[key];
     const current = state.upgradeLevels[key];
     const next = current + 1;
     const card = document.createElement('div');
-    const isSpecialSkill = key === 'deulgireum_rapid' || key === 'ganjang_gim' || key === 'kim_bugak';
+    const isSpecialSkill = key === 'deulgireum_rapid' || key === 'ganjang_gim' || key === 'kim_bugak' || key === 'electrocution';
     card.className = isSpecialSkill ? 'upgrade-card special-skill-card' : 'upgrade-card';
     card.dataset.index = String(index);
     const skill = skillData[key];
@@ -1875,6 +1851,13 @@ function applyUpgrade(index) {
       state.magnetLevel = state.upgradeLevels.magnet;
       state.magnetRadius = state.magnetLevel > 0 ? 100 + (state.magnetLevel - 1) * 50 : 0;
       break;
+    case 'hp_increase':
+      // 최대 HP +2 증가 (현재 체력도 +2)
+      state.playerHealth += 2;
+      break;
+    case 'electrocution':
+      // 감전 스킬 획득 - em_field에 감전 효과 추가
+      break;
     default:
       break;
   }
@@ -1898,7 +1881,7 @@ function recomputePlayerStats() {
   currentFireInterval = Math.max(0.08, constants.PLAYER_FIRE_INTERVAL * Math.pow(0.9, state.upgradeLevels.attack_speed));
 
   const multiShotLevel = state.upgradeLevels.multi_shot;
-  const burstEligible = state.gameMode === 'timeattack' && multiShotLevel > 3;
+  const burstEligible = multiShotLevel > 3;
 
   if (!burstEligible) {
     bulletCount = 1 + multiShotLevel;
@@ -1917,9 +1900,7 @@ function recomputePlayerStats() {
 
   // 공속 업그레이드가 블레이드 회전속도에도 영향
   let baseRotationSpeed = constants.BLADE_ROTATION_SPEED;
-  if (state.gameMode === 'timeattack') {
-    baseRotationSpeed *= timeAttackConstants.TIME_ATTACK_BLADE_ROTATION_FACTOR;
-  }
+  baseRotationSpeed *= timeAttackConstants.TIME_ATTACK_BLADE_ROTATION_FACTOR;
   currentBladeRotationSpeed = baseRotationSpeed * (1 + 0.3 * state.upgradeLevels.attack_speed);
 
   // 공속 업그레이드가 슈크림 발사 간격에도 영향
@@ -1939,7 +1920,7 @@ function addKillRewardsRaw(scoreDelta = 0, xpDelta = 0) {
   if (scoreDelta > 0) {
     state.score += scoreDelta;
   }
-  const maxLevel = state.gameMode === 'timeattack' ? 40 : 20;
+  const maxLevel = 40;
   if (xpDelta > 0 && state.level < maxLevel) {
     state.xp += xpDelta;
   }
@@ -1977,7 +1958,7 @@ function grantRewardForEnemy(enemy) {
 }
 
 function triggerLevelBlast() {
-  const blastRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.LEVEL_BLAST_RADIUS;
+  const blastRadius = timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS;
   const radiusSq = blastRadius * blastRadius;
   const removedEnemies = [];
   const survivors = [];
@@ -2059,7 +2040,7 @@ function resolvePendingLevelBlast() {
 function processLevelUps() {
   if (processingLevelChain) return;
   setProcessingLevelChain(true);
-  const maxLevel = state.gameMode === 'timeattack' ? 40 : 20;
+  const maxLevel = 40;
   while (state.xp >= state.xpToNext && !state.selectingUpgrade && state.level < maxLevel) {
     state.xp -= state.xpToNext;
     state.level += 1;
@@ -2443,7 +2424,7 @@ function update(dt) {
   }
 
   // 타임어택 모드 시간 관리
-  if (state.gameMode === 'timeattack' && activePlay) {
+  if (activePlay) {
     state.timeAttackRemaining = Math.max(0, state.timeAttackRemaining - dt);
     if (state.timeAttackRemaining <= 0) {
       // 타임어택 시간 종료 - 승리 처리
@@ -2453,12 +2434,58 @@ function update(dt) {
   }
 
   // 타임어택 모드 보스 타이머
-  if (state.gameMode === 'timeattack' && activePlay && !state.boss) {
+  if (activePlay && !state.boss) {
     state.timeAttackBossTimer += dt;
     // 3분(180초)마다 보스 등장
     if (state.timeAttackBossTimer >= 180) {
       spawnTimeAttackBoss(vectorCopy);
       state.timeAttackBossTimer = 0;
+      // 보스 스폰 시 검은먼지 타이머도 리셋 (충돌 방지)
+      state.nextBlackDustSpawn = 60;
+      state.blackDustWarningActive = false;
+    }
+  }
+
+  // 타임어택 모드 1분마다 검은먼지 스폰
+  if (activePlay) {
+    // 경고 중일 때 타이머 감소
+    if (state.blackDustWarningActive) {
+      state.blackDustWarningTimer -= dt;
+      if (state.blackDustWarningTimer <= 0) {
+        // 경고 종료, 검은먼지 스폰
+        state.blackDustWarningActive = false;
+        state.blackDustSpawnCount++; // 스폰 횟수 증가
+        const spawnCount = state.blackDustSpawnCount * 100; // 1분=100, 2분=200, 3분=300...
+        spawnBlackDustGroup(sprites, { overrideCount: spawnCount, overrideHealth: 1, storm: true });
+        state.nextBlackDustSpawn = 60; // 다음 스폰까지 60초
+      }
+    } else {
+      // 다음 스폰까지 카운트다운
+      state.nextBlackDustSpawn -= dt;
+
+      // 보스 스폰 시간(180초의 배수)과 겹치는지 체크
+      const nextBossSpawnIn = 180 - state.timeAttackBossTimer;
+      const isBossSpawnSoon = nextBossSpawnIn <= 10; // 보스 스폰 10초 전
+
+      if (state.nextBlackDustSpawn <= 3 && state.nextBlackDustSpawn > 0 && !isBossSpawnSoon) {
+        // 3초 전부터 경고 표시 (보스 스폰이 임박하지 않은 경우만)
+        if (!state.blackDustWarningActive) {
+          state.blackDustWarningActive = true;
+          state.blackDustWarningTimer = timeAttackConstants.TIME_ATTACK_BLACK_DUST_WARNING_DURATION;
+        }
+      }
+      if (state.nextBlackDustSpawn <= 0) {
+        // 보스 스폰 시간과 겹치면 검은먼지 스폰 스킵
+        if (isBossSpawnSoon) {
+          state.nextBlackDustSpawn = 60; // 다음 사이클로 연기
+        } else {
+          // 시간이 다 되었는데 경고가 활성화되지 않았다면 즉시 스폰 (예외 처리)
+          state.blackDustSpawnCount++;
+          const spawnCount = state.blackDustSpawnCount * 100;
+          spawnBlackDustGroup(sprites, { overrideCount: spawnCount, overrideHealth: 1, storm: true });
+          state.nextBlackDustSpawn = 60;
+        }
+      }
     }
   }
 
@@ -2475,12 +2502,18 @@ function update(dt) {
   state.mineFlashTimer = Math.max(0, state.mineFlashTimer - dt);
   state.levelBlastTimer = Math.max(0, state.levelBlastTimer - dt);
   state.toothpasteFlashTimer = Math.max(0, state.toothpasteFlashTimer - dt);
-  state.toothpasteGlowPhase = (state.toothpasteGlowPhase + dt * 4) % (Math.PI * 2);
-  if (state.gameMode === 'timeattack') {
-    state.hpBarTimer = Math.max(1, state.hpBarTimer);
-  } else {
-    state.hpBarTimer = Math.max(0, state.hpBarTimer - dt);
+
+  // 게임 시작 메시지 타이머 감소 및 스킬 선택 시작
+  const prevStartMessageTimer = state.gameStartMessageTimer;
+  state.gameStartMessageTimer = Math.max(0, state.gameStartMessageTimer - dt);
+
+  // 타임어택 모드에서 게임 시작 메시지가 끝나면 첫 스킬 선택
+  if (prevStartMessageTimer > 0 && state.gameStartMessageTimer === 0 && state.level === 1 && !state.selectingUpgrade) {
+    openUpgradeSelection();
   }
+
+  state.toothpasteGlowPhase = (state.toothpasteGlowPhase + dt * 4) % (Math.PI * 2);
+  state.hpBarTimer = Math.max(1, state.hpBarTimer);
   state.specialBurstEffectTimer = Math.max(0, state.specialBurstEffectTimer - dt);
   if (state.bossWarningTimer > 0) {
     state.bossWarningTimer = Math.max(0, state.bossWarningTimer - dt);
@@ -2510,47 +2543,45 @@ function update(dt) {
   if (!activePlay) return;
 
   state.fireTimer -= dt;
-  state.spawnTimer -= dt;
-  // 블랙 더스트 스톰 관리 (기본 스폰은 비활성)
-  if (state.gameMode === 'timeattack') {
-    state.stormWarningTimer = Math.max(0, state.stormWarningTimer - dt);
-    state.sirenPhase = (state.sirenPhase || 0) + dt;
 
-    const stormInterval = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_INTERVAL;
-    const spawnInterval = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_DURATION / timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT;
-
-    if (!state.stormActive) {
-      state.stormTimer += dt;
-      if (state.stormTimer >= stormInterval) {
-        state.stormActive = true;
-        state.stormTimer = 0;
-        state.stormCountdown = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_DURATION;
-        state.stormSpawnedCount = 0;
-        state.stormWarningTimer = timeAttackConstants.TIME_ATTACK_BLACK_DUST_WARNING_DURATION;
-        state.blackDustSpawnTimer = 0;
-      }
-    }
-
-    if (state.stormActive) {
-      state.stormCountdown -= dt;
-      state.blackDustSpawnTimer -= dt;
-      if (state.blackDustSpawnTimer <= 0 && state.stormSpawnedCount < timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT) {
-        spawnBlackDustGroup(sprites, { overrideCount: 1, overrideHealth: 5, storm: true });
-        state.stormSpawnedCount += 1;
-        state.blackDustSpawnTimer += spawnInterval;
-      }
-
-      if (state.stormSpawnedCount >= timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT && state.stormCountdown <= 0) {
-        state.stormActive = false;
-        state.blackDustSpawnTimer = stormInterval;
-        state.stormTimer = 0;
-      }
-    }
+  // 검은먼지 경고 중에는 일반 적 스폰 멈춤
+  if (state.blackDustWarningActive) {
+    // 스폰 타이머를 감소시키지 않음
   } else {
+    state.spawnTimer -= dt;
+  }
+  // 블랙 더스트 스톰 관리 (기본 스폰은 비활성)
+  state.stormWarningTimer = Math.max(0, state.stormWarningTimer - dt);
+  state.sirenPhase = (state.sirenPhase || 0) + dt;
+
+  const stormInterval = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_INTERVAL;
+  const spawnInterval = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_DURATION / timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT;
+
+  if (!state.stormActive) {
+    state.stormTimer += dt;
+    if (state.stormTimer >= stormInterval) {
+      state.stormActive = true;
+      state.stormTimer = 0;
+      state.stormCountdown = timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_DURATION;
+      state.stormSpawnedCount = 0;
+      state.stormWarningTimer = timeAttackConstants.TIME_ATTACK_BLACK_DUST_WARNING_DURATION;
+      state.blackDustSpawnTimer = 0;
+    }
+  }
+
+  if (state.stormActive) {
+    state.stormCountdown -= dt;
     state.blackDustSpawnTimer -= dt;
-    if (state.blackDustSpawnTimer <= 0) {
-      spawnBlackDustGroup(sprites);
-      state.blackDustSpawnTimer = constants.BLACK_DUST_SPAWN_INTERVAL;
+    if (state.blackDustSpawnTimer <= 0 && state.stormSpawnedCount < timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT) {
+      spawnBlackDustGroup(sprites, { overrideCount: 1, overrideHealth: 5, storm: true });
+      state.stormSpawnedCount += 1;
+      state.blackDustSpawnTimer += spawnInterval;
+    }
+
+    if (state.stormSpawnedCount >= timeAttackConstants.TIME_ATTACK_BLACK_DUST_STORM_COUNT && state.stormCountdown <= 0) {
+      state.stormActive = false;
+      state.blackDustSpawnTimer = stormInterval;
+      state.stormTimer = 0;
     }
   }
 
@@ -2623,7 +2654,7 @@ function handleMovement(dt) {
 
   if (state.mine.active) {
     const distSq = vectorLengthSq(vectorSub(state.playerPos, state.mine.pos));
-    const mineRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.MINE_TRIGGER_RADIUS;
+    const mineRadius = timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS;
     if (distSq <= mineRadius * mineRadius) detonateMine();
   }
   // Toothpaste pickup: sprite-overlap (circle vs circle) using actual sprite radii
@@ -2643,12 +2674,14 @@ function handleMovement(dt) {
     constants.SPAWN_INTERVAL_FLOOR,
     constants.SPAWN_INTERVAL - state.elapsed * 0.02,
   );
-  if (state.spawnTimer <= 0) {
+
+  // 검은먼지 경고 중에는 일반 적 스폰하지 않음
+  const canSpawnNormalEnemies = !state.blackDustWarningActive;
+
+  if (state.spawnTimer <= 0 && canSpawnNormalEnemies) {
     if (!state.boss) {
       let batch = 1 + Math.floor(state.elapsed / 30);
-      if (state.gameMode === 'timeattack') {
-        batch = Math.max(1, Math.round(batch * constants.TIME_ATTACK_ENEMY_SPAWN_MULTIPLIER));
-      }
+      batch = Math.max(1, Math.round(batch * constants.TIME_ATTACK_ENEMY_SPAWN_MULTIPLIER));
       for (let i = 0; i < batch; i++) {
         // 테스트용: 남색 세균을 시작부터 등장 (30% 확률)
         if(state.stage >= 2 && Math.random() < 0.3) {
@@ -2678,25 +2711,32 @@ function recomputeBlades(dt) {
     if (previousAngle > state.bladeAngle) {
       // 토네이도 발사
       spawnTornado();
+
+      // 회전수 증가
+      if (!state.bladeRotationCount) state.bladeRotationCount = 0;
+      state.bladeRotationCount++;
     }
+
+    // 회전수 초기화
+    if (!state.bladeRotationCount) state.bladeRotationCount = 0;
 
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
       const angle = state.bladeAngle + i * step;
-      const bladeRadius = state.gameMode === 'timeattack'
-        ? constants.BLADE_RADIUS * timeAttackConstants.TIME_ATTACK_BLADE_RADIUS_MULTIPLIER + timeAttackConstants.TIME_ATTACK_BLADE_EXTRA_RADIUS
-        : constants.BLADE_RADIUS;
+      const bladeRadius = constants.BLADE_RADIUS * timeAttackConstants.TIME_ATTACK_BLADE_RADIUS_MULTIPLIER + timeAttackConstants.TIME_ATTACK_BLADE_EXTRA_RADIUS;
       const offset = vector(Math.cos(angle) * bladeRadius, Math.sin(angle) * bladeRadius);
       state.blades.push({
         pos: vectorAdd(state.playerPos, offset),
         spriteIndex: Math.min(i, sprites.blades.length - 1),
+        bladeId: i, // 블레이드 고유 ID
+        rotationCount: state.bladeRotationCount, // 현재 회전수
       });
     }
   }
 }
 
 function spawnTornado() {
-  if (state.gameMode === 'timeattack') return;
+  return;
   const bladeCount = state.upgradeLevels.blade;
   if (bladeCount === 0 || state.enemies.length === 0) return; // 블레이드가 없거나 적이 없으면 발사하지 않음
 
@@ -2744,19 +2784,15 @@ function spawnProjectile(direction, options = {}) {
   let bulletSize;
   if (state.hasKimBugak) {
     bulletSize = Math.round(constants.BULLET_SIZE * 2);
-  } else if (state.gameMode === 'timeattack') {
-    bulletSize = Math.round(constants.BULLET_SIZE * timeAttackConstants.TIME_ATTACK_BASE_BULLET_SCALE);
   } else {
-    bulletSize = constants.BULLET_SIZE;
+    bulletSize = Math.round(constants.BULLET_SIZE * timeAttackConstants.TIME_ATTACK_BASE_BULLET_SCALE);
   }
   const bulletSprite = state.hasKimBugak ? sprites.kimBugakBullet : sprites.bullet;
 
   const rangeMultiplier = options.rangeMultiplier ?? 1;
 
   // 타임어택 모드에서 김공격 사정거리 조정
-  const bulletLifetime = state.gameMode === 'timeattack'
-    ? (timeAttackConstants.TIME_ATTACK_BULLET_RANGE * rangeMultiplier) / constants.BULLET_SPEED
-    : constants.BULLET_LIFETIME * rangeMultiplier;
+  const bulletLifetime = (timeAttackConstants.TIME_ATTACK_BULLET_RANGE * rangeMultiplier) / constants.BULLET_SPEED;
 
   state.bullets.push({
     pos: vectorCopy(state.playerPos),
@@ -2854,9 +2890,7 @@ function handleShooting(dt) {
   }
 
   // 게임 모드에 따라 타겟 찾기
-  const targetInfo = state.gameMode === 'timeattack'
-    ? findTimeAttackTarget()
-    : findNormalModeTarget(dt);
+  const targetInfo = findTimeAttackTarget();
 
   const targetDir = targetInfo.direction;
   if (!targetDir) return;
@@ -2964,7 +2998,8 @@ function handleBullets(dt) {
         if (bullet.pierce && bullet.pierce > 0) {
           bullet.pierce -= 1;   // 관통 소모 후 계속 진행
         } else {
-          continue;             // 관통 없으면 소멸
+          consumed = true;      // 관통 없으면 탄환 소멸
+          break;
         }
       }
     }
@@ -2989,9 +3024,7 @@ function fireSprinkleVolley() {
 
   const targets = [];
 
-  const maxRangeSq = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE * timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE
-    : Infinity;
+  const maxRangeSq = timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE * timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE;
 
   for (const enemy of state.enemies) {
     const dist = vectorLengthSq(vectorSub(enemy.pos, state.playerPos));
@@ -3027,16 +3060,16 @@ function fireSprinkleVolley() {
     state.sprinkles.push({
       pos,
       dir: fallbackDir,
-      speed: state.gameMode === 'timeattack' ? constants.SPRINKLE_SPEED * 0.45 : constants.SPRINKLE_SPEED,
+      speed: constants.SPRINKLE_SPEED * 0.45,
       lifetime: constants.SPRINKLE_LIFETIME,
       targetType: target.type,
       targetId: target.type === 'enemy' ? target.ref.id : null,
       size: constants.BULLET_SIZE * 1.2,
       hitRadius: (constants.BULLET_SIZE * 0.75),
-      phase: state.gameMode === 'timeattack' ? 'lift' : 'rocket',
-      liftTimer: state.gameMode === 'timeattack' ? 0.18 : 0,
+      phase: 'lift',
+      liftTimer: 0.18,
       trail: [],
-      rocketBoost: state.gameMode === 'timeattack' ? 0 : 1,
+      rocketBoost: 0,
       color,
     });
   }
@@ -3045,9 +3078,7 @@ function fireSprinkleVolley() {
 }
 
 function resolveSprinkleTarget(sprinkle) {
-  const rangeSq = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE * timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE
-    : Infinity;
+  const rangeSq = timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE * timeAttackConstants.TIME_ATTACK_SPRINKLE_RANGE;
   if (sprinkle.targetType === 'enemy') {
     const enemy = state.enemies.find((e) => e.id === sprinkle.targetId);
     if (enemy) {
@@ -3110,29 +3141,27 @@ function handleSprinkles(dt) {
     sprinkle.lifetime -= dt;
     if (sprinkle.lifetime <= 0) continue;
 
-    if (state.gameMode === 'timeattack') {
-      if (sprinkle.phase === 'lift') {
-        sprinkle.liftTimer -= dt;
-        sprinkle.pos = vectorAdd(sprinkle.pos, vector(0, -35 * dt));
-        if (sprinkle.liftTimer <= 0) {
-          sprinkle.phase = 'rocket';
-          sprinkle.rocketBoost = 0;
-          sprinkle.speed = constants.SPRINKLE_SPEED * 1.1;
-        }
-      } else {
-        sprinkle.rocketBoost = Math.min(1, (sprinkle.rocketBoost || 0) + dt * 1.5);
-        const boostSpeed = constants.SPRINKLE_SPEED * (1.2 + (sprinkle.rocketBoost || 0));
-        sprinkle.speed = Math.min(constants.SPRINKLE_SPEED * 2.6, boostSpeed);
-        sprinkle.trail = sprinkle.trail || [];
-        sprinkle.trail.push({ pos: vectorCopy(sprinkle.pos), life: 0.18 });
-        if (sprinkle.trail.length > 12) {
-          sprinkle.trail.shift();
-        }
-        for (const trail of sprinkle.trail) {
-          trail.life -= dt;
-        }
-        sprinkle.trail = sprinkle.trail.filter((trail) => trail.life > 0);
+    if (sprinkle.phase === 'lift') {
+      sprinkle.liftTimer -= dt;
+      sprinkle.pos = vectorAdd(sprinkle.pos, vector(0, -35 * dt));
+      if (sprinkle.liftTimer <= 0) {
+        sprinkle.phase = 'rocket';
+        sprinkle.rocketBoost = 0;
+        sprinkle.speed = constants.SPRINKLE_SPEED * 1.1;
       }
+    } else {
+      sprinkle.rocketBoost = Math.min(1, (sprinkle.rocketBoost || 0) + dt * 1.5);
+      const boostSpeed = constants.SPRINKLE_SPEED * (1.2 + (sprinkle.rocketBoost || 0));
+      sprinkle.speed = Math.min(constants.SPRINKLE_SPEED * 2.6, boostSpeed);
+      sprinkle.trail = sprinkle.trail || [];
+      sprinkle.trail.push({ pos: vectorCopy(sprinkle.pos), life: 0.18 });
+      if (sprinkle.trail.length > 12) {
+        sprinkle.trail.shift();
+      }
+      for (const trail of sprinkle.trail) {
+        trail.life -= dt;
+      }
+      sprinkle.trail = sprinkle.trail.filter((trail) => trail.life > 0);
     }
 
     const resolved = resolveSprinkleTarget(sprinkle);
@@ -3149,7 +3178,7 @@ function handleSprinkles(dt) {
       }
     }
 
-    const movement = (state.gameMode === 'timeattack' && sprinkle.phase === 'lift')
+    const movement = (sprinkle.phase === 'lift')
       ? vector(0, 0)
       : vectorScale(sprinkle.dir, sprinkle.speed * dt);
     sprinkle.pos = vectorAdd(sprinkle.pos, movement);
@@ -3161,13 +3190,6 @@ function handleSprinkles(dt) {
       const enemy = state.enemies[i];
       if (circleIntersects(sprinkle.pos, sprinkle.hitRadius, enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2)) {
         enemy.health = (enemy.health || 1) - 1;
-
-        if (state.gameMode !== 'timeattack') {
-          enemy.burning = true;
-          enemy.burnDuration = constants.BURN_DURATION;
-          enemy.burnTickTimer = constants.BURN_TICK_INTERVAL;
-          enemy.burnFlash = 0.2; // 화상 시각 효과용
-        }
 
         if (enemy.health <= 0) {
           const defeated = state.enemies.splice(i, 1)[0];
@@ -3185,12 +3207,6 @@ function handleSprinkles(dt) {
         state.boss.health -= 1;
         state.score += constants.BOSS_HIT_SCORE;
 
-        if (state.gameMode !== 'timeattack') {
-          state.boss.burning = true;
-          state.boss.burnDuration = constants.BURN_DURATION;
-          state.boss.burnTickTimer = constants.BURN_TICK_INTERVAL;
-          state.boss.burnFlash = 0.2;
-        }
         if (state.boss.health <= 0) {
           const bossDefeated = state.boss;
           state.boss = null;
@@ -3248,9 +3264,10 @@ function triggerEmField() {
         const idx = state.enemies.indexOf(enemy);
         if (idx !== -1) {
           enemy.health = (enemy.health || 1) - 1;
-          if (state.gameMode !== 'timeattack') {
+          // 감전 스킬 보유 시 감전 효과 적용
+          if (state.upgradeLevels.electrocution > 0) {
             enemy.electrocuted = true;
-            enemy.electrocutionTimer = 1.0;
+            enemy.electrocutionTimer = 2.0; // 2초 감전
             enemy.electrocutionFlash = 0.5;
           }
           if (enemy.health <= 0) {
@@ -3265,9 +3282,10 @@ function triggerEmField() {
         if (boss) {
           boss.health -= 1;
           state.score += constants.BOSS_HIT_SCORE;
-          if (state.gameMode !== 'timeattack') {
+          // 감전 스킬 보유 시 감전 효과 적용
+          if (state.upgradeLevels.electrocution > 0) {
             boss.electrocuted = true;
-            boss.electrocutionTimer = 1.0;
+            boss.electrocutionTimer = 2.0; // 2초 감전
             boss.electrocutionFlash = 0.5;
           }
           if (boss.health <= 0) {
@@ -3454,14 +3472,30 @@ function handleEnemies(dt) {
 
     let killed = false;
     if (state.blades.length > 0) {
-      const bladeSizeForHit = state.gameMode === 'timeattack'
-        ? constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE
-        : constants.BLADE_SIZE;
+      const bladeSizeForHit = constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
       for (const blade of state.blades) {
         if (circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, blade.pos, bladeSizeForHit / 2)) {
-          enemy.health = (enemy.health || 1) - (state.gameMode === 'timeattack'
-            ? timeAttackConstants.TIME_ATTACK_BLADE_DAMAGE
-            : 1);
+          // 이 블레이드의 이번 회전에 이미 맞았는지 확인
+          if (!enemy.hitByBlades) enemy.hitByBlades = new Set();
+
+          const hitKey = `${blade.bladeId}_${blade.rotationCount}`;
+          if (enemy.hitByBlades.has(hitKey)) {
+            continue; // 이미 이 블레이드의 이번 회전에 맞았으면 스킵
+          }
+
+          // 블레이드 ID + 회전수 기록
+          enemy.hitByBlades.add(hitKey);
+
+          enemy.health = (enemy.health || 1) - timeAttackConstants.TIME_ATTACK_BLADE_DAMAGE;
+
+          // 적을 10px 밀쳐내기 (넉백)
+          if (enemy.health > 0) {
+            const knockbackDistance = 10;
+            const direction = vectorNormalize(vectorSub(enemy.pos, blade.pos));
+            const knockbackVector = vectorScale(direction, knockbackDistance);
+            enemy.pos = vectorAdd(enemy.pos, knockbackVector);
+          }
+
           if (enemy.health <= 0) {
             grantRewardForEnemy(enemy);
             onEnemyRemoved(enemy);
@@ -3523,21 +3557,37 @@ function handleEnemyProjectiles(dt) {
     }
 
     if (!state.gameOver && state.blades.length > 0) {
-      const id = 'boss';
-      if (!state.bladeCooldowns.has(id)) {
-        for (const blade of state.blades) {
-          if (circleIntersects(state.boss.pos, constants.BOSS_RADIUS, blade.pos, constants.BLADE_SIZE / 2)) {
-            state.boss.health -= 1;
-            state.score += constants.BOSS_HIT_SCORE;
-            state.bladeCooldowns.set(id, constants.BLADE_HIT_COOLDOWN);
-            if (state.boss.health <= 0) {
-              state.boss = null;
-              state.victory = true;
-              state.bossWarningTimer = 0;
-              handleVictory();
-            }
-            break;
+      const bladeSizeForBoss = constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
+
+      for (const blade of state.blades) {
+        if (circleIntersects(state.boss.pos, constants.BOSS_RADIUS, blade.pos, bladeSizeForBoss / 2)) {
+          // 이 블레이드의 이번 회전에 이미 맞았는지 확인
+          if (!state.boss.hitByBlades) state.boss.hitByBlades = new Set();
+
+          const hitKey = `${blade.bladeId}_${blade.rotationCount}`;
+          if (state.boss.hitByBlades.has(hitKey)) {
+            continue; // 이미 이 블레이드의 이번 회전에 맞았으면 스킵
           }
+
+          // 블레이드 ID + 회전수 기록
+          state.boss.hitByBlades.add(hitKey);
+
+          const bladeDamage = timeAttackConstants.TIME_ATTACK_BLADE_DAMAGE;
+          state.boss.health -= bladeDamage;
+          state.score += constants.BOSS_HIT_SCORE;
+
+          if (state.boss.health <= 0) {
+            const defeatedBoss = state.boss;
+            state.boss = null;
+            state.bossWarningTimer = 0;
+            grantRewards(
+              defeatedBoss?.scoreReward ?? 100,
+              defeatedBoss?.xpReward ?? constants.XP_REWARD_BOSS,
+              defeatedBoss?.pos ?? state.playerPos
+            );
+            handleVictory();
+          }
+          break;
         }
       }
     }
@@ -3545,13 +3595,8 @@ function handleEnemyProjectiles(dt) {
 }
 
 function getWorldDims() {
-  if (state.gameMode === 'timeattack') {
-    const worldW = timeAttackConstants.TIME_ATTACK_WIDTH;
-    const worldH = timeAttackConstants.TIME_ATTACK_HEIGHT;
-    return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
-  }
-  const worldW = (window.__renderScale && window.__renderScale.worldW) || constants.WIDTH;
-  const worldH = (window.__renderScale && window.__renderScale.worldH) || constants.HEIGHT;
+  const worldW = timeAttackConstants.TIME_ATTACK_WIDTH;
+  const worldH = timeAttackConstants.TIME_ATTACK_HEIGHT;
   return { worldW, worldH, halfW: worldW / 2, halfH: worldH / 2 };
 }
 
@@ -3585,16 +3630,25 @@ function render() {
 
   drawBackground();
   drawObstacles();
-  drawXpCrumbs(ctx, worldToScreen);
   drawWorldBounds();
+
+  // 게임 오브젝트(적, 아이템, XP 등)에만 클리핑 적용 (배경 영역만)
+  ctx.save();
+  const { worldW, worldH } = getWorldDims();
+
+  // 배경은 화면 좌표 (0,0) ~ (worldW, worldH)에 그려지므로 클리핑도 동일하게
+  ctx.beginPath();
+  ctx.rect(0, 0, worldW, worldH);
+  ctx.clip();
+
+  // XP 크럼 (김가루) - 클리핑 영역 안에서 그리기
+  drawXpCrumbs(ctx, worldToScreen);
 
   if (state.mine.active) {
     let mineSize = constants.MINE_SIZE;
 
     // 타임어택 모드에서는 지뢰 크기 50% 축소
-    if (state.gameMode === 'timeattack') {
-      mineSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-    }
+    mineSize *= constants.TIME_ATTACK_OBJECT_SCALE;
 
     drawSprite(sprites.mine, state.mine.pos, mineSize);
   }
@@ -3642,9 +3696,7 @@ function render() {
     let projectileSize = projectile.size;
 
     // 타임어택 모드에서는 적 발사체 크기 50% 축소
-    if (state.gameMode === 'timeattack') {
-      projectileSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-    }
+    projectileSize *= constants.TIME_ATTACK_OBJECT_SCALE;
 
     drawSprite(sprites.enemyProjectile, projectile.pos, projectileSize);
   }
@@ -3654,32 +3706,36 @@ function render() {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
       let bladeSize = constants.BLADE_SIZE;
 
-      if (state.gameMode === 'timeattack') {
-        bladeSize *= timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
-      }
+      bladeSize *= timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
 
       drawSprite(sprite, blade.pos, bladeSize);
     }
   }
 
-  // 토네이도 렌더링
-  if (state.gameMode !== 'timeattack' && state.tornadoes.length > 0) {
-    for (const tornado of state.tornadoes) {
-      let tornadoSize = tornado.size;
+  // 토네이도 렌더링 (타임어택 모드에서는 표시 안함)
 
-      // 타임어택 모드에서는 토네이도 크기 50% 축소
-      if (state.gameMode === 'timeattack') {
-        tornadoSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-      }
-
-      drawSprite(sprites.tornado, tornado.pos, tornadoSize);
-    }
-  }
+  // 게임 오브젝트 클리핑 해제
+  ctx.restore();
 
   drawPlayer();
 
   if (state.boss && state.bossWarningTimer > 0) {
     drawBossWarning();
+  }
+
+  // 타임어택 모드 보스 HP바 표시
+  if (state.boss) {
+    drawTimeAttackBossHP(ctx, state, getWorldDims);
+  }
+
+  // 타임어택 모드 검은먼지 경고 표시
+  if (state.blackDustWarningActive) {
+    drawBlackDustWarning(ctx, state, getWorldDims, timeAttackConstants);
+  }
+
+  // 게임 시작 메시지 표시
+  if (state.gameStartMessageTimer > 0) {
+    drawGameStartMessage(ctx, state, getWorldDims);
   }
 
   if (state.mineFlashTimer > 0) {
@@ -3691,6 +3747,10 @@ function render() {
   if (state.levelBlastTimer > 0) {
     drawLevelBlast();
   }
+
+  // 타임어택 모드에서 화면 밖 치약 방향 표시
+  drawOffScreenToothpasteIndicators();
+
   drawPlayerHPBar();
 
   ctx.restore();
@@ -3723,16 +3783,9 @@ function drawBackground() {
   ctx.fillStyle = oakGrad;
   ctx.fillRect(0, 0, worldW, worldH);
 
-  // 노말모드 격자 그리기
-  if (state.gameMode !== 'timeattack') {
-    drawNormalModeGrid();
-  }
-
   // 타임어택 모드에서만 격자무늬와 아이템들 그리기
-  if (state.gameMode === 'timeattack') {
-    drawGridPattern();
-    drawTrayItems();
-  }
+  drawGridPattern();
+  drawTrayItems();
 
 }
 
@@ -4244,9 +4297,7 @@ function drawSpaceBackground() {
 
 function drawObstacles() {
   // 타임어택 모드에서는 장애물 그리지 않음
-  if (state.gameMode === 'timeattack') {
-    return;
-  }
+  return;
 
   for (const obs of obstacles) {
     const style = DONUT_STYLES[obs.type] || DONUT_STYLES.boston_creme;
@@ -4657,7 +4708,7 @@ function drawSprinkleProjectile(projectile) {
   const height = size * 1.6;
   const color = projectile.color || '#f5f5f5';
 
-  if (state.gameMode === 'timeattack' && projectile.trail && projectile.trail.length > 0) {
+  if (projectile.trail && projectile.trail.length > 0) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const trail of projectile.trail) {
@@ -4676,23 +4727,19 @@ function drawSprinkleProjectile(projectile) {
   ctx.translate(screen.x, screen.y);
   ctx.rotate(angle);
 
-  if (state.gameMode === 'timeattack') {
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.ellipse(-width * 0.1, 0, width * 0.95, height * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.ellipse(-width * 0.1, 0, width * 0.95, height * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
 
   ctx.drawImage(sprite, -width / 2, -height / 2, width, height);
 
-  if (state.gameMode === 'timeattack') {
-    ctx.fillStyle = hexToRgba(color, 0.55);
-    ctx.beginPath();
-    ctx.ellipse(-width * 0.65, 0, width * 0.6, height * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.fillStyle = hexToRgba(color, 0.55);
+  ctx.beginPath();
+  ctx.ellipse(-width * 0.65, 0, width * 0.6, height * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
@@ -4704,9 +4751,7 @@ function drawBulletSprite(bullet) {
   let bulletSize = bullet.size || constants.BULLET_SIZE;
 
   // 타임어택 모드에서는 총알 크기 50% 축소
-  if (state.gameMode === 'timeattack') {
-    bulletSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-  }
+  bulletSize *= constants.TIME_ATTACK_OBJECT_SCALE;
 
   const width = bulletSize * 0.9;
   const height = bulletSize * 1.6;
@@ -4720,15 +4765,30 @@ function drawBulletSprite(bullet) {
 
 function drawBossEntity(boss) {
   const screen = worldToScreen(boss.pos);
-  let size = constants.BOSS_RADIUS * 2.4;
+  let size = constants.BOSS_RADIUS * 3.2;
 
-  if (state.gameMode === 'timeattack') {
-    size = constants.BOSS_RADIUS * 3.2;
-  }
+  // 움직임 효과: 통통 튕기는 애니메이션
+  const bounceOffset = Math.sin(state.elapsed * 8) * size * 0.03;
+  const squashStretch = 1 + Math.sin(state.elapsed * 8) * 0.05;
 
   ctx.save();
-  ctx.translate(screen.x, screen.y);
-  ctx.rotate(boss.facingAngle || 0);
+
+  // 그림자 효과
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.ellipse(screen.x, screen.y + size * 0.4, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
+
+  // 보스 본체
+  ctx.translate(screen.x, screen.y + bounceOffset);
+
+  // 스프라이트가 위쪽을 향하고 있으므로 90도 오프셋 추가
+  const spriteAngleOffset = Math.PI / 2;
+  ctx.rotate((boss.facingAngle || 0) + spriteAngleOffset);
+  ctx.scale(squashStretch, 1 / squashStretch);
+
   const bossSprite = (sprites.bossSprites && sprites.bossSprites[boss.bossType])
     ? sprites.bossSprites[boss.bossType]
     : sprites.bossSprites?.default || sprites.boss;
@@ -4747,6 +4807,13 @@ function drawBossEntity(boss) {
 }
 
 function drawBossWarning() {
+  // 타임어택 모드에서는 보스 출현 알림창으로 표시
+  if (state.bossWarningTimer > 0) {
+    drawTimeAttackBossWarning(ctx, state, getWorldDims);
+  }
+  return;
+
+  // 노말 모드: 돌진 경고
   const { halfW, halfH } = getWorldDims();
   const screenX = halfW;
   const screenY = halfH * 0.3;
@@ -4781,8 +4848,6 @@ function drawBossWarning() {
 }
 
 function drawPlayerHPBar() {
-  if (state.gameMode !== 'timeattack' && state.hpBarTimer <= 0) return;
-
   const { halfW, halfH } = getWorldDims();
   const screenX = halfW;
   const screenY = halfH - constants.PLAYER_SIZE / 2 - 20;
@@ -4793,7 +4858,7 @@ function drawPlayerHPBar() {
   const hpColor = '#ff4444';
   const fullColor = '#ff4444';
 
-  const alpha = state.gameMode === 'timeattack' ? 1 : Math.min(1, state.hpBarTimer);
+  const alpha = 1;
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -4817,7 +4882,7 @@ function drawPlayerHPBar() {
 
 function drawMineFlash() {
   const ratio = state.mineFlashTimer / constants.MINE_FLASH_DURATION;
-  const mineRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.MINE_TRIGGER_RADIUS;
+  const mineRadius = timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS;
   const radius = mineRadius * (1 + ratio * 1.5);
   const screen = worldToScreen(state.mine.pos);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
@@ -4831,7 +4896,7 @@ function drawMineFlash() {
 
 function drawToothpasteFlash() {
   const ratio = state.toothpasteFlashTimer / constants.TOOTHPASTE_FLASH_DURATION;
-  const pickupRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.TOOTHPASTE_PICKUP_RADIUS;
+  const pickupRadius = timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS;
   const radius = pickupRadius * (1 + ratio * 1.2);
   const screen = worldToScreen(state.playerPos);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
@@ -4849,10 +4914,8 @@ function drawToothpasteItem(item) {
   let toothpasteSize = 44;
 
   // 타임어택 모드에서는 치약 아이템 크기 50% 축소
-  if (state.gameMode === 'timeattack') {
-    glowRadius *= constants.TIME_ATTACK_OBJECT_SCALE;
-    toothpasteSize *= constants.TIME_ATTACK_OBJECT_SCALE;
-  }
+  glowRadius *= constants.TIME_ATTACK_OBJECT_SCALE;
+  toothpasteSize *= constants.TIME_ATTACK_OBJECT_SCALE;
 
   const glowGradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, glowRadius);
   glowGradient.addColorStop(0, 'rgba(120, 230, 255, 0.45)');
@@ -4873,7 +4936,7 @@ function drawLevelBlast() {
   const ratio = state.levelBlastTimer / constants.LEVEL_BLAST_DURATION;
   if (ratio <= 0) return;
   const screen = worldToScreen(state.playerPos);
-  const blastRadius = state.gameMode === 'timeattack' ? timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS : constants.LEVEL_BLAST_RADIUS;
+  const blastRadius = timeAttackConstants.TIME_ATTACK_ATTACK_RADIUS;
   const radius = blastRadius * (0.8 + (1 - ratio) * 0.7);
   const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
   gradient.addColorStop(0, `rgba(255, 245, 170, ${0.5 * ratio + 0.3})`);
@@ -4890,6 +4953,121 @@ function drawLevelBlast() {
   ctx.stroke();
 }
 
+function drawOffScreenToothpasteIndicators() {
+  if (!state.toothpasteItems || state.toothpasteItems.length === 0) return;
+
+  const { worldW, worldH } = getWorldDims();
+  const margin = 40; // 화면 가장자리 여백
+  const indicatorSize = 20; // 화살표 크기
+
+  for (const item of state.toothpasteItems) {
+    const screen = worldToScreen(item.pos);
+
+    // 화면 안에 있으면 스킵
+    if (screen.x >= margin && screen.x <= worldW - margin &&
+        screen.y >= margin && screen.y <= worldH - margin) {
+      continue;
+    }
+
+    // 플레이어에서 치약으로의 방향 벡터
+    const dx = item.pos.x - state.playerPos.x;
+    const dy = item.pos.y - state.playerPos.y;
+    const angle = Math.atan2(dy, dx);
+
+    // 화면 가장자리에 위치 계산
+    let indicatorX = worldW / 2 + dx;
+    let indicatorY = worldH / 2 + dy;
+
+    // 화면 가장자리로 클램핑
+    const centerX = worldW / 2;
+    const centerY = worldH / 2;
+    const edgeMargin = 50; // 가장자리에서의 거리
+
+    // 화면 경계에 맞춰 위치 조정
+    if (indicatorX < edgeMargin) indicatorX = edgeMargin;
+    if (indicatorX > worldW - edgeMargin) indicatorX = worldW - edgeMargin;
+    if (indicatorY < edgeMargin) indicatorY = edgeMargin;
+    if (indicatorY > worldH - edgeMargin) indicatorY = worldH - edgeMargin;
+
+    // 가장자리로 이동 (방향에 따라)
+    const toEdgeX = indicatorX - centerX;
+    const toEdgeY = indicatorY - centerY;
+    const maxX = centerX - edgeMargin;
+    const maxY = centerY - edgeMargin;
+
+    let t = 1.0;
+    if (Math.abs(toEdgeX) > 0) {
+      t = Math.min(t, maxX / Math.abs(toEdgeX));
+    }
+    if (Math.abs(toEdgeY) > 0) {
+      t = Math.min(t, maxY / Math.abs(toEdgeY));
+    }
+
+    indicatorX = centerX + toEdgeX * t;
+    indicatorY = centerY + toEdgeY * t;
+
+    // 귀여운 하트 화살표 그리기
+    ctx.save();
+    ctx.translate(indicatorX, indicatorY);
+    ctx.rotate(angle);
+
+    // 펄스 애니메이션
+    const pulseScale = 1 + Math.sin(state.toothpasteGlowPhase * 2) * 0.15;
+    ctx.scale(pulseScale, pulseScale);
+
+    // 외곽 글로우 효과
+    const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, indicatorSize * 1.5);
+    glowGradient.addColorStop(0, 'rgba(120, 230, 255, 0.4)');
+    glowGradient.addColorStop(1, 'rgba(120, 230, 255, 0)');
+    ctx.fillStyle = glowGradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, indicatorSize * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 귀여운 하트 모양 화살표
+    ctx.fillStyle = '#78E6FF';
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    // 화살촉 (뾰족한 부분)
+    ctx.moveTo(indicatorSize, 0);
+    // 오른쪽 날개
+    ctx.lineTo(indicatorSize * -0.3, indicatorSize * -0.5);
+    // 오른쪽 하트 곡선
+    ctx.quadraticCurveTo(indicatorSize * -0.6, indicatorSize * -0.8, indicatorSize * -0.8, indicatorSize * -0.5);
+    ctx.quadraticCurveTo(indicatorSize * -1.0, indicatorSize * -0.2, indicatorSize * -0.8, 0);
+    // 중간 지점
+    ctx.lineTo(indicatorSize * -0.5, 0);
+    // 왼쪽 하트 곡선
+    ctx.lineTo(indicatorSize * -0.8, 0);
+    ctx.quadraticCurveTo(indicatorSize * -1.0, indicatorSize * 0.2, indicatorSize * -0.8, indicatorSize * 0.5);
+    ctx.quadraticCurveTo(indicatorSize * -0.6, indicatorSize * 0.8, indicatorSize * -0.3, indicatorSize * 0.5);
+    // 왼쪽 날개
+    ctx.lineTo(indicatorSize, 0);
+    ctx.closePath();
+
+    // 그림자 효과
+    ctx.shadowColor = 'rgba(120, 230, 255, 0.6)';
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 하얀 테두리
+    ctx.stroke();
+
+    // 반짝이 효과 (작은 별)
+    const sparkleOffset = Math.sin(state.toothpasteGlowPhase * 3) * 3;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(indicatorSize * -1.2 + sparkleOffset, indicatorSize * -0.6, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
 // calculateTotalScore 함수는 gameState.js에서 import
 
 function updateHud() {
@@ -4897,12 +5075,8 @@ function updateHud() {
 
   statNickname.textContent = state.nickname || '---';
 
-  // 타임어택 모드일 때는 남은 시간을 표시
-  if (state.gameMode === 'timeattack') {
-    statTime.textContent = `남은 시간: ${formatTime(state.timeAttackRemaining)}`;
-  } else {
-    statTime.textContent = formatTime(state.elapsed);
-  }
+  // 타임어택 모드일 때는 경과 시간을 표시 (0분→15분)
+  statTime.textContent = formatTime(state.elapsed);
 
   statScore.textContent = totalScore.toString().padStart(5, '0');
   statHP.textContent = `${Math.max(0, state.playerHealth)} / ${getPlayerMaxHealth()}`;
@@ -4913,11 +5087,7 @@ function updateHud() {
     if (mobileHP) mobileHP.textContent = `${Math.max(0, state.playerHealth)} / ${getPlayerMaxHealth()}`;
     if (mobileScore) mobileScore.textContent = totalScore.toString().padStart(5, '0');
     if (mobileTime) {
-      if (state.gameMode === 'timeattack') {
-        mobileTime.textContent = `남은 시간: ${formatTime(state.timeAttackRemaining)}`;
-      } else {
-        mobileTime.textContent = formatTime(state.elapsed);
-      }
+      mobileTime.textContent = formatTime(state.elapsed);
     }
   }
 
@@ -4925,85 +5095,14 @@ function updateHud() {
   if (state.boss) {
     statBoss.hidden = false;
     statBossHP.textContent = `HP ${Math.max(0, state.boss.health)} / ${constants.BOSS_HEALTH}`;
-
-    // 타임어택 보스 HP 바 업데이트
-    if (state.gameMode === 'timeattack') {
-      updateTimeAttackBossHP();
-    }
   } else {
     statBoss.hidden = true;
-
-    // 타임어택 보스 HP 바 숨기기
-    if (state.gameMode === 'timeattack') {
-      const bossHpElement = document.getElementById('timeattack-boss-hp');
-      if (bossHpElement) bossHpElement.style.display = 'none';
-    }
   }
 
   const progress = state.xpToNext > 0 ? clamp(state.xp / state.xpToNext, 0, 1) : 0;
   xpBarFill.style.width = `${progress * 100}%`;
   xpLevelText.textContent = `LV ${state.level}`;
   xpProgressText.textContent = `${state.xp} / ${state.xpToNext}`;
-}
-
-function updateTimeAttackBossHP() {
-  const bossHpElement = document.getElementById('timeattack-boss-hp');
-  const bossNameElement = document.getElementById('boss-name');
-  const bossHpBars = document.getElementById('boss-hp-bars');
-  const bossHpText = document.getElementById('boss-hp-text');
-
-  if (!bossHpElement || !state.boss) return;
-
-  // 보스 HP 바 표시
-  bossHpElement.style.display = 'block';
-
-  // 보스 이름 설정
-  const bossNames = {
-    'ladybug': '무당벌레',
-    'snail': '달팽이',
-    'ant': '개미',
-    'butterfly': '나비',
-    'cat': '고양이'
-  };
-  bossNameElement.textContent = bossNames[state.boss.bossType] || '보스';
-
-  // HP 텍스트 업데이트
-  const currentHP = Math.max(0, Math.ceil(state.boss.health));
-  const maxHP = state.boss.maxHealth;
-  bossHpText.textContent = `HP: ${currentHP}/${maxHP}`;
-
-  // 무지개색 HP 바 생성 (100HP당 한 단계)
-  // 색상: 빨(100) 주(200) 노(300) 초(400) 파(500)
-  const colors = ['#ff4444', '#ff8844', '#ffff44', '#44ff44', '#4444ff'];
-  const hpSegments = Math.ceil(maxHP / 100); // 총 몇 개의 100HP 단계인지
-  const currentSegment = Math.ceil(currentHP / 100); // 현재 몇 번째 단계인지
-
-  // HP 바 생성
-  bossHpBars.innerHTML = '';
-  for (let i = hpSegments; i >= 1; i--) {
-    const segmentDiv = document.createElement('div');
-    segmentDiv.style.flex = '1';
-    segmentDiv.style.height = '100%';
-    segmentDiv.style.transition = 'width 0.3s ease';
-
-    if (i > currentSegment) {
-      // 완전히 소진된 단계 - 보이지 않음
-      segmentDiv.style.width = '0%';
-      segmentDiv.style.backgroundColor = 'transparent';
-    } else if (i === currentSegment) {
-      // 현재 단계 - 남은 HP 비율만큼 표시
-      const segmentHP = currentHP - ((i - 1) * 100);
-      const segmentPercent = (segmentHP / 100) * 100;
-      segmentDiv.style.width = `${segmentPercent}%`;
-      segmentDiv.style.backgroundColor = colors[i - 1] || colors[colors.length - 1];
-    } else {
-      // 아직 소진되지 않은 단계 - 100% 표시
-      segmentDiv.style.width = '100%';
-      segmentDiv.style.backgroundColor = colors[i - 1] || colors[colors.length - 1];
-    }
-
-    bossHpBars.appendChild(segmentDiv);
-  }
 }
 
 function handleKeyDown(event) {

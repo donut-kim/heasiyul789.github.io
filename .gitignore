@@ -3,3 +3,19 @@ firebase-security-rules.json
 node_modules
 package-lock.json
 package.json
+
+# 백업 파일
+*.bak
+*.bak2
+*.backup
+*~
+
+# 임시 파일
+*_function.txt
+*_temp.txt
+*.tmp
+*.txt
+
+# OS 파일
+.DS_Store
+Thumbs.db

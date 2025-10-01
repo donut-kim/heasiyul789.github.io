@@ -12,7 +12,7 @@ export const CAMERA_VIEWPORT_MARGIN = 120;
 
 // 플레이어 설정
 export const PLAYER_SIZE = 40;
-export const PLAYER_SPEED = 230;
+export const PLAYER_SPEED = 300;
 export const PLAYER_MAX_HEALTH = 5;
 export const PLAYER_FIRE_INTERVAL = 0.42;
 export const PLAYER_INVULN_TIME = 1.0;
@@ -65,16 +65,16 @@ export const SPAWN_RADIUS_MIN = 420;
 export const SPAWN_RADIUS_MAX = 680;
 
 // 보라세균 (큰 적)
-export const BIG_ENEMY_SIZE = ENEMY_SIZE * 2;
+export const BIG_ENEMY_SIZE = ENEMY_SIZE;
 export const BIG_ENEMY_HEALTH = 3;
-export const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.8;
+export const BIG_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.3;
 export const BIG_ENEMY_SPAWN_TIME = 90;
 export const BIG_ENEMY_SPAWN_CHANCE = 0.35;
 
 // 남색세균 (스테이지 2+, 원거리 공격)
-export const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE * 1.2;
+export const DARK_BLUE_ENEMY_SIZE = BIG_ENEMY_SIZE ;
 export const DARK_BLUE_ENEMY_HEALTH = 8;
-export const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.7;
+export const DARK_BLUE_ENEMY_SPEED = ENEMY_BASE_SPEED * 0.3;
 export const DARK_BLUE_ENEMY_FIRE_INTERVAL = 3.25;
 export const DARK_BLUE_PROJECTILE_SIZE = 10;
 export const DARK_BLUE_PROJECTILE_SPEED = 140;
@@ -91,7 +91,7 @@ export const BLACK_DUST_MAX_COUNT = 5;
 // 주황색 무당벌레 설정 (3스테이지 전용, 빠르고 작음)
 export const ORANGE_LADYBUG_SIZE = ENEMY_SIZE;
 export const ORANGE_LADYBUG_HEALTH = 10;
-export const ORANGE_LADYBUG_SPEED = ENEMY_BASE_SPEED * 1.2;
+export const ORANGE_LADYBUG_SPEED = ENEMY_BASE_SPEED * 1;
 export const ORANGE_LADYBUG_SPAWN_INTERVAL_MIN = 5.0;
 export const ORANGE_LADYBUG_SPAWN_INTERVAL_MAX = 10.0;
 export const ORANGE_LADYBUG_ZIGZAG_AMPLITUDE = 80;
@@ -116,7 +116,7 @@ export const BOSS_HIT_RADIUS = 18;
 export const BLADE_RADIUS = 60;
 export const BLADE_SIZE = 56;
 export const BLADE_ROTATION_SPEED = 2.4;
-export const BLADE_HIT_COOLDOWN = 0.3;
+export const BLADE_HIT_COOLDOWN = 0.5;
 
 // 전기장 설정
 export const EM_FIELD_BASE_INTERVAL = 4.0;
@@ -159,7 +159,7 @@ export const UPGRADE_DEFINITIONS = {
   speed: { title: '이속 증가', max: 5 },
   attack_speed: { title: '공속 증가', max: 5 },
   multi_shot: { title: '김 추가', max: 5 },
-  magnet: { title: '빵가루 자석', max: 5 },
+  magnet: { title: 'No잼 자석', max: 5 },
   double_shot: { title: '더블 발사', max: 3 },
   sprinkle: { title: '스프링클', max: 3 },
   deulgireum_rapid: { title: '들기름', max: 1 },
@@ -167,10 +167,11 @@ export const UPGRADE_DEFINITIONS = {
   em_field: { title: '슈크림', max: 3 },
   ganjang_gim: { title: '간장김', max: 1 },
   kim_bugak: { title: '김부각', max: 1 },
-  full_heal: { title: '부스러기 획득', max: 1 },
+  hp_increase: { title: '최대 HP 증가', max: 5 },
+  electrocution: { title: '감전', max: 1 },
 };
 
-export const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'magnet', 'double_shot', 'sprinkle', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'deulgireum_rapid', 'full_heal'];
+export const upgradeDisplayOrder = ['speed', 'attack_speed', 'multi_shot', 'magnet', 'double_shot', 'sprinkle', 'blade', 'em_field', 'ganjang_gim', 'kim_bugak', 'deulgireum_rapid', 'hp_increase', 'electrocution'];
 
 // Gim variants
 export const GIM_VARIANTS = ['독도김','성경김', '광천김', '성광김', '재래김'];

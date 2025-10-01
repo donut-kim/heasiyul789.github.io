@@ -97,6 +97,11 @@ export const state = {
   stormSpawnedCount: 0,
   stormWarningTimer: 0,
   sirenPhase: 0,
+  nextBlackDustSpawn: 60, // 다음 검은먼지 스폰까지 남은 시간 (초)
+  blackDustWarningActive: false, // 검은먼지 경고 활성화 여부
+  blackDustWarningTimer: 0, // 검은먼지 경고 표시 타이머
+  gameStartMessageTimer: 0, // 게임 시작 메시지 표시 타이머
+  blackDustSpawnCount: 0, // 검은먼지 스폰 횟수 (1분=1회, 2분=2회...)
 };
 
 export const keys = new Set();
@@ -192,6 +197,11 @@ export function resetGameplayState() {
   state.stormSpawnedCount = 0;
   state.stormWarningTimer = 0;
   state.sirenPhase = 0;
+  state.nextBlackDustSpawn = 60; // 1분마다 검은먼지 스폰
+  state.blackDustWarningActive = false;
+  state.blackDustWarningTimer = 0;
+  state.gameStartMessageTimer = 5; // 5초 동안 시작 메시지 표시
+  state.blackDustSpawnCount = 0;
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {

@@ -19,8 +19,7 @@ function ensureXpArray() {
 export function spawnXpCrumbs(origin, totalXp) {
   if (!totalXp || totalXp <= 0) return;
   ensureXpArray();
-  const chunkSize = 20;
-  const crumbCount = Math.max(1, Math.round(totalXp / chunkSize));
+  const crumbCount = 1; // 빵가루를 1개로 고정
   const baseXp = Math.floor(totalXp / crumbCount);
   let remainder = Math.round(totalXp - baseXp * crumbCount);
 

@@ -161,15 +161,34 @@ export function updateStartButtonState() {
 }
 
 export function buildResultHtml(details) {
-  let html = `
-    <div class="result-block" style="background: rgba(18,26,38,0.0); border: none; box-shadow: none;">
-      <span class="result-label" style="display:block; font-size:14px; color:#9fb4d8; margin-bottom:8px;">최종 점수</span>
-      <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
-        ${details.totalScore.toLocaleString()}
-      </span>
-    </div>`;
+  // 타임어택 모드에서는 생존시간을 표시, 노말 모드에서는 최종 점수 표시
+  const isTimeAttack = window.state?.gameMode === 'timeattack';
 
-  return html;
+  if (isTimeAttack) {
+    // 생존시간을 분:초 형식으로 변환
+    const totalSeconds = Math.floor(details.time);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    const timeString = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+    let html = `
+      <div class="result-block" style="background: rgba(18,26,38,0.0); border: none; box-shadow: none;">
+        <span class="result-label" style="display:block; font-size:14px; color:#9fb4d8; margin-bottom:8px;">생존 시간</span>
+        <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
+          ${timeString}
+        </span>
+      </div>`;
+    return html;
+  } else {
+    let html = `
+      <div class="result-block" style="background: rgba(18,26,38,0.0); border: none; box-shadow: none;">
+        <span class="result-label" style="display:block; font-size:14px; color:#9fb4d8; margin-bottom:8px;">최종 점수</span>
+        <span class="result-value" style="font-size:64px; font-weight:800; color:#ffffff; text-shadow:0 8px 24px rgba(0,0,0,0.5);">
+          ${details.totalScore.toLocaleString()}
+        </span>
+      </div>`;
+    return html;
+  }
 }
 
 // 전역에서 사용할 수 있도록 window 객체에 연결

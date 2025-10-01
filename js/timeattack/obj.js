@@ -11,25 +11,10 @@ import {
 
 let enemyIdCounter = 0;
 
-// 게임 모드에 따른 적 크기 계산
+// 타임어택 모드: 모든 적의 크기를 분홍세균 크기로 통일
 export function getEnemySizeForMode(baseSize, enemyType = 'default') {
-  if (state.gameMode === 'timeattack') {
-    switch (enemyType) {
-      case 'pink':
-        return baseSize * 1.6;
-      case 'big':
-        return baseSize * 0.7;
-      case 'darkblue':
-        return baseSize * 0.85;
-      case 'blackDust':
-        return baseSize * 0.75;
-      case 'orange':
-        return baseSize * 0.85;
-      default:
-        return baseSize * 0.85;
-    }
-  }
-  return baseSize;
+  // 분홍세균 크기로 통일 (보스 제외)
+  return constants.ENEMY_SIZE * 1.6;
 }
 
 // 스테이지별 속도 배율
@@ -41,26 +26,19 @@ export function getStageSpeedMultiplier() {
 // 분홍 세균 생성
 export function spawnEnemy(sprites) {
   const angle = randRange(0, Math.PI * 2);
-  const minRadius = state.gameMode === 'timeattack'
-    ? Math.max(constants.SPAWN_RADIUS_MIN, 500)
-    : constants.SPAWN_RADIUS_MIN;
-  const maxRadius = state.gameMode === 'timeattack'
-    ? Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX)
-    : constants.SPAWN_RADIUS_MAX;
+  const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
+  const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
   const radius = randRange(minRadius, maxRadius);
   const pos = vector(
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
-  const speedFactor = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR
-    : 1;
   const size = getEnemySizeForMode(constants.ENEMY_SIZE, 'pink');
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
-    speed: baseSpeed * getStageSpeedMultiplier() * speedFactor,
+    speed: baseSpeed * getStageSpeedMultiplier() * timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR,
     health: 1,
     size,
     sprite: sprites.enemy,
@@ -73,12 +51,8 @@ export function spawnEnemy(sprites) {
 // 남색 세균 생성
 export function spawnDarkBlueEnemy(sprites, collidesWithObstacles) {
   const enemySize = getEnemySizeForMode(constants.DARK_BLUE_ENEMY_SIZE, 'darkblue');
-  const minRadius = state.gameMode === 'timeattack'
-    ? Math.max(constants.SPAWN_RADIUS_MIN, 500)
-    : constants.SPAWN_RADIUS_MIN;
-  const maxRadius = state.gameMode === 'timeattack'
-    ? Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX)
-    : constants.SPAWN_RADIUS_MAX;
+  const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
+  const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
   let pos;
   let attempts = 0;
   const maxAttempts = 20;
@@ -105,18 +79,15 @@ export function spawnDarkBlueEnemy(sprites, collidesWithObstacles) {
   }
 
   const baseSpeed = constants.DARK_BLUE_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.DARK_BLUE_ENEMY_SPEED;
-  const speedFactor = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR
-    : 1;
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
-    speed: baseSpeed * getStageSpeedMultiplier() * speedFactor,
-    health: constants.DARK_BLUE_ENEMY_HEALTH,
+    speed: baseSpeed * getStageSpeedMultiplier() * timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR,
+    health: constants.DARK_BLUE_ENEMY_HEALTH * 2,
     size: enemySize,
     sprite: sprites.darkBlueEnemy,
-    fireTimer: state.gameMode === 'timeattack' ? null : randRange(0, constants.DARK_BLUE_ENEMY_FIRE_INTERVAL),
-    canShoot: state.gameMode !== 'timeattack',
+    fireTimer: null, // 타임어택에서는 발사하지 않음
+    canShoot: false,
     type: 'darkBlue',
     xpReward: constants.XP_REWARD_DARK_BLUE,
     scoreReward: 20
@@ -125,18 +96,15 @@ export function spawnDarkBlueEnemy(sprites, collidesWithObstacles) {
 
 // 검은 먼지 그룹 생성
 export function spawnBlackDustGroup(sprites, options = {}) {
-  if (state.gameMode === 'timeattack' && !options.storm) {
+  // storm이 false면 스폰하지 않음 (타임어택에서는 1분마다 storm으로만 스폰)
+  if (!options.storm) {
     return;
   }
   const count = options.overrideCount ?? randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
   const baseAngle = randRange(0, Math.PI * 2);
   const enemySize = getEnemySizeForMode(constants.BLACK_DUST_SIZE, 'blackDust');
-  const minRadius = state.gameMode === 'timeattack'
-    ? Math.max(constants.SPAWN_RADIUS_MIN, 500)
-    : constants.SPAWN_RADIUS_MIN;
-  const maxRadius = state.gameMode === 'timeattack'
-    ? Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX)
-    : constants.SPAWN_RADIUS_MAX;
+  const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
+  const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
 
   for (let i = 0; i < count; i++) {
     const angle = baseAngle + randRange(-Math.PI / 4, Math.PI / 4);
@@ -147,14 +115,13 @@ export function spawnBlackDustGroup(sprites, options = {}) {
     );
 
     const baseSpeed = constants.BLACK_DUST_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BLACK_DUST_SPEED;
-    const speedFactor = state.gameMode === 'timeattack'
-      ? timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR
-      : 1;
+    const health = options.overrideHealth ?? 3; // 타임어택 기본 체력 3
+
     state.enemies.push({
       id: enemyIdCounter++,
       pos,
-      speed: baseSpeed * getStageSpeedMultiplier() * speedFactor,
-      health: options.overrideHealth ?? constants.BLACK_DUST_HEALTH,
+      speed: baseSpeed * getStageSpeedMultiplier() * timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR,
+      health: health,
       size: enemySize,
       sprite: sprites.blackDust,
       type: 'blackDust',
@@ -167,12 +134,8 @@ export function spawnBlackDustGroup(sprites, options = {}) {
 // 주황 무당벌레 생성
 export function spawnOrangeLadybug(sprites) {
   const angle = randRange(0, Math.PI * 2);
-  const baseMin = state.gameMode === 'timeattack'
-    ? Math.max(constants.SPAWN_RADIUS_MIN * 1.2, 500)
-    : constants.SPAWN_RADIUS_MIN * 1.5;
-  const baseMax = state.gameMode === 'timeattack'
-    ? Math.max(baseMin + 220, constants.SPAWN_RADIUS_MAX * 1.2)
-    : constants.SPAWN_RADIUS_MAX * 1.2;
+  const baseMin = Math.max(constants.SPAWN_RADIUS_MIN * 1.2, 500);
+  const baseMax = Math.max(baseMin + 220, constants.SPAWN_RADIUS_MAX * 1.2);
   const radius = randRange(baseMin, baseMax);
   const pos = vector(
     state.playerPos.x + Math.cos(angle) * radius,
@@ -180,16 +143,13 @@ export function spawnOrangeLadybug(sprites) {
   );
 
   const baseSpeed = constants.ORANGE_LADYBUG_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ORANGE_LADYBUG_SPEED;
-  const speedFactor = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR
-    : 1;
   const enemySize = getEnemySizeForMode(constants.ORANGE_LADYBUG_SIZE, 'orange');
 
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
-    speed: baseSpeed * getStageSpeedMultiplier() * speedFactor,
-    health: constants.ORANGE_LADYBUG_HEALTH,
+    speed: baseSpeed * getStageSpeedMultiplier() * timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR,
+    health: constants.ORANGE_LADYBUG_HEALTH * 2,
     size: enemySize,
     sprite: sprites.orangeLadybug,
     type: 'orangeLadybug',
@@ -205,27 +165,20 @@ export function spawnOrangeLadybug(sprites) {
 // 보라색 큰 적 생성
 export function spawnBigEnemy(sprites) {
   const angle = randRange(0, Math.PI * 2);
-  const minRadius = state.gameMode === 'timeattack'
-    ? Math.max(constants.SPAWN_RADIUS_MIN, 500)
-    : constants.SPAWN_RADIUS_MIN;
-  const maxRadius = state.gameMode === 'timeattack'
-    ? Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX)
-    : constants.SPAWN_RADIUS_MAX;
+  const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
+  const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
   const radius = randRange(minRadius, maxRadius);
   const pos = vector(
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
   const baseSpeed = constants.BIG_ENEMY_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.BIG_ENEMY_SPEED;
-  const speedFactor = state.gameMode === 'timeattack'
-    ? timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR
-    : 1;
   const enemySize = getEnemySizeForMode(constants.BIG_ENEMY_SIZE, 'big');
   state.enemies.push({
     id: enemyIdCounter++,
     pos,
-    speed: baseSpeed * getStageSpeedMultiplier() * speedFactor,
-    health: constants.BIG_ENEMY_HEALTH,
+    speed: baseSpeed * getStageSpeedMultiplier() * timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR,
+    health: 4, // 타임어택 체력 4
     size: enemySize,
     sprite: sprites.bigEnemy,
     xpReward: constants.XP_REWARD_PURPLE,
@@ -234,7 +187,7 @@ export function spawnBigEnemy(sprites) {
   });
 }
 
-// 노말 모드 보스 생성
+// 노말 모드 보스 생성 (타임어택에서는 사용 안 함)
 export function spawnBoss() {
   const angle = randRange(0, Math.PI * 2);
   const distance = 600;
@@ -262,7 +215,9 @@ export function spawnBoss() {
 
 // 타임어택 모드 보스 생성
 export function spawnTimeAttackBoss(vectorCopy) {
-  const bossType = 'ladybug';
+  // 보스 타입 결정 (인덱스에 따라)
+  const bossTypes = ['ladybug', 'ant', 'butterfly', 'cat', 'dog'];
+  const bossType = bossTypes[state.timeAttackBossIndex % bossTypes.length];
 
   const angle = randRange(0, Math.PI * 2);
   const distance = 600;
