@@ -23,17 +23,13 @@ export async function saveRankingData(nickname, character, stage, survivalTime, 
   let localSuccess = false;
 
   try {
-    // 로컬 환경이 아닐 때만 Firebase 저장 시도
-    if (!isLocalEnvironment()) {
-      firebaseSuccess = await saveRankingToFirebase(nickname, character, stage, survivalTime, finalScore);
-      if (firebaseSuccess) {
-        console.log('Firebase에 랭킹 저장 완료');
-      }
-    } else {
-      console.log('로컬 환경 - Firebase 저장 건너뜀');
+    // Firebase에 항상 저장 시도
+    firebaseSuccess = await saveRankingToFirebase(nickname, character, stage, survivalTime, finalScore);
+    if (firebaseSuccess) {
+      console.log('Firebase에 랭킹 저장 완료');
     }
 
-    // 로컬 DB에는 항상 저장 (로컬 환경에서도 저장)
+    // 로컬 DB에는 항상 저장 (백업용)
     localSuccess = await savePlayerRanking(nickname, character, stage, survivalTime, finalScore);
     if (localSuccess) {
       console.log('로컬 DB에 랭킹 저장 완료');
@@ -75,22 +71,20 @@ function filterUniqueNicknames(rankings) {
   });
 }
 
-// 하이브리드 랭킹 데이터 불러오기 (Firebase 우선, localStorage 백업)
+// Firebase 전용 랭킹 데이터 불러오기
 export async function loadRankingData() {
   try {
-    // Firebase 데이터 시도
-    const firebaseRankings = await loadRankingsFromFirebase(50); // 더 많이 가져와서 필터링
+    // Firebase 데이터만 사용
+    const firebaseRankings = await loadRankingsFromFirebase(50);
     if (firebaseRankings && firebaseRankings.length > 0) {
       console.log('Firebase에서 랭킹 로드:', firebaseRankings.length, '개');
       const uniqueRankings = filterUniqueNicknames(firebaseRankings);
       return uniqueRankings.slice(0, 7); // 상위 7위만 반환
     }
 
-    // Firebase 실패 시 로컬 데이터 사용
-    const localRankings = await getTopRankings(50); // 더 많이 가져와서 필터링
-    console.log('로컬 DB에서 랭킹 로드:', localRankings.length, '개');
-    const uniqueRankings = filterUniqueNicknames(localRankings);
-    return uniqueRankings.slice(0, 7); // 상위 7위만 반환
+    // Firebase에 데이터가 없으면 빈 배열 반환
+    console.log('Firebase에 랭킹 데이터가 없습니다');
+    return [];
   } catch (error) {
     console.error('랭킹 데이터 로딩 실패:', error);
     return [];

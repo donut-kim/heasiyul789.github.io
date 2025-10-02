@@ -153,16 +153,11 @@ export async function showRankingModal() {
     rankingHTML = '<div style="text-align: center; padding: 20px; color: #ff6b6b;">랭킹 데이터를 불러오는데 실패했습니다.</div>';
   }
 
-  // 로컬 환경 경고 메시지
-  const localWarning = isLocalEnvironment() ?
-    '<div style="background: rgba(255, 193, 7, 0.2); border: 1px solid #ffc107; border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; font-size: 12px; color: #ffc107; text-align: center;">⚠️ 로컬 환경에서는 랭킹 저장이 비활성화됩니다</div>' : '';
-
   showModal('🏆 랭킹', '', {
     showRestart: false,
     showRanking: false,
     extraHTML: `
       <div style="width: min(95vw, 600px); max-width: 600px;">
-        ${localWarning}
         <div style="display: grid; grid-template-columns: 60px 1fr 80px 90px; gap: 8px; padding: 8px 10px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 14px;">
           <span style="text-align: center;">순위</span>
           <span>닉네임</span>

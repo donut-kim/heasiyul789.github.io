@@ -96,56 +96,68 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
     const existingSnapshot = await getDocs(existingQuery);
 
     const newScore = parseInt(finalScore);
+    const newTime = parseFloat(survivalTime);
 
     if (existingSnapshot.empty) {
       // 해당 사용자가 없으면 새로 저장
       console.log('새로운 사용자, 랭킹 저장:', userId);
 
+      const now = new Date();
       const rankingData = {
+        character: character,
+        date: now.toISOString(),
+        finalScore: newScore,
         nickname: cleanNickname,
         stage: parseInt(stage),
-        gameTime: parseFloat(survivalTime),
-        score: newScore,
-        gameType: 'timeattack',
-        uid: userId,
-        createdAt: serverTimestamp()
+        survivalTime: newTime,
+        timestamp: now.getTime(),
+        gameType: 'timeattack'
       };
 
       await addDoc(collection(db, 'rankings'), rankingData);
       console.log('Firestore에 랭킹 저장 완료:', rankingData);
       return true;
     } else {
-      // 기존 기록이 있으면 점수 비교
-      let maxExistingScore = 0;
-      let maxDocId = null;
+      // 기존 기록이 있으면 시간 비교 (시간이 같으면 점수 비교)
+      let bestTime = 0;
+      let bestScore = 0;
+      let bestDocId = null;
 
       existingSnapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        if (data.score > maxExistingScore) {
-          maxExistingScore = data.score;
-          maxDocId = docSnap.id;
+        const existingTime = data.survivalTime || 0;
+        const existingScore = data.finalScore || data.score || 0;
+
+        if (existingTime > bestTime || (existingTime === bestTime && existingScore > bestScore)) {
+          bestTime = existingTime;
+          bestScore = existingScore;
+          bestDocId = docSnap.id;
         }
       });
 
-      if (newScore > maxExistingScore) {
-        // 기존 최고 기록보다 높으면 업데이트
-        console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 업데이트`);
+      // 새 기록이 더 좋은지 확인 (시간 우선, 같으면 점수)
+      const shouldUpdate = newTime > bestTime || (newTime === bestTime && newScore > bestScore);
 
+      if (shouldUpdate) {
+        console.log(`기존 기록(시간: ${bestTime}, 점수: ${bestScore}) < 새 기록(시간: ${newTime}, 점수: ${newScore}), 업데이트`);
+
+        const now = new Date();
         const updateData = {
+          character: character,
+          date: now.toISOString(),
+          finalScore: newScore,
           nickname: cleanNickname,
           stage: parseInt(stage),
-          gameTime: parseFloat(survivalTime),
-          score: newScore,
-          gameType: 'timeattack',
-          uid: userId,
-          createdAt: serverTimestamp()
+          survivalTime: newTime,
+          timestamp: now.getTime(),
+          gameType: 'timeattack'
         };
 
-        await updateDoc(doc(db, 'rankings', maxDocId), updateData);
+        await updateDoc(doc(db, 'rankings', bestDocId), updateData);
         console.log('Firestore에 랭킹 업데이트 완료:', updateData);
         return true;
       } else {
-        console.log(`기존 최고점수(${maxExistingScore}) >= 새 점수(${newScore}), 저장 안함`);
+        console.log(`기존 기록(시간: ${bestTime}, 점수: ${bestScore}) >= 새 기록(시간: ${newTime}, 점수: ${newScore}), 저장 안함`);
         return false;
       }
     }
@@ -185,17 +197,22 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
       rankings.push({
         id: doc.id,
         nickname: data.nickname || '익명',
-        character: 'signature_knotted',
+        character: data.character || 'signature_knotted',
         stage: data.stage || 1,
-        survivalTime: data.gameTime || 0,
-        finalScore: data.score || 0,
-        timestamp: data.createdAt?.toMillis() || Date.now(),
-        date: data.createdAt?.toDate().toISOString() || new Date().toISOString()
+        survivalTime: data.survivalTime || data.gameTime || 0,
+        finalScore: data.finalScore || data.score || 0,
+        timestamp: data.timestamp || data.createdAt?.toMillis() || Date.now(),
+        date: data.date || data.createdAt?.toDate().toISOString() || new Date().toISOString()
       });
     });
 
-    // 클라이언트에서 score 기준 내림차순 정렬 후 상위 limitCount개만 반환
-    rankings.sort((a, b) => b.finalScore - a.finalScore);
+    // 클라이언트에서 시간 기준 내림차순 정렬 (시간 같으면 점수) 후 상위 limitCount개만 반환
+    rankings.sort((a, b) => {
+      if (b.survivalTime !== a.survivalTime) {
+        return b.survivalTime - a.survivalTime; // 시간 긴 순
+      }
+      return b.finalScore - a.finalScore; // 시간 같으면 점수 높은 순
+    });
     const topRankings = rankings.slice(0, limitCount);
 
     return topRankings;

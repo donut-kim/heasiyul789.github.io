@@ -84,31 +84,41 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
     const cleanNickname = nickname.trim();
     const userId = currentUser?.uid || `guest_${cleanNickname}`; // 비회원은 guest_ 접두사 사용
 
-    const { collection, getDocs, query, where, addDoc, updateDoc, doc, serverTimestamp } = window.firestoreDB;
+    const { collection, getDocs, query, where, addDoc, updateDoc, doc } = window.firestoreDB;
 
-    // 기존 해당 닉네임의 최고 기록 찾기 (닉네임 기반)
+    // 기존 해당 닉네임의 최고 기록 찾기 (닉네임 기반, gameType='normal' 또는 빈 값)
     const existingQuery = query(
       collection(db, 'rankings'),
-      where('nickname', '==', cleanNickname),
-      where('gameType', '==', 'normal')
+      where('nickname', '==', cleanNickname)
     );
 
     const existingSnapshot = await getDocs(existingQuery);
 
     const newScore = parseInt(finalScore);
 
-    if (existingSnapshot.empty) {
+    // gameType이 'normal' 또는 비어있는 것만 필터링
+    const normalRecords = [];
+    existingSnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (!data.gameType || data.gameType === 'normal') {
+        normalRecords.push({ id: docSnap.id, data });
+      }
+    });
+
+    if (normalRecords.length === 0) {
       // 해당 사용자가 없으면 새로 저장
       console.log('새로운 사용자, 랭킹 저장:', userId);
 
+      const now = new Date();
       const rankingData = {
+        character: character,
+        date: now.toISOString(),
+        finalScore: newScore,
         nickname: cleanNickname,
         stage: parseInt(stage),
-        gameTime: parseFloat(survivalTime),
-        score: newScore,
-        gameType: 'normal',
-        uid: userId,
-        createdAt: serverTimestamp()
+        survivalTime: parseFloat(survivalTime),
+        timestamp: now.getTime(),
+        gameType: 'normal'
       };
 
       await addDoc(collection(db, 'rankings'), rankingData);
@@ -119,11 +129,11 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
       let maxExistingScore = 0;
       let maxDocId = null;
 
-      existingSnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.score > maxExistingScore) {
-          maxExistingScore = data.score;
-          maxDocId = docSnap.id;
+      normalRecords.forEach((record) => {
+        const existingScore = record.data.finalScore || record.data.score || 0;
+        if (existingScore > maxExistingScore) {
+          maxExistingScore = existingScore;
+          maxDocId = record.id;
         }
       });
 
@@ -131,14 +141,16 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
         // 기존 최고 기록보다 높으면 업데이트
         console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 업데이트`);
 
+        const now = new Date();
         const updateData = {
+          character: character,
+          date: now.toISOString(),
+          finalScore: newScore,
           nickname: cleanNickname,
           stage: parseInt(stage),
-          gameTime: parseFloat(survivalTime),
-          score: newScore,
-          gameType: 'normal',
-          uid: userId,
-          createdAt: serverTimestamp()
+          survivalTime: parseFloat(survivalTime),
+          timestamp: now.getTime(),
+          gameType: 'normal'
         };
 
         await updateDoc(doc(db, 'rankings', maxDocId), updateData);
