@@ -64,26 +64,27 @@ class DonutRankingDB {
       // 파일의 랭킹 데이터를 로드
       this.rankings = [...rankingData];
       this.isInitialized = true;
-      console.log('DonutRankingDB 초기화 완료 - 현재 랭킹:', this.rankings.length, '개');
     } catch (error) {
       console.error('DB 초기화 실패:', error);
     }
   }
 
   // 랭킹 데이터 저장 - 닉네임별 최고 점수만 업데이트
-  async saveRanking(nickname, character, stage, survivalTime, finalScore) {
+  async saveRanking(nickname, character, stage, survivalTime, finalScore, gameType = 'timeattack') {
     try {
       const cleanNickname = nickname.trim();
       const newScore = parseInt(finalScore);
 
-      // 기존 해당 닉네임의 기록 찾기
-      const existingIndex = this.rankings.findIndex(rank => rank.nickname === cleanNickname);
+      // 기존 해당 닉네임과 게임타입의 기록 찾기
+      const existingIndex = this.rankings.findIndex(rank =>
+        rank.nickname === cleanNickname && rank.gameType === gameType
+      );
 
       if (existingIndex >= 0) {
         // 기존 기록이 있으면 점수 비교
         const existingScore = this.rankings[existingIndex].finalScore;
         if (newScore <= existingScore) {
-          console.log(`기존 점수(${existingScore}) >= 새 점수(${newScore}), 저장 안함`);
+          console.log(`[${gameType}] 기존 점수(${existingScore}) >= 새 점수(${newScore}), 저장 안함`);
           return false;
         }
 
@@ -95,11 +96,12 @@ class DonutRankingDB {
           stage,
           survivalTime,
           finalScore: newScore,
+          gameType,
           timestamp: new Date().toISOString()
         };
-        console.log(`기존 점수(${existingScore}) < 새 점수(${newScore}), 업데이트`);
+        console.log(`[${gameType}] 기존 점수(${existingScore}) < 새 점수(${newScore}), 업데이트`);
       } else {
-        // 새로운 닉네임이면 추가
+        // 새로운 닉네임이거나 새로운 게임타입이면 추가
         const newRanking = {
           id: Date.now() + Math.random(), // 임시 ID
           nickname: cleanNickname,
@@ -107,11 +109,12 @@ class DonutRankingDB {
           stage,
           survivalTime,
           finalScore: newScore,
+          gameType,
           timestamp: new Date().toISOString()
         };
 
         this.rankings.push(newRanking);
-        console.log('새로운 닉네임, 랭킹 저장:', cleanNickname);
+        console.log(`[${gameType}] 새로운 기록 저장:`, cleanNickname);
       }
 
       // 점수순으로 정렬 (내림차순)
@@ -198,7 +201,7 @@ export async function initializeDB() {
 }
 
 export async function savePlayerRanking(nickname, character, stage, survivalTime, finalScore) {
-  return await rankingDB.saveRanking(nickname, character, stage, survivalTime, finalScore);
+  return await rankingDB.saveRanking(nickname, character, stage, survivalTime, finalScore, 'timeattack');
 }
 
 export async function getTopRankings(limit = 10) {

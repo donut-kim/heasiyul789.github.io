@@ -83,11 +83,11 @@ function drawMenuBoard(ctx) {
 
   ctx.font = '36px Arial';
   ctx.fillStyle = '#ffebcd';
-  ctx.fillText('KIM Donut ............. $300', 0, -40);
-  ctx.fillText('kIM atte .............. $300', 0, 10);
-  ctx.fillText('Chocolate Donut ....... $2.80', 0, 60);
-  ctx.fillText('Strawberry Cake ....... $4.50', 0, 110);
-  ctx.fillText('Orange Juice .......... $3.50', 0, 160);
+  ctx.fillText('KIM Donut .............. $7.77', 0, -40);
+  ctx.fillText('KIM Latte .............. $7.77', 0, 10);
+  ctx.fillText('pretzel ................ $2.80', 0, 60);
+  ctx.fillText('Strawberry Cake ........ $4.50', 0, 110);
+  ctx.fillText('Orange Juice ........... $3.50', 0, 160);
 }
 
 // 쇼케이스 (도넛&케이크) - 더 큰 사이즈

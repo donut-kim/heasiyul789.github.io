@@ -56,16 +56,10 @@ async function initializeFirebase() {
     };
 
     isFirebaseReady = true;
-    console.log('Firebase Firestore & Auth 초기화 완료');
 
     // 구글 로그인 초기화
-    console.log('window.initGoogleAuth 확인:', typeof window.initGoogleAuth);
     if (window.initGoogleAuth) {
-      console.log('window.initGoogleAuth 호출 시작');
       window.initGoogleAuth();
-      console.log('window.initGoogleAuth 호출 완료');
-    } else {
-      console.error('window.initGoogleAuth 함수를 찾을 수 없습니다');
     }
 
     return true;
@@ -174,7 +168,6 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
     const querySnapshot = await getDocs(rankingsQuery);
 
     if (querySnapshot.empty) {
-      console.log('Firestore에 타임어택 랭킹 데이터가 없습니다.');
       return [];
     }
 
@@ -197,7 +190,6 @@ export async function loadRankingsFromFirebase(limitCount = 7) {
     rankings.sort((a, b) => b.finalScore - a.finalScore);
     const topRankings = rankings.slice(0, limitCount);
 
-    console.log('Firestore에서 랭킹 로드 완료:', topRankings.length, '개');
     return topRankings;
 
   } catch (error) {
