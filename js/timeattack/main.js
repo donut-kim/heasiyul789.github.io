@@ -2446,25 +2446,45 @@ function update(dt) {
     const bossSpawnTimes = [180, 360, 540, 720, 900]; // 3분, 6분, 9분, 12분, 15분
     const currentBossTime = bossSpawnTimes[state.timeAttackBossIndex];
 
-    if (currentBossTime && state.elapsed >= currentBossTime) {
-      spawnTimeAttackBoss(vectorCopy);
-      // 보스 스폰 시 검은먼지 타이머도 리셋 (충돌 방지)
-      state.nextBlackDustSpawn = 60;
-      state.blackDustWarningActive = false;
+    if (currentBossTime) {
+      const timeUntilBoss = currentBossTime - state.elapsed;
+
+      // 5초 전에 보스 알림 표시
+      if (timeUntilBoss <= 5 && timeUntilBoss > 0 && !state.bossWarningShown) {
+        state.bossWarningTimer = 5; // 5초간 경고 표시 (배너는 자동으로 표시됨)
+        state.bossWarningShown = true;
+      }
+
+      // 정각에 보스 스폰
+      if (state.elapsed >= currentBossTime) {
+        spawnTimeAttackBoss(vectorCopy);
+        state.bossWarningShown = false; // 다음 보스를 위해 초기화
+        // 보스 스폰 시 검은먼지 타이머도 리셋 (충돌 방지)
+        state.nextBlackDustSpawn = 60;
+        state.blackDustWarningActive = false;
+      }
     }
   }
 
-  // 타임어택 모드 1분마다 검은먼지 스폰
+  // 타임어택 모드 1분마다 검은먼지 스폰 (10초간 천천히 스폰)
   if (activePlay) {
-    // 경고 중일 때 타이머 감소
-    if (state.blackDustWarningActive) {
-      state.blackDustWarningTimer -= dt;
-      if (state.blackDustWarningTimer <= 0) {
-        // 경고 종료, 검은먼지 스폰
+    // 검은먼지 스폰 중일 때
+    if (state.blackDustSpawning) {
+      state.blackDustSpawnTimer -= dt;
+      state.blackDustSpawnInterval -= dt;
+
+      // 일정 간격마다 일부씩 스폰
+      if (state.blackDustSpawnInterval <= 0) {
+        const totalCount = state.blackDustSpawnCount * 200; // 2배로 증가 (1분=200, 2분=400...)
+        const spawnPerBatch = Math.ceil(totalCount / 20); // 10초간 20번 스폰
+        spawnBlackDustGroup(sprites, { overrideCount: spawnPerBatch, overrideHealth: 1, storm: true });
+        state.blackDustSpawnInterval = 0.5; // 0.5초마다 스폰
+      }
+
+      // 10초 경과하면 스폰 종료
+      if (state.blackDustSpawnTimer <= 0) {
+        state.blackDustSpawning = false;
         state.blackDustWarningActive = false;
-        state.blackDustSpawnCount++; // 스폰 횟수 증가
-        const spawnCount = state.blackDustSpawnCount * 100; // 1분=100, 2분=200, 3분=300...
-        spawnBlackDustGroup(sprites, { overrideCount: spawnCount, overrideHealth: 1, storm: true });
         state.nextBlackDustSpawn = 60; // 다음 스폰까지 60초
       }
     } else {
@@ -2476,22 +2496,23 @@ function update(dt) {
       const isBossSpawnSoon = nextBossSpawnIn <= 5; // 보스 스폰 5초 전
 
       if (state.nextBlackDustSpawn <= 3 && state.nextBlackDustSpawn > 0 && !isBossSpawnSoon) {
-        // 3초 전부터 경고 표시 (보스 스폰이 임박하지 않은 경우만)
+        // 3초 전부터 경고 표시
         if (!state.blackDustWarningActive) {
           state.blackDustWarningActive = true;
           state.blackDustWarningTimer = timeAttackConstants.TIME_ATTACK_BLACK_DUST_WARNING_DURATION;
         }
       }
+
       if (state.nextBlackDustSpawn <= 0) {
         // 보스 스폰 시간과 겹치면 검은먼지 스폰 스킵
         if (isBossSpawnSoon) {
           state.nextBlackDustSpawn = 60; // 다음 사이클로 연기
         } else {
-          // 시간이 다 되었는데 경고가 활성화되지 않았다면 즉시 스폰 (예외 처리)
+          // 10초간 천천히 스폰 시작
           state.blackDustSpawnCount++;
-          const spawnCount = state.blackDustSpawnCount * 100;
-          spawnBlackDustGroup(sprites, { overrideCount: spawnCount, overrideHealth: 1, storm: true });
-          state.nextBlackDustSpawn = 60;
+          state.blackDustSpawning = true;
+          state.blackDustSpawnTimer = 10; // 10초간 스폰
+          state.blackDustSpawnInterval = 0; // 즉시 첫 스폰
         }
       }
     }
@@ -2691,14 +2712,21 @@ function handleMovement(dt) {
     if (!state.boss) {
       let batch = 1 + Math.floor(state.elapsed / 30);
       batch = Math.max(1, Math.round(batch * constants.TIME_ATTACK_ENEMY_SPAWN_MULTIPLIER));
+
+      // 배치 스폰 시 360도를 균등하게 나눠서 골고루 분산
+      const angleStep = (Math.PI * 2) / batch;
+      const startAngle = Math.random() * Math.PI * 2; // 시작 각도는 랜덤
+
       for (let i = 0; i < batch; i++) {
+        const spawnAngle = startAngle + (angleStep * i);
+
         // 테스트용: 남색 세균을 시작부터 등장 (30% 확률)
         if(state.stage >= 2 && Math.random() < 0.3) {
           spawnDarkBlueEnemy(sprites, collidesWithObstacles);
         } else if (state.elapsed >= constants.BIG_ENEMY_SPAWN_TIME && Math.random() < constants.BIG_ENEMY_SPAWN_CHANCE) {
           spawnBigEnemy(sprites);
         } else {
-          spawnEnemy(sprites);
+          spawnEnemy(sprites, spawnAngle);
         }
       }
     }
@@ -3666,18 +3694,18 @@ function render() {
     }
   }
 
+  // 적군 렌더링 (항상 원래 이미지 사용)
   for (const enemy of state.enemies) {
     const spr = enemy.sprite || sprites.enemy;
     let sz = enemy.size || constants.ENEMY_SIZE;
 
     drawSprite(spr, enemy.pos, sz);
 
-    // 감전 효과 그리기
+    // 효과는 항상 표시 (중요한 피드백)
     if (enemy.electrocuted && enemy.electrocutionFlash > 0) {
       drawElectrocutionEffect(enemy.pos, sz);
     }
 
-    // 화상 효과 그리기
     if (enemy.burning) {
       drawBurnEffect(enemy.pos, sz, enemy.burnFlash || 0);
     }
@@ -4942,6 +4970,16 @@ async function initialize() {
   startButton.addEventListener('click', attemptStart);
 
   // 모드 선택은 index.html에서 처리됨
+
+  // 랭킹 버튼 이벤트 리스너
+  const rankingButton = document.getElementById('ranking-button');
+  if (rankingButton) {
+    rankingButton.addEventListener('click', () => {
+      import('./ui.js').then(({ showRankingModal }) => {
+        showRankingModal();
+      });
+    });
+  }
 
   // 패치 노트 버튼 이벤트 리스너
   const patchNotesButton = document.getElementById('patch-notes-button');

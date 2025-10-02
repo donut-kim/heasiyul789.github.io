@@ -64,7 +64,6 @@ class DonutRankingDB {
       // 파일의 랭킹 데이터를 로드
       this.rankings = [...rankingData];
       this.isInitialized = true;
-      console.log('DonutRankingDB 초기화 완료 - 현재 랭킹:', this.rankings.length, '개');
     } catch (error) {
       console.error('DB 초기화 실패:', error);
     }

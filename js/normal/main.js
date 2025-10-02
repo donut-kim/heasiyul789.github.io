@@ -3361,17 +3361,18 @@ function render() {
     }
   }
 
+  // 적군 렌더링 (항상 원래 이미지 사용)
   for (const enemy of state.enemies) {
     const spr = enemy.sprite || sprites.enemy;
     const sz = enemy.size || constants.ENEMY_SIZE;
+
     drawSprite(spr, enemy.pos, sz);
 
-    // 감전 효과 그리기
+    // 효과는 항상 표시 (중요한 피드백)
     if (enemy.electrocuted && enemy.electrocutionFlash > 0) {
       drawElectrocutionEffect(enemy.pos, sz);
     }
 
-    // 화상 효과 그리기
     if (enemy.burning) {
       drawBurnEffect(enemy.pos, sz, enemy.burnFlash || 0);
     }
@@ -4404,6 +4405,16 @@ async function initialize() {
     }
   });
   startButton.addEventListener('click', attemptStart);
+
+  // 랭킹 버튼 이벤트 리스너
+  const rankingButton = document.getElementById('ranking-button');
+  if (rankingButton) {
+    rankingButton.addEventListener('click', () => {
+      import('./ui.js').then(({ showRankingModal }) => {
+        showRankingModal();
+      });
+    });
+  }
 
   // 패치 노트 버튼 이벤트 리스너
   const patchNotesButton = document.getElementById('patch-notes-button');

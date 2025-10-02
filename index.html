@@ -933,6 +933,7 @@
 
           <!-- 패치 내용 버튼 -->
           <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+            <button id="ranking-button" type="button" style="flex: 1; background: #f59e0b; font-size: 12px; padding: 6px 12px; border: none; border-radius: 999px; color: white; cursor: pointer; font-weight: 600;">🏆 랭킹</button>
             <button id="patch-notes-button" type="button" style="flex: 1; background: #7c3aed; font-size: 12px; padding: 6px 12px; border: none; border-radius: 999px; color: white; cursor: pointer; font-weight: 600;">📝 디스코드</button>
           </div>
 
@@ -958,13 +959,19 @@
 
     <!-- Firebase SDK -->
     <script type="module">
-      // Firebase는 랭킹용으로만 사용 (인증 제거)
+      // Firebase 랭킹 및 인증
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
       import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+      import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
 
       window.firebase = {
         initializeApp,
-        getFirestore
+        getFirestore,
+        getAuth,
+        GoogleAuthProvider,
+        signInWithPopup,
+        onAuthStateChanged,
+        signOut
       };
 
       // 페이지 로드 시 Firebase 초기화 (랭킹용)
@@ -1020,13 +1027,18 @@
           startButton.disabled = true;
         }
 
-        // 닉네임 입력 시 버튼 활성화/비활성화
+        // 닉네임 입력 시 즉시 저장 및 버튼 활성화/비활성화
         nicknameInput.addEventListener('input', () => {
           const trimmed = nicknameInput.value.trim();
           startButton.disabled = trimmed.length < 2 || trimmed.length > 9;
+
+          // 유효한 닉네임이면 즉시 localStorage에 저장
+          if (trimmed.length >= 2 && trimmed.length <= 9) {
+            saveNickname(trimmed);
+          }
         });
 
-        // 게임 시작 버튼 클릭 시 닉네임 저장
+        // 게임 시작 버튼 클릭 시 표시 모드로 전환
         startButton.addEventListener('click', () => {
           const nickname = nicknameInput.value.trim();
           if (nickname.length >= 2 && nickname.length <= 9) {

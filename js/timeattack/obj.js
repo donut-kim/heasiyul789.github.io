@@ -24,8 +24,9 @@ export function getStageSpeedMultiplier() {
 }
 
 // 분홍 세균 생성
-export function spawnEnemy(sprites) {
-  const angle = randRange(0, Math.PI * 2);
+export function spawnEnemy(sprites, angleOverride = null) {
+  // 각도를 지정하지 않으면 랜덤, 지정하면 해당 각도 사용 (골고루 분산)
+  const angle = angleOverride !== null ? angleOverride : randRange(0, Math.PI * 2);
   const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
   const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
   const radius = randRange(minRadius, maxRadius);
@@ -33,7 +34,8 @@ export function spawnEnemy(sprites) {
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
-  const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
+  // 분홍세균은 시간에 따라 속도 증가 없이 고정 속도 유지
+  const baseSpeed = constants.ENEMY_BASE_SPEED;
   const size = getEnemySizeForMode(constants.ENEMY_SIZE, 'pink');
   state.enemies.push({
     id: enemyIdCounter++,
@@ -101,13 +103,17 @@ export function spawnBlackDustGroup(sprites, options = {}) {
     return;
   }
   const count = options.overrideCount ?? randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
-  const baseAngle = randRange(0, Math.PI * 2);
   const enemySize = getEnemySizeForMode(constants.BLACK_DUST_SIZE, 'blackDust');
   const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
   const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
 
+  // 360도를 균등하게 나눠서 골고루 분산
+  const angleStep = (Math.PI * 2) / count;
+  const startAngle = Math.random() * Math.PI * 2;
+
   for (let i = 0; i < count; i++) {
-    const angle = baseAngle + randRange(-Math.PI / 4, Math.PI / 4);
+    // 기본 각도에 약간의 랜덤 추가 (너무 규칙적이지 않게)
+    const angle = startAngle + (angleStep * i) + randRange(-0.1, 0.1);
     const radius = randRange(minRadius, maxRadius);
     const pos = vector(
       state.playerPos.x + Math.cos(angle) * radius,
