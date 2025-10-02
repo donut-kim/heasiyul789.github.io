@@ -1607,6 +1607,13 @@ function ensureChunksAroundPlayer() {
 function handleVictory() {
   if (state.victory) return;
 
+  // 마지막 보스(5번째 보스, index 4)를 처치했는지 확인
+  if (state.timeAttackBossIndex >= 4) {
+    // 15분 생존 성공!
+    handleTimeAttackVictory();
+    return;
+  }
+
   // 타임어택 모드에서는 보스 클리어 후 스킬 선택
   state.boss = null;
   state.bossWarningTimer = 0;
@@ -2585,7 +2592,7 @@ function update(dt) {
   if (state.paused) return;
   const activePlay = !state.selectingUpgrade && !state.victory && !state.gameOver;
   if (activePlay && !state.boss) {
-    state.elapsed += dt;
+    state.elapsed += dt; // 게임 시간 (보스 전투 중에는 멈춤)
   }
 
   // 타임어택 모드 시간 관리
