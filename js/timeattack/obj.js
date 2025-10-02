@@ -24,8 +24,9 @@ export function getStageSpeedMultiplier() {
 }
 
 // 분홍 세균 생성
-export function spawnEnemy(sprites) {
-  const angle = randRange(0, Math.PI * 2);
+export function spawnEnemy(sprites, angleOverride = null) {
+  // 각도를 지정하지 않으면 랜덤, 지정하면 해당 각도 사용 (골고루 분산)
+  const angle = angleOverride !== null ? angleOverride : randRange(0, Math.PI * 2);
   const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
   const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
   const radius = randRange(minRadius, maxRadius);
@@ -33,7 +34,8 @@ export function spawnEnemy(sprites) {
     state.playerPos.x + Math.cos(angle) * radius,
     state.playerPos.y + Math.sin(angle) * radius,
   );
-  const baseSpeed = constants.ENEMY_BASE_SPEED + state.elapsed * constants.ENEMY_SPEED_SCALE * constants.ENEMY_BASE_SPEED;
+  // 분홍세균은 시간에 따라 속도 증가 없이 고정 속도 유지
+  const baseSpeed = constants.ENEMY_BASE_SPEED;
   const size = getEnemySizeForMode(constants.ENEMY_SIZE, 'pink');
   state.enemies.push({
     id: enemyIdCounter++,
@@ -101,13 +103,17 @@ export function spawnBlackDustGroup(sprites, options = {}) {
     return;
   }
   const count = options.overrideCount ?? randInt(constants.BLACK_DUST_MIN_COUNT, constants.BLACK_DUST_MAX_COUNT + 1);
-  const baseAngle = randRange(0, Math.PI * 2);
   const enemySize = getEnemySizeForMode(constants.BLACK_DUST_SIZE, 'blackDust');
   const minRadius = Math.max(constants.SPAWN_RADIUS_MIN, 500);
   const maxRadius = Math.max(minRadius + 200, constants.SPAWN_RADIUS_MAX);
 
+  // 360도를 균등하게 나눠서 골고루 분산
+  const angleStep = (Math.PI * 2) / count;
+  const startAngle = Math.random() * Math.PI * 2;
+
   for (let i = 0; i < count; i++) {
-    const angle = baseAngle + randRange(-Math.PI / 4, Math.PI / 4);
+    // 기본 각도에 약간의 랜덤 추가 (너무 규칙적이지 않게)
+    const angle = startAngle + (angleStep * i) + randRange(-0.1, 0.1);
     const radius = randRange(minRadius, maxRadius);
     const pos = vector(
       state.playerPos.x + Math.cos(angle) * radius,
@@ -230,12 +236,12 @@ export function spawnTimeAttackBoss(vectorCopy) {
     state.playerPos.y + Math.sin(angle) * distance,
   );
 
-  // 보스 HP: 3분(100), 6분(200), 9분(300), 12분(400), 15분(500)
-  const bossHP = (state.timeAttackBossIndex + 1) * 100;
+  // 보스 HP: 테스트용 200 (원래: 3분(100), 6분(200), 9분(300), 12분(400), 15분(500))
+  const bossHP = 200; // 레이어 테스트용
 
   state.boss = createBossAtPosition(bossPos, bossHP, bossType, state.timeAttackBossIndex + 1);
   state.timeAttackBossIndex++;
-  state.bossWarningTimer = constants.BOSS_WARNING_DURATION;
+  // bossWarningTimer는 돌진 스킬용이므로 보스 스폰 시 설정하지 않음
 }
 
 // 치약 아이템 생성
@@ -256,6 +262,30 @@ export function spawnToothpasteItem(getCurrentWorldBounds, collidesWithObstacles
     const y = randRange(-bounds + margin, bounds - margin);
     if (!collidesWithObstacles(x, y, clearanceRadius)) {
       state.toothpasteItems.push({ pos: vector(x, y) });
+      return true;
+    }
+  }
+  return false;
+}
+
+// 자석 아이템 생성
+export function spawnMagnetItem(getCurrentWorldBounds, collidesWithObstacles) {
+  // 최대 3개로 제한 (오래된 것부터 제거)
+  const MAX_MAGNETS = 3;
+  if (state.magnetItems.length >= MAX_MAGNETS) {
+    state.magnetItems.shift(); // 가장 오래된 아이템 제거
+  }
+
+  const attempts = 24;
+  const margin = 40;
+  const magnetSize = 44;
+  const clearanceRadius = magnetSize + 20;
+  for (let i = 0; i < attempts; i++) {
+    const bounds = getCurrentWorldBounds();
+    const x = randRange(-bounds + margin, bounds - margin);
+    const y = randRange(-bounds + margin, bounds - margin);
+    if (!collidesWithObstacles(x, y, clearanceRadius)) {
+      state.magnetItems.push({ pos: vector(x, y) });
       return true;
     }
   }

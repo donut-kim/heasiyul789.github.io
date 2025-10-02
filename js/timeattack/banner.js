@@ -177,34 +177,35 @@ export function drawTimeAttackBossHP(ctx, state, getWorldDims) {
   ctx.lineWidth = 2;
   ctx.strokeRect(0, barY, worldW, barHeight);
 
-  // 옛날 게임 스타일 HP 바: 100HP당 한 블록, 색상이 하나씩 사라짐
+  // 레이어 방식 HP 바: 도화지에 색깔 겹쳐 칠하듯이
+  // 빨강 → 주황 → 노랑 → 초록 → 파랑 순서로 밑에서부터 쌓임
   const colors = ['#ff2222', '#ff8800', '#ffdd00', '#44ff44', '#4488ff'];
-  const hpPerSegment = 100;
-  const totalSegments = Math.ceil(maxHP / hpPerSegment);
-  const segmentWidth = (worldW - 4) / totalSegments; // 테두리 2px씩 제외
-  const segmentGap = 2;
+  const hpPerLayer = 100; // 각 레이어당 100 HP
 
-  // 세그먼트 그리기
-  for (let i = 0; i < totalSegments; i++) {
-    const segmentStartHP = i * hpPerSegment;
-    const segmentEndHP = (i + 1) * hpPerSegment;
-    const x = 2 + i * segmentWidth + (i > 0 ? segmentGap * i : 0);
-    const y = barY + 2;
-    const w = segmentWidth - (i < totalSegments - 1 ? segmentGap : 0);
-    const h = barHeight - 4;
+  const barX = 2;
+  const barYPos = barY + 2;
+  const barWidth = worldW - 4;
+  const barHeightInner = barHeight - 4;
 
-    ctx.fillStyle = colors[i % colors.length];
+  // 0 HP 상태일 때 검은색 바 표시 (HP가 없다는 것을 명확히)
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(barX, barYPos, barWidth, barHeightInner);
 
-    if (currentHP > segmentEndHP) {
-      // 완전히 채워진 세그먼트
-      ctx.fillRect(x, y, w, h);
-    } else if (currentHP > segmentStartHP) {
-      // 현재 감소 중인 세그먼트
-      const remainingHP = currentHP - segmentStartHP;
-      const percentage = remainingHP / hpPerSegment;
-      ctx.fillRect(x, y, w * percentage, h);
+  if (currentHP > 0) {
+    // 현재 HP가 어느 레이어에 있는지 계산
+    const currentLayer = Math.floor((currentHP - 1) / hpPerLayer); // 0부터 시작
+    const hpInCurrentLayer = ((currentHP - 1) % hpPerLayer) + 1; // 현재 레이어에서의 HP (1~100)
+
+    // 이전 레이어들을 모두 100%로 그리기 (밑에 깔리는 레이어)
+    for (let layer = 0; layer < currentLayer; layer++) {
+      ctx.fillStyle = colors[layer % colors.length];
+      ctx.fillRect(barX, barYPos, barWidth, barHeightInner);
     }
-    // 이미 소진된 세그먼트는 그리지 않음
+
+    // 현재 레이어를 일부만 그리기
+    ctx.fillStyle = colors[currentLayer % colors.length];
+    const percentage = hpInCurrentLayer / hpPerLayer;
+    ctx.fillRect(barX, barYPos, barWidth * percentage, barHeightInner);
   }
 
   // HP 텍스트

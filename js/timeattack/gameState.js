@@ -27,6 +27,7 @@ export const state = {
   enemies: [],
   boss: null,
   bossWarningTimer: 0,
+  bossSpawnWarningTimer: 0, // 보스 출현 알림용 타이머 (스킬 경고와 분리)
   mine: { pos: vector(0, 0), active: true },
   mineFlashTimer: 0,
   level: 1,
@@ -102,6 +103,10 @@ export const state = {
   blackDustWarningTimer: 0, // 검은먼지 경고 표시 타이머
   gameStartMessageTimer: 0, // 게임 시작 메시지 표시 타이머
   blackDustSpawnCount: 0, // 검은먼지 스폰 횟수 (1분=1회, 2분=2회...)
+  // 자석 아이템 관련
+  magnetItems: [], // 맵에 드랍된 자석 아이템들
+  magnetSpawnTimer: 60, // 자석 아이템 스폰 타이머 (1분 후 첫 자석 스폰)
+  magnetFlashTimer: 0, // 자석 아이템 획득 시 화면 효과
 };
 
 export const keys = new Set();
@@ -134,6 +139,7 @@ export function resetGameplayState() {
   state.stage = 1;
   state.boss = null;
   state.bossWarningTimer = 0;
+  state.bossSpawnWarningTimer = 0;
   state.mine = { pos: vector(0, 0), active: true };
   state.mineFlashTimer = 0;
   state.level = 1;
@@ -202,6 +208,11 @@ export function resetGameplayState() {
   state.blackDustWarningTimer = 0;
   state.gameStartMessageTimer = 5; // 5초 동안 시작 메시지 표시
   state.blackDustSpawnCount = 0;
+
+  // 자석 아이템 리셋
+  state.magnetItems = [];
+  state.magnetSpawnTimer = 60; // 1분 후 첫 자석 스폰
+  state.magnetFlashTimer = 0;
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {

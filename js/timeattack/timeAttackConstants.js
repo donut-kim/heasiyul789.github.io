@@ -8,7 +8,7 @@ export const TIME_ATTACK_WORLD_BOUNDS = 600;
 // 공격 관련 설정
 export const TIME_ATTACK_BULLET_RANGE = 300; // 김공격 기본 사정거리
 export const TIME_ATTACK_ATTACK_RADIUS = 10; // 기타 공격 사거리
-export const TIME_ATTACK_BASE_BULLET_SCALE = 1.35; // 기본 김 크기 배율 (살짝 증가)
+export const TIME_ATTACK_BASE_BULLET_SCALE = 1.62; // 기본 김 크기 배율 (1.35 * 1.2 = 1.62, 20% 추가 증가)
 export const TIME_ATTACK_PLAYER_MAX_HEALTH = 10;
 export const TIME_ATTACK_BURST_INTERVAL_LV4 = 0.08; // 4레벨 반원 간격
 export const TIME_ATTACK_BURST_INTERVAL_LV5 = 0.055; // 5레벨 반원 간격
@@ -16,7 +16,7 @@ export const TIME_ATTACK_ENEMY_SPEED_FACTOR = 0.4; // 적 이동속도 60% 감�
 export const TIME_ATTACK_BLADE_SIZE_SCALE = 1.25;
 export const TIME_ATTACK_BLADE_ROTATION_FACTOR = 1.3;
 export const TIME_ATTACK_BLADE_EXTRA_RADIUS = 10;
-export const TIME_ATTACK_BLADE_DAMAGE = 2;
+export const TIME_ATTACK_BLADE_DAMAGE = 1;
 export const TIME_ATTACK_BLADE_KNOCKBACK = 60;
 export const TIME_ATTACK_SPRINKLE_RANGE = 200;
 export const TIME_ATTACK_BLACK_DUST_STORM_INTERVAL = 60;
