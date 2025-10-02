@@ -135,14 +135,12 @@ export async function showRankingModal() {
       rankings.forEach((rank, index) => {
         const nickname = truncateText(rank.nickname, 8);
         const survivalTime = formatSurvivalTime(rank.survivalTime);
-        const stage = rank.stage || 1;
         const score = rank.finalScore || 0;
         const rankEmoji = index === 0 || index === 1 ? ' 🍗' : '';
         rankingHTML += `
-          <div style="display: grid; grid-template-columns: 60px 1fr 60px 80px 90px; gap: 8px; align-items: center; padding: 8px 10px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 14px;">
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px 90px; gap: 8px; align-items: center; padding: 8px 10px; margin: 2px 0; background: rgba(0,0,0,0.3); border-radius: 4px; border-left: 3px solid ${index < 3 ? '#ffd700' : '#4a90e2'}; font-size: 14px;">
             <span style="font-weight: bold; color: #ffffff; text-align: center;">${index + 1}${rankEmoji}</span>
             <span style="color: #9fb4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${nickname}</span>
-            <span style="color: #a78bfa; text-align: center;">S${stage}</span>
             <span style="color: #fbbf24; text-align: center;">${survivalTime}</span>
             <span style="color: #4ade80; text-align: right;">${score.toLocaleString()}</span>
           </div>
@@ -165,10 +163,9 @@ export async function showRankingModal() {
     extraHTML: `
       <div style="width: min(95vw, 600px); max-width: 600px;">
         ${localWarning}
-        <div style="display: grid; grid-template-columns: 60px 1fr 60px 80px 90px; gap: 8px; padding: 8px 10px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 14px;">
+        <div style="display: grid; grid-template-columns: 60px 1fr 80px 90px; gap: 8px; padding: 8px 10px; margin-bottom: 8px; font-weight: bold; color: #9fb4d8; border-bottom: 1px solid rgba(159,180,216,0.3); font-size: 14px;">
           <span style="text-align: center;">순위</span>
           <span>닉네임</span>
-          <span style="text-align: center;">스테이지</span>
           <span style="text-align: center;">시간</span>
           <span style="text-align: right;">점수</span>
         </div>
