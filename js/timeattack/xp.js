@@ -105,6 +105,15 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
     crumb.driftTimer += dt;
     crumb.pulse += dt * 4;
 
+    // 자석 효과 처리
+    if (crumb.isMagnetized && crumb.magnetDelay !== undefined) {
+      crumb.magnetDelay -= dt;
+      if (crumb.magnetDelay <= 0 && !crumb.absorbing) {
+        crumb.absorbing = true;
+        crumb.magnetSpeed = 150; // 자석 효과는 느리게 시작
+      }
+    }
+
     if (crumb.absorbing && playerPos) {
       const toPlayer = vectorSub(playerPos, crumb.pos);
       const distSq = vectorLengthSq(toPlayer);
@@ -114,8 +123,18 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
       }
       const dist = Math.sqrt(distSq) || 1;
       const dir = vectorScale(toPlayer, 1 / dist);
-      const speed = 220 + (magnetRadius > 0 ? (1 - Math.min(dist / magnetRadius, 1)) * 280 : 0);
-      crumb.pos = vectorAdd(crumb.pos, vectorScale(dir, speed * dt));
+
+      // 자석 효과일 때는 점진적으로 가속
+      if (crumb.isMagnetized) {
+        crumb.magnetSpeed = Math.min((crumb.magnetSpeed || 150) + dt * 300, 600);
+        const speed = crumb.magnetSpeed;
+        crumb.pos = vectorAdd(crumb.pos, vectorScale(dir, speed * dt));
+      } else {
+        // 일반 자석 효과
+        const speed = 220 + (magnetRadius > 0 ? (1 - Math.min(dist / magnetRadius, 1)) * 280 : 0);
+        crumb.pos = vectorAdd(crumb.pos, vectorScale(dir, speed * dt));
+      }
+
       crumb.size = Math.max(crumb.size * (1 - dt * 3), crumb.size * 0.4);
       crumb.renderOffsetY = 0;
       crumb.absorbGlow = (crumb.absorbGlow || 0) + dt;

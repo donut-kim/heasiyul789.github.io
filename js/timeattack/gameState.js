@@ -102,6 +102,10 @@ export const state = {
   blackDustWarningTimer: 0, // 검은먼지 경고 표시 타이머
   gameStartMessageTimer: 0, // 게임 시작 메시지 표시 타이머
   blackDustSpawnCount: 0, // 검은먼지 스폰 횟수 (1분=1회, 2분=2회...)
+  // 자석 아이템 관련
+  magnetItems: [], // 맵에 드랍된 자석 아이템들
+  magnetSpawnTimer: 10, // 자석 아이템 스폰 타이머 (10초 테스트용)
+  magnetFlashTimer: 0, // 자석 아이템 획득 시 화면 효과
 };
 
 export const keys = new Set();
@@ -202,6 +206,11 @@ export function resetGameplayState() {
   state.blackDustWarningTimer = 0;
   state.gameStartMessageTimer = 5; // 5초 동안 시작 메시지 표시
   state.blackDustSpawnCount = 0;
+
+  // 자석 아이템 리셋
+  state.magnetItems = [];
+  state.magnetSpawnTimer = 10; // 10초 후 첫 스폰 (테스트용)
+  state.magnetFlashTimer = 0;
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {

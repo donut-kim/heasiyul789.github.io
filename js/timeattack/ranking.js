@@ -19,23 +19,21 @@ export function isLocalEnvironment() {
 
 // 하이브리드 랭킹 시스템 (Firebase 우선, localStorage 백업)
 export async function saveRankingData(nickname, character, stage, survivalTime, finalScore) {
-  // 로컬 환경에서는 랭킹 저장 차단
-  if (isLocalEnvironment()) {
-    console.log('로컬 환경에서는 랭킹 저장이 비활성화됩니다.');
-    return false;
-  }
-
   let firebaseSuccess = false;
   let localSuccess = false;
 
   try {
-    // Firebase 저장 시도
-    firebaseSuccess = await saveRankingToFirebase(nickname, character, stage, survivalTime, finalScore);
-    if (firebaseSuccess) {
-      console.log('Firebase에 랭킹 저장 완료');
+    // 로컬 환경이 아닐 때만 Firebase 저장 시도
+    if (!isLocalEnvironment()) {
+      firebaseSuccess = await saveRankingToFirebase(nickname, character, stage, survivalTime, finalScore);
+      if (firebaseSuccess) {
+        console.log('Firebase에 랭킹 저장 완료');
+      }
+    } else {
+      console.log('로컬 환경 - Firebase 저장 건너뜀');
     }
 
-    // 로컬 DB에도 저장 (백업용)
+    // 로컬 DB에는 항상 저장 (로컬 환경에서도 저장)
     localSuccess = await savePlayerRanking(nickname, character, stage, survivalTime, finalScore);
     if (localSuccess) {
       console.log('로컬 DB에 랭킹 저장 완료');
@@ -97,11 +95,6 @@ export async function checkAndSaveRanking(state, computeFinalScoreDetails) {
   const shouldSave = (stage === 1 && survivalTime >= 90) || stage >= 2;
 
   if (shouldSave) {
-    if (isLocalEnvironment()) {
-      console.log('로컬 환경에서는 랭킹이 저장되지 않습니다. 실서버에서 플레이해주세요!');
-      return;
-    }
-
     const details = computeFinalScoreDetails();
     await saveRankingData(
       state.nickname,

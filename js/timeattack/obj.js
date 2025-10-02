@@ -267,3 +267,27 @@ export function spawnToothpasteItem(getCurrentWorldBounds, collidesWithObstacles
   }
   return false;
 }
+
+// 자석 아이템 생성
+export function spawnMagnetItem(getCurrentWorldBounds, collidesWithObstacles) {
+  // 최대 3개로 제한 (오래된 것부터 제거)
+  const MAX_MAGNETS = 3;
+  if (state.magnetItems.length >= MAX_MAGNETS) {
+    state.magnetItems.shift(); // 가장 오래된 아이템 제거
+  }
+
+  const attempts = 24;
+  const margin = 40;
+  const magnetSize = 44;
+  const clearanceRadius = magnetSize + 20;
+  for (let i = 0; i < attempts; i++) {
+    const bounds = getCurrentWorldBounds();
+    const x = randRange(-bounds + margin, bounds - margin);
+    const y = randRange(-bounds + margin, bounds - margin);
+    if (!collidesWithObstacles(x, y, clearanceRadius)) {
+      state.magnetItems.push({ pos: vector(x, y) });
+      return true;
+    }
+  }
+  return false;
+}
