@@ -110,9 +110,10 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
       console.log('새로운 사용자, 랭킹 저장:', userId);
 
       const now = new Date();
+      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
       const rankingData = {
         character: character,
-        date: now.toISOString(),
+        date: koreaTime.toISOString().replace('Z', '+09:00'),
         finalScore: newScore,
         nickname: cleanNickname,
         stage: parseInt(stage),
@@ -142,9 +143,10 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
         console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 업데이트`);
 
         const now = new Date();
+        const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
         const updateData = {
           character: character,
-          date: now.toISOString(),
+          date: koreaTime.toISOString().replace('Z', '+09:00'),
           finalScore: newScore,
           nickname: cleanNickname,
           stage: parseInt(stage),

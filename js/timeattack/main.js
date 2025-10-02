@@ -1608,7 +1608,7 @@ function handleVictory() {
   if (state.victory) return;
 
   // 마지막 보스(5번째 보스, index 4)를 처치했는지 확인
-  if (state.timeAttackBossIndex >= 4) {
+  if (state.timeAttackBossIndex > 4) {
     // 15분 생존 성공!
     handleTimeAttackVictory();
     return;
@@ -2593,12 +2593,9 @@ function update(dt) {
   const activePlay = !state.selectingUpgrade && !state.victory && !state.gameOver;
   if (activePlay && !state.boss) {
     state.elapsed += dt; // 게임 시간 (보스 전투 중에는 멈춤)
-  }
 
-  // 타임어택 모드 시간 관리
-  if (activePlay) {
-    state.timeAttackRemaining = Math.max(0, state.timeAttackRemaining - dt);
-    if (state.timeAttackRemaining <= 0) {
+    // 타임어택 모드 시간 체크 (15분 = 900초)
+    if (state.elapsed >= 900) {
       // 타임어택 시간 종료 - 승리 처리
       handleTimeAttackVictory();
       return;
@@ -2656,8 +2653,9 @@ function update(dt) {
       state.nextBlackDustSpawn -= dt;
 
       // 보스 스폰 시간(180초의 배수)과 겹치는지 체크
-      const nextBossSpawnIn = 180 - state.timeAttackBossTimer;
-      const isBossSpawnSoon = nextBossSpawnIn <= 5; // 보스 스폰 5초 전
+      const bossSpawnTimes = [180, 360, 540, 720, 900];
+      const nextBossTime = bossSpawnTimes[state.timeAttackBossIndex];
+      const isBossSpawnSoon = nextBossTime && (nextBossTime - state.elapsed) <= 5; // 보스 스폰 5초 전
 
       if (state.nextBlackDustSpawn <= 3 && state.nextBlackDustSpawn > 0 && !isBossSpawnSoon) {
         // 3초 전부터 경고 표시
@@ -5408,8 +5406,10 @@ function handleKeyUp(event) {
   keys.delete(event.code);
 }
 
+let gameSpeed = 1; // 게임 속도 배수 (1, 2, 4, 8, 16, 32)
+
 function gameLoop(timestamp) {
-  const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
+  const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1) * gameSpeed;
   lastTimestamp = timestamp;
   update(dt);
   render(dt);
@@ -5504,6 +5504,36 @@ async function initialize() {
       const discordLink = 'https://discord.gg/vMSRcupzgb';
       window.open(discordLink, '_blank');
     });
+  }
+
+  // 테스트용 배속 버튼 (localhost에서만 표시)
+  if (window.location.hostname === 'localhost') {
+    console.log('🎮 배속 버튼 초기화 시작');
+    const speeds = [1, 2, 4];
+    let speedIndex = 0;
+
+    const setupSpeedButton = (buttonId) => {
+      const button = document.getElementById(buttonId);
+      console.log(`버튼 찾기 (${buttonId}):`, button);
+      if (button) {
+        button.style.display = 'block';
+        button.addEventListener('click', () => {
+          speedIndex = (speedIndex + 1) % speeds.length;
+          gameSpeed = speeds[speedIndex];
+          button.textContent = `배속: x${gameSpeed}`;
+          console.log(`배속 변경: x${gameSpeed}`);
+
+          // 다른 버튼도 같이 업데이트
+          const otherButton = document.getElementById(buttonId === 'speed-test-button' ? 'speed-test-button-mobile' : 'speed-test-button');
+          if (otherButton) {
+            otherButton.textContent = `배속: x${gameSpeed}`;
+          }
+        });
+      }
+    };
+
+    setupSpeedButton('speed-test-button');
+    setupSpeedButton('speed-test-button-mobile');
   }
 
   initCharacterSelection();

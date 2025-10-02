@@ -77,8 +77,6 @@ export const state = {
   joystickActive: false,
   gameStartTime: null,
   gameMode: 'normal', // 'normal' 또는 'timeattack'
-  timeAttackRemaining: 60 * 15, // 타임어택 모드 남은 시간 (15분)
-  timeAttackBossTimer: 0, // 타임어택 보스 타이머
   timeAttackBossIndex: 0, // 현재 보스 인덱스 (0: 무당벌레, 1: 달팽이, 2: 개미, 3: 나비, 4: 고양이)
   moveDirection: vector(1, 0), // 캐릭터 이동 방향 (기본: 오른쪽)
   lastMoveDirection: vector(1, 0), // 마지막 이동 방향 (정지 시에도 유지)
@@ -216,8 +214,6 @@ export function resetGameplayState() {
 
   // 타임어택 모드 리셋 (게임모드는 유지)
   if (state.gameMode === 'timeattack') {
-    state.timeAttackRemaining = 60 * 15; // 15분 초기화
-    state.timeAttackBossTimer = 0;
     state.timeAttackBossIndex = 0;
   }
 
