@@ -145,7 +145,7 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
     } else {
       crumb.pos = vectorAdd(crumb.pos, vectorScale(crumb.velocity, dt));
       crumb.velocity = vectorScale(crumb.velocity, Math.pow(damping, dt * 60));
-      crumb.renderOffsetY = Math.sin(crumb.driftTimer * 2) * 4;
+      crumb.renderOffsetY = 0; // 움직임 효과 제거
 
       if (playerPos && magnetRadius > 0) {
         const diff = vectorSub(playerPos, crumb.pos);

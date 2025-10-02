@@ -50,19 +50,29 @@ export async function saveRankingData(nickname, character, stage, survivalTime, 
 function filterUniqueNicknames(rankings) {
   const nicknameMap = new Map();
 
-  // 점수 기준으로 내림차순 정렬
-  const sortedRankings = rankings.sort((a, b) => b.finalScore - a.finalScore);
+  // 시간 기준 내림차순 정렬 (시간이 같으면 점수로 정렬)
+  const sortedRankings = rankings.sort((a, b) => {
+    if (b.survivalTime !== a.survivalTime) {
+      return b.survivalTime - a.survivalTime; // 시간 긴 순
+    }
+    return b.finalScore - a.finalScore; // 시간 같으면 점수 높은 순
+  });
 
   for (const ranking of sortedRankings) {
     const nickname = ranking.nickname.trim();
     if (!nicknameMap.has(nickname)) {
-      // 해당 닉네임의 첫 번째(최고 점수) 기록만 저장
+      // 해당 닉네임의 첫 번째(최고 기록) 기록만 저장
       nicknameMap.set(nickname, ranking);
     }
   }
 
-  // Map의 값들을 배열로 변환하고 점수 기준으로 재정렬
-  return Array.from(nicknameMap.values()).sort((a, b) => b.finalScore - a.finalScore);
+  // Map의 값들을 배열로 변환하고 시간 기준으로 재정렬
+  return Array.from(nicknameMap.values()).sort((a, b) => {
+    if (b.survivalTime !== a.survivalTime) {
+      return b.survivalTime - a.survivalTime;
+    }
+    return b.finalScore - a.finalScore;
+  });
 }
 
 // 하이브리드 랭킹 데이터 불러오기 (Firebase 우선, localStorage 백업)

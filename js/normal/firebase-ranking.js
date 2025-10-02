@@ -84,7 +84,7 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
     const cleanNickname = nickname.trim();
     const userId = currentUser?.uid || `guest_${cleanNickname}`; // 비회원은 guest_ 접두사 사용
 
-    const { collection, getDocs, query, where, addDoc, serverTimestamp } = window.firestoreDB;
+    const { collection, getDocs, query, where, addDoc, updateDoc, doc, serverTimestamp } = window.firestoreDB;
 
     // 기존 해당 닉네임의 최고 기록 찾기 (닉네임 기반)
     const existingQuery = query(
@@ -96,33 +96,11 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
     const existingSnapshot = await getDocs(existingQuery);
 
     const newScore = parseInt(finalScore);
-    let shouldSave = false;
 
     if (existingSnapshot.empty) {
       // 해당 사용자가 없으면 새로 저장
-      shouldSave = true;
       console.log('새로운 사용자, 랭킹 저장:', userId);
-    } else {
-      // 기존 기록이 있으면 점수 비교
-      let maxExistingScore = 0;
-      existingSnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.score > maxExistingScore) {
-          maxExistingScore = data.score;
-        }
-      });
 
-      if (newScore > maxExistingScore) {
-        shouldSave = true;
-        console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 새로 생성`);
-      } else {
-        console.log(`기존 최고점수(${maxExistingScore}) >= 새 점수(${newScore}), 저장 안함`);
-        return false;
-      }
-    }
-
-    if (shouldSave) {
-      // Security Rules에 맞는 필드만 사용
       const rankingData = {
         nickname: cleanNickname,
         stage: parseInt(stage),
@@ -133,14 +111,44 @@ export async function saveRankingToFirebase(nickname, character, stage, survival
         createdAt: serverTimestamp()
       };
 
-      // create만 허용되므로 addDoc 사용 (자동 생성된 ID)
       await addDoc(collection(db, 'rankings'), rankingData);
-
       console.log('Firestore에 랭킹 저장 완료:', rankingData);
       return true;
-    }
+    } else {
+      // 기존 기록이 있으면 점수 비교
+      let maxExistingScore = 0;
+      let maxDocId = null;
 
-    return false;
+      existingSnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.score > maxExistingScore) {
+          maxExistingScore = data.score;
+          maxDocId = docSnap.id;
+        }
+      });
+
+      if (newScore > maxExistingScore) {
+        // 기존 최고 기록보다 높으면 업데이트
+        console.log(`기존 최고점수(${maxExistingScore}) < 새 점수(${newScore}), 업데이트`);
+
+        const updateData = {
+          nickname: cleanNickname,
+          stage: parseInt(stage),
+          gameTime: parseFloat(survivalTime),
+          score: newScore,
+          gameType: 'normal',
+          uid: userId,
+          createdAt: serverTimestamp()
+        };
+
+        await updateDoc(doc(db, 'rankings', maxDocId), updateData);
+        console.log('Firestore에 랭킹 업데이트 완료:', updateData);
+        return true;
+      } else {
+        console.log(`기존 최고점수(${maxExistingScore}) >= 새 점수(${newScore}), 저장 안함`);
+        return false;
+      }
+    }
   } catch (error) {
     console.error('Firestore 랭킹 저장 실패:', error);
     return false;
