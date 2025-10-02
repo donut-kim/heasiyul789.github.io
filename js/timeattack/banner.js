@@ -181,7 +181,6 @@ export function drawTimeAttackBossHP(ctx, state, getWorldDims) {
   // 빨강 → 주황 → 노랑 → 초록 → 파랑 순서로 밑에서부터 쌓임
   const colors = ['#ff2222', '#ff8800', '#ffdd00', '#44ff44', '#4488ff'];
   const hpPerLayer = 100; // 각 레이어당 100 HP
-  const totalLayers = Math.ceil(maxHP / hpPerLayer);
 
   const barX = 2;
   const barYPos = barY + 2;
@@ -192,25 +191,21 @@ export function drawTimeAttackBossHP(ctx, state, getWorldDims) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(barX, barYPos, barWidth, barHeightInner);
 
-  // 레이어를 밑에서부터 그림 (빨강이 제일 아래)
-  for (let i = 0; i < totalLayers; i++) {
-    const layerStartHP = i * hpPerLayer;
-    const layerEndHP = (i + 1) * hpPerLayer;
+  if (currentHP > 0) {
+    // 현재 HP가 어느 레이어에 있는지 계산
+    const currentLayer = Math.floor((currentHP - 1) / hpPerLayer); // 0부터 시작
+    const hpInCurrentLayer = ((currentHP - 1) % hpPerLayer) + 1; // 현재 레이어에서의 HP (1~100)
 
-    // 현재 레이어가 보여야 하는지 확인
-    if (currentHP > layerStartHP) {
-      ctx.fillStyle = colors[i % colors.length];
-
-      if (currentHP >= layerEndHP) {
-        // 이 레이어는 완전히 채워짐 (100%)
-        ctx.fillRect(barX, barYPos, barWidth, barHeightInner);
-      } else {
-        // 이 레이어가 현재 감소 중 (부분적으로 채워짐)
-        const remainingHP = currentHP - layerStartHP;
-        const percentage = remainingHP / hpPerLayer;
-        ctx.fillRect(barX, barYPos, barWidth * percentage, barHeightInner);
-      }
+    // 이전 레이어들을 모두 100%로 그리기 (밑에 깔리는 레이어)
+    for (let layer = 0; layer < currentLayer; layer++) {
+      ctx.fillStyle = colors[layer % colors.length];
+      ctx.fillRect(barX, barYPos, barWidth, barHeightInner);
     }
+
+    // 현재 레이어를 일부만 그리기
+    ctx.fillStyle = colors[currentLayer % colors.length];
+    const percentage = hpInCurrentLayer / hpPerLayer;
+    ctx.fillRect(barX, barYPos, barWidth * percentage, barHeightInner);
   }
 
   // HP 텍스트

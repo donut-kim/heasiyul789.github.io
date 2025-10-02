@@ -236,12 +236,12 @@ export function spawnTimeAttackBoss(vectorCopy) {
     state.playerPos.y + Math.sin(angle) * distance,
   );
 
-  // 보스 HP: 3분(100), 6분(200), 9분(300), 12분(400), 15분(500)
-  const bossHP = (state.timeAttackBossIndex + 1) * 100;
+  // 보스 HP: 테스트용 200 (원래: 3분(100), 6분(200), 9분(300), 12분(400), 15분(500))
+  const bossHP = 200; // 레이어 테스트용
 
   state.boss = createBossAtPosition(bossPos, bossHP, bossType, state.timeAttackBossIndex + 1);
   state.timeAttackBossIndex++;
-  state.bossWarningTimer = constants.BOSS_WARNING_DURATION;
+  // bossWarningTimer는 돌진 스킬용이므로 보스 스폰 시 설정하지 않음
 }
 
 // 치약 아이템 생성

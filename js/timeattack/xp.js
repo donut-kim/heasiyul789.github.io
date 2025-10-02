@@ -110,7 +110,7 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
       crumb.magnetDelay -= dt;
       if (crumb.magnetDelay <= 0 && !crumb.absorbing) {
         crumb.absorbing = true;
-        crumb.magnetSpeed = 150; // 자석 효과는 느리게 시작
+        crumb.magnetSpeed = 50; // 자석 효과는 느리게 시작 (가속 효과를 위해 낮게)
       }
     }
 
@@ -126,7 +126,8 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
 
       // 자석 효과일 때는 점진적으로 가속
       if (crumb.isMagnetized) {
-        crumb.magnetSpeed = Math.min((crumb.magnetSpeed || 150) + dt * 300, 600);
+        // 초기 속도 50에서 시작해서 점점 가속 (최대 800)
+        crumb.magnetSpeed = Math.min((crumb.magnetSpeed || 50) + dt * 600, 800);
         const speed = crumb.magnetSpeed;
         crumb.pos = vectorAdd(crumb.pos, vectorScale(dir, speed * dt));
       } else {
@@ -135,7 +136,10 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
         crumb.pos = vectorAdd(crumb.pos, vectorScale(dir, speed * dt));
       }
 
-      crumb.size = Math.max(crumb.size * (1 - dt * 3), crumb.size * 0.4);
+      // 크기 축소는 플레이어에 가까워졌을 때만 (거리 100 이하)
+      if (dist < 100) {
+        crumb.size = Math.max(crumb.size * (1 - dt * 3), crumb.size * 0.4);
+      }
       crumb.renderOffsetY = 0;
       crumb.absorbGlow = (crumb.absorbGlow || 0) + dt;
     } else {
@@ -181,18 +185,26 @@ function getCachedGradient(ctx, x, y, size) {
   return gradientCache.get(key);
 }
 
-export function drawXpCrumbs(ctx, worldToScreen) {
+export function drawXpCrumbs(ctx, worldToScreen, getWorldDims) {
   if (!state.xpCrumbs || state.xpCrumbs.length === 0) return;
   ensureXpArray();
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
+  const { worldW, worldH } = getWorldDims ? getWorldDims() : { worldW: 600, worldH: 1000 };
+
   // 항상 상세한 렌더링 (원래 모양 유지)
   for (const crumb of state.xpCrumbs) {
     const screen = worldToScreen(crumb.pos);
     const bob = crumb.renderOffsetY ?? 0;
     const size = crumb.size * (0.9 + Math.sin(crumb.pulse) * 0.05);
+
+    // 화면 안에 있는지 체크 (화면 안으로 들어올 때부터 렌더링)
+    const inScreen = screen.x >= 0 && screen.x <= worldW &&
+                     screen.y >= 0 && screen.y <= worldH;
+
+    if (!inScreen) continue; // 화면 밖이면 스킵
 
     ctx.save();
     ctx.translate(screen.x, screen.y + bob);

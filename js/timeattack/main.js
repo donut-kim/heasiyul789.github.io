@@ -2297,45 +2297,46 @@ function updateBoss(dt) {
     }
   }
 
-  switch (boss.state) {
-    case 'windup': {
-      boss.windupTimer -= dt;
-      if (boss.windupTimer <= 0) {
-        boss.state = 'charging';
-        const direction = vectorNormalize(vectorSub(boss.attackTarget, boss.pos));
-        boss.direction = direction;
-        boss.facingAngle = Math.atan2(direction.y, direction.x);
-      }
-      return;
-    }
-    case 'charging': {
-      if (vectorLengthSq(boss.direction) === 0) {
-        boss.state = 'idle';
-        boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
-        return;
-      }
-      const remaining = vectorSub(boss.attackTarget, boss.pos);
-      const step = vectorScale(boss.direction, constants.BOSS_CHARGE_SPEED * dt);
-      if (vectorLengthSq(step) >= vectorLengthSq(remaining)) {
-        boss.pos = vectorCopy(boss.attackTarget);
-        boss.state = 'idle';
-        boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
-        state.bossWarningTimer = 0;
-      } else {
-        boss.pos = vectorAdd(boss.pos, step);
-      }
-      clampWorldPosition(boss.pos);
-      return;
-    }
-    default:
-      break;
-  }
-
-  // 무당벌레 보스 점프 스킬 처리
-  if (boss.type === 'ladybug') {
+  // 무당벌레 보스는 점프 스킬만 사용 (기존 돌진 스킬 스킵)
+  if (boss.bossType === 'ladybug') {
     const isJumping = updateLadybugJumpSkill(boss, state, dt);
     if (isJumping) {
       return; // 점프 중에는 일반 이동 안함
+    }
+  } else {
+    // 다른 보스들은 기존 돌진 스킬 사용
+    switch (boss.state) {
+      case 'windup': {
+        boss.windupTimer -= dt;
+        if (boss.windupTimer <= 0) {
+          boss.state = 'charging';
+          const direction = vectorNormalize(vectorSub(boss.attackTarget, boss.pos));
+          boss.direction = direction;
+          boss.facingAngle = Math.atan2(direction.y, direction.x);
+        }
+        return;
+      }
+      case 'charging': {
+        if (vectorLengthSq(boss.direction) === 0) {
+          boss.state = 'idle';
+          boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
+          return;
+        }
+        const remaining = vectorSub(boss.attackTarget, boss.pos);
+        const step = vectorScale(boss.direction, constants.BOSS_CHARGE_SPEED * dt);
+        if (vectorLengthSq(step) >= vectorLengthSq(remaining)) {
+          boss.pos = vectorCopy(boss.attackTarget);
+          boss.state = 'idle';
+          boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
+          state.bossWarningTimer = 0;
+        } else {
+          boss.pos = vectorAdd(boss.pos, step);
+        }
+        clampWorldPosition(boss.pos);
+        return;
+      }
+      default:
+        break;
     }
   }
 
@@ -2355,15 +2356,18 @@ function updateBoss(dt) {
     clampWorldPosition(boss.pos);
   }
 
-  if (boss.attackTimer <= 0) {
-    boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
-    if (Math.random() < constants.BOSS_ATTACK_CHANCE) {
-      boss.state = 'windup';
-      boss.windupTimer = constants.BOSS_WINDUP_TIME;
-      boss.attackTarget = vectorCopy(state.playerPos);
-      boss.direction = vector(0, 0);
-      boss.facingAngle = Math.atan2(state.playerPos.y - boss.pos.y, state.playerPos.x - boss.pos.x);
-      state.bossWarningTimer = constants.BOSS_WINDUP_TIME;
+  // 돌진 스킬 비활성화 (무당벌레는 점프만 사용)
+  if (boss.bossType !== 'ladybug') {
+    if (boss.attackTimer <= 0) {
+      boss.attackTimer = constants.BOSS_ATTACK_INTERVAL;
+      if (Math.random() < constants.BOSS_ATTACK_CHANCE) {
+        boss.state = 'windup';
+        boss.windupTimer = constants.BOSS_WINDUP_TIME;
+        boss.attackTarget = vectorCopy(state.playerPos);
+        boss.direction = vector(0, 0);
+        boss.facingAngle = Math.atan2(state.playerPos.y - boss.pos.y, state.playerPos.x - boss.pos.x);
+        state.bossWarningTimer = constants.BOSS_WINDUP_TIME;
+      }
     }
   }
 }
@@ -2604,7 +2608,7 @@ function update(dt) {
 
       // 5초 전에 보스 알림 표시
       if (timeUntilBoss <= 5 && timeUntilBoss > 0 && !state.bossWarningShown) {
-        state.bossWarningTimer = 5; // 5초간 경고 표시 (배너는 자동으로 표시됨)
+        state.bossSpawnWarningTimer = 5; // 5초간 경고 표시 (배너는 자동으로 표시됨)
         state.bossWarningShown = true;
       }
 
@@ -2630,7 +2634,7 @@ function update(dt) {
       if (state.blackDustSpawnInterval <= 0) {
         const totalCount = state.blackDustSpawnCount * 200; // 2배로 증가 (1분=200, 2분=400...)
         const spawnPerBatch = Math.ceil(totalCount / 20); // 10초간 20번 스폰
-        spawnBlackDustGroup(sprites, { overrideCount: spawnPerBatch, overrideHealth: 1, storm: true });
+        spawnBlackDustGroup(sprites, { overrideCount: spawnPerBatch, overrideHealth: 3, storm: true }); // 체력 1 -> 3
         state.blackDustSpawnInterval = 0.5; // 0.5초마다 스폰
       }
 
@@ -2700,6 +2704,10 @@ function update(dt) {
   state.specialBurstEffectTimer = Math.max(0, state.specialBurstEffectTimer - dt);
   if (state.bossWarningTimer > 0) {
     state.bossWarningTimer = Math.max(0, state.bossWarningTimer - dt);
+  }
+
+  if (state.bossSpawnWarningTimer > 0) {
+    state.bossSpawnWarningTimer = Math.max(0, state.bossSpawnWarningTimer - dt);
   }
 
   if (state.hasDeulgireumRapid && state.rapidFireTimer > 0) {
@@ -2784,7 +2792,7 @@ function update(dt) {
   state.magnetSpawnTimer -= dt;
   if (state.magnetSpawnTimer <= 0) {
     spawnMagnetItem(getCurrentWorldBounds, collidesWithObstacles);
-    state.magnetSpawnTimer = 10; // 10초 후 다시 스폰 (테스트용)
+    state.magnetSpawnTimer = 60; // 60초(1분) 후 다시 스폰
   }
 
   if (state.stageThreeActive && state.orangeLadybugSpawnTimer <= 0) {
@@ -2837,6 +2845,20 @@ function handleMovement(dt) {
     const normalizedMove = vectorNormalize(move);
     state.moveDirection = normalizedMove;
     state.lastMoveDirection = vectorCopy(normalizedMove);
+  }
+
+  // 플레이어 넉백 속도 적용
+  if (state.playerKnockbackVelocity && vectorLengthSq(state.playerKnockbackVelocity) > 0) {
+    const knockbackMove = vectorScale(state.playerKnockbackVelocity, dt);
+    state.playerPos = moveWithCollision(state.playerPos, knockbackMove, constants.PLAYER_SIZE);
+
+    // 넉백 속도 감쇠 (마찰) - 0.85 -> 0.92 (더 천천히 감소 = 더 멀리 밀림)
+    state.playerKnockbackVelocity = vectorScale(state.playerKnockbackVelocity, 0.92);
+
+    // 속도가 충분히 작아지면 제거
+    if (vectorLengthSq(state.playerKnockbackVelocity) < 10) {
+      state.playerKnockbackVelocity = null;
+    }
   }
 
   state.playerPos = moveWithCollision(state.playerPos, move, constants.PLAYER_SIZE);
@@ -3660,11 +3682,11 @@ function handleEnemies(dt) {
         // 넉백 속도 적용
         if (enemy.knockbackVelocity) {
           enemy.pos = vectorAdd(enemy.pos, vectorScale(enemy.knockbackVelocity, dt));
-          // 감쇠 적용 (매 프레임마다 10% 감소)
-          enemy.knockbackVelocity = vectorScale(enemy.knockbackVelocity, 0.9);
+          // 감쇠 적용 (매 프레임마다 5% 감소로 변경 - 더 멀리 밀림)
+          enemy.knockbackVelocity = vectorScale(enemy.knockbackVelocity, 0.95);
 
           // 속도가 충분히 작아지면 제거
-          if (vectorLengthSq(enemy.knockbackVelocity) < 0.1) {
+          if (vectorLengthSq(enemy.knockbackVelocity) < 0.5) {
             enemy.knockbackVelocity = null;
           }
         }
@@ -3678,11 +3700,11 @@ function handleEnemies(dt) {
         // 넉백 속도 적용
         if (enemy.knockbackVelocity) {
           enemy.pos = vectorAdd(enemy.pos, vectorScale(enemy.knockbackVelocity, dt));
-          // 감쇠 적용 (매 프레임마다 10% 감소)
-          enemy.knockbackVelocity = vectorScale(enemy.knockbackVelocity, 0.9);
+          // 감쇠 적용 (매 프레임마다 5% 감소로 변경 - 더 멀리 밀림)
+          enemy.knockbackVelocity = vectorScale(enemy.knockbackVelocity, 0.95);
 
           // 속도가 충분히 작아지면 제거
-          if (vectorLengthSq(enemy.knockbackVelocity) < 0.1) {
+          if (vectorLengthSq(enemy.knockbackVelocity) < 0.5) {
             enemy.knockbackVelocity = null;
           }
         }
@@ -3737,7 +3759,7 @@ function handleEnemies(dt) {
 
           // 자연스러운 넉백 적용
           if (enemy.health > 0) {
-            const knockbackDistance = 20;
+            const knockbackDistance = 50; // 20 -> 50으로 증가
             const direction = vectorNormalize(vectorSub(enemy.pos, blade.pos));
 
             // 넉백 속도 벡터 초기화 또는 누적
@@ -3746,7 +3768,7 @@ function handleEnemies(dt) {
             }
 
             // 넉백 추가 (기존 속도에 더하기)
-            const knockbackForce = vectorScale(direction, knockbackDistance * 3); // 초기 힘
+            const knockbackForce = vectorScale(direction, knockbackDistance * 8); // 3 -> 8로 증가
             enemy.knockbackVelocity = vectorAdd(enemy.knockbackVelocity, knockbackForce);
           }
 
@@ -3863,7 +3885,7 @@ function worldToScreen(pos) {
 }
 
 
-function render() {
+function render(dt = 0) {
   // DPR을 고려한 캔버스 상태 초기화
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -3895,7 +3917,7 @@ function render() {
   ctx.clip();
 
   // XP 크럼 (김가루) - 클리핑 영역 안에서 그리기
-  drawXpCrumbs(ctx, worldToScreen);
+  drawXpCrumbs(ctx, worldToScreen, getWorldDims);
 
   if (state.mine.active) {
     let mineSize = constants.MINE_SIZE;
@@ -3979,7 +4001,7 @@ function render() {
 
   drawPlayer();
 
-  if (state.boss && state.bossWarningTimer > 0) {
+  if (state.boss && (state.bossSpawnWarningTimer > 0 || state.bossWarningTimer > 0)) {
     drawBossWarning();
   }
 
@@ -4018,9 +4040,9 @@ function render() {
   drawOffScreenMagnetIndicators();
 
   // 무당벌레 보스 점프 경고 및 착지 이펙트
-  renderJumpWarning(ctx, state, 0);
-  renderChargeWarning(ctx, state, 0);
-  renderLandingEffect(ctx, state, 0);
+  renderJumpWarning(ctx, state, dt, worldToScreen);
+  renderChargeWarning(ctx, state, dt);
+  renderLandingEffect(ctx, state, dt, worldToScreen);
 
   drawPlayerHPBar();
 
@@ -4768,6 +4790,105 @@ function drawBulletSprite(bullet) {
   ctx.restore();
 }
 
+// 무당벌레 날개 그리기 함수
+function drawLadybugWings(ctx, boss, size) {
+  // 날개 펄럭임 속도 (빠르게)
+  const wingFlap = Math.sin(state.elapsed * 30) * 0.2 + 0.8; // 0.6 ~ 1.0
+
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+
+  // 왼쪽 날개 (반투명 흰색)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.strokeStyle = 'rgba(180, 180, 180, 0.8)';
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.ellipse(-size * 0.2, -size * 0.05, size * 0.35, size * 0.55 * wingFlap, -Math.PI / 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 왼쪽 날개 디테일 (날개맥)
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.2, -size * 0.05);
+  ctx.lineTo(-size * 0.4, -size * 0.05 - size * 0.5 * wingFlap);
+  ctx.stroke();
+
+  // 오른쪽 날개
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.strokeStyle = 'rgba(180, 180, 180, 0.8)';
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.ellipse(size * 0.2, -size * 0.05, size * 0.35, size * 0.55 * wingFlap, Math.PI / 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 오른쪽 날개 디테일
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.2, -size * 0.05);
+  ctx.lineTo(size * 0.4, -size * 0.05 - size * 0.5 * wingFlap);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// 무당벌레 등딱지 그리기 함수 (열린 상태)
+function drawLadybugShell(ctx, boss, size) {
+  // 등딱지 열림 각도
+  const openAngle = Math.PI / 4; // 45도
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+
+  // 왼쪽 등딱지 (빨간색)
+  ctx.fillStyle = '#ff4444';
+  ctx.strokeStyle = '#cc0000';
+  ctx.lineWidth = 2;
+
+  // 왼쪽 반원
+  ctx.save();
+  ctx.rotate(-openAngle);
+  ctx.beginPath();
+  ctx.ellipse(-size * 0.05, 0, size * 0.35, size * 0.45, 0, -Math.PI / 2, Math.PI / 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 왼쪽 점무늬
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(-size * 0.15, -size * 0.15, size * 0.08, 0, Math.PI * 2);
+  ctx.arc(-size * 0.1, size * 0.1, size * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 오른쪽 등딱지
+  ctx.fillStyle = '#ff4444';
+  ctx.strokeStyle = '#cc0000';
+  ctx.lineWidth = 2;
+
+  ctx.save();
+  ctx.rotate(openAngle);
+  ctx.beginPath();
+  ctx.ellipse(size * 0.05, 0, size * 0.35, size * 0.45, 0, Math.PI / 2, -Math.PI / 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 오른쪽 점무늬
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(size * 0.15, -size * 0.15, size * 0.08, 0, Math.PI * 2);
+  ctx.arc(size * 0.1, size * 0.1, size * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
 function drawBossEntity(boss) {
   const screen = worldToScreen(boss.pos);
   let size = constants.BOSS_RADIUS * 3.2;
@@ -4799,10 +4920,20 @@ function drawBossEntity(boss) {
   ctx.rotate((boss.facingAngle || 0) + spriteAngleOffset);
   ctx.scale(squashStretch, 1 / squashStretch);
 
+  // 무당벌레 날개 애니메이션 (점프 경고 중이거나 점프 중일 때)
+  if (boss.bossType === 'ladybug' && (boss.jumpWarning || boss.isJumping)) {
+    drawLadybugWings(ctx, boss, size);
+  }
+
   const bossSprite = (sprites.bossSprites && sprites.bossSprites[boss.bossType])
     ? sprites.bossSprites[boss.bossType]
     : sprites.bossSprites?.default || sprites.boss;
   ctx.drawImage(bossSprite, -size / 2, -size / 2, size, size);
+
+  // 무당벌레 등딱지 애니메이션 (점프 경고 중이거나 점프 중일 때)
+  if (boss.bossType === 'ladybug' && (boss.jumpWarning || boss.isJumping)) {
+    drawLadybugShell(ctx, boss, size);
+  }
   ctx.restore();
 
   // 보스 감전 효과 그리기
@@ -4817,44 +4948,46 @@ function drawBossEntity(boss) {
 }
 
 function drawBossWarning() {
-  // 타임어택 모드에서는 보스 출현 알림창으로 표시
-  if (state.bossWarningTimer > 0) {
+  // 보스 출현 알림창 표시
+  if (state.bossSpawnWarningTimer > 0) {
     drawTimeAttackBossWarning(ctx, state, getWorldDims);
+    return;
   }
-  return;
 
-  // 노말 모드: 돌진 경고
-  const { halfW, halfH } = getWorldDims();
-  const screenX = halfW;
-  const screenY = halfH * 0.3;
+  // 보스 돌진 경고 표시 (타임어택 & 노말 모드 공통)
+  if (state.bossWarningTimer > 0) {
+    const { halfW, halfH } = getWorldDims();
+    const screenX = halfW;
+    const screenY = halfH * 0.3;
 
-  // 텍스트 그림자 효과
-  ctx.font = "900 64px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+    // 텍스트 그림자 효과
+    ctx.font = "900 64px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-  // 검은색 그림자
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-  ctx.fillText('돌진!', screenX + 3, screenY + 3);
+    // 검은색 그림자
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillText('돌진!', screenX + 3, screenY + 3);
 
-  // 빨간색 메인 텍스트
-  ctx.fillStyle = '#ff0000';
-  ctx.fillText('돌진!', screenX, screenY);
+    // 빨간색 메인 텍스트
+    ctx.fillStyle = '#ff0000';
+    ctx.fillText('돌진!', screenX, screenY);
 
-  // 흰색 테두리
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2;
-  ctx.strokeText('돌진!', screenX, screenY);
+    // 흰색 테두리
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeText('돌진!', screenX, screenY);
 
-  // 빨간색 글로우 효과
-  ctx.shadowColor = '#ff0000';
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = '#ff4444';
-  ctx.fillText('돌진!', screenX, screenY);
+    // 빨간색 글로우 효과
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ff4444';
+    ctx.fillText('돌진!', screenX, screenY);
 
-  // 그림자 효과 초기화
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+    // 그림자 효과 초기화
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+  }
 }
 
 function drawPlayerHPBar() {
@@ -5272,7 +5405,7 @@ function gameLoop(timestamp) {
   const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
   lastTimestamp = timestamp;
   update(dt);
-  render();
+  render(dt);
   requestAnimationFrame(gameLoop);
 }
 
