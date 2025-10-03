@@ -223,8 +223,8 @@ export function drawTimeAttackBossHP(ctx, state, getWorldDims) {
 
   // 보스 이름 설정
   const bossNames = {
+    'queenAnt': '여왕개미',
     'ladybug': '무당벌레',
-    'ant': '개미',
     'butterfly': '나비',
     'cat': '고양이',
     'dog': '강아지'

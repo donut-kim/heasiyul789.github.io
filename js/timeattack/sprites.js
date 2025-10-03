@@ -538,19 +538,6 @@ export function createClampBossSprite(size) {
 }
 
 // Create sprites object
-export const sprites = {
-  player: createDonutSprite(PLAYER_SIZE),
-  glazedDonut: createGlazedDonutSprite(PLAYER_SIZE),
-  enemy: createBacteriaSprite(ENEMY_SIZE),
-  bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
-  blackDust: createBlackDustSprite(BLACK_DUST_SIZE),
-  boss: createClampBossSprite(BOSS_RADIUS * 2.6),
-  bossSprites: {
-    ladybug: createLadybugBossSprite(BOSS_RADIUS * 2.4),
-    default: createClampBossSprite(BOSS_RADIUS * 2.6),
-  },
-  // Additional sprites would be initialized here
-};
 function createLadybugBossSprite(size) {
   const off = document.createElement('canvas');
   off.width = size;
@@ -632,3 +619,80 @@ function createLadybugBossSprite(size) {
   ict.restore();
   return off;
 }
+
+// 작은 개미 스프라이트 (집단지성 스킬용)
+function createSmallAntSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ict = off.getContext('2d');
+  const center = size / 2;
+
+  ict.save();
+  ict.translate(center, center);
+
+  // 배
+  ict.fillStyle = '#2a2a2a';
+  ict.beginPath();
+  ict.ellipse(0, size * 0.15, size * 0.25, size * 0.35, 0, 0, Math.PI * 2);
+  ict.fill();
+
+  // 가슴
+  ict.fillStyle = '#1a1a1a';
+  ict.beginPath();
+  ict.ellipse(0, -size * 0.08, size * 0.18, size * 0.2, 0, 0, Math.PI * 2);
+  ict.fill();
+
+  // 머리
+  ict.fillStyle = '#1f1f1f';
+  ict.beginPath();
+  ict.arc(0, -size * 0.28, size * 0.12, 0, Math.PI * 2);
+  ict.fill();
+
+  // 더듬이
+  ict.strokeStyle = '#2a2a2a';
+  ict.lineWidth = size * 0.02;
+  ict.lineCap = 'round';
+
+  ict.beginPath();
+  ict.moveTo(-size * 0.06, -size * 0.32);
+  ict.lineTo(-size * 0.15, -size * 0.42);
+  ict.stroke();
+
+  ict.beginPath();
+  ict.moveTo(size * 0.06, -size * 0.32);
+  ict.lineTo(size * 0.15, -size * 0.42);
+  ict.stroke();
+
+  // 다리 (간단하게 3쌍)
+  ict.strokeStyle = '#1a1a1a';
+  ict.lineWidth = size * 0.018;
+
+  for (let i = 0; i < 3; i++) {
+    const y = -size * 0.15 + i * size * 0.1;
+    // 왼쪽
+    ict.beginPath();
+    ict.moveTo(-size * 0.1, y);
+    ict.lineTo(-size * 0.25, y + size * 0.08);
+    ict.stroke();
+    // 오른쪽
+    ict.beginPath();
+    ict.moveTo(size * 0.1, y);
+    ict.lineTo(size * 0.25, y + size * 0.08);
+    ict.stroke();
+  }
+
+  ict.restore();
+  return off;
+}
+
+export const sprites = {
+  player: createDonutSprite(PLAYER_SIZE),
+  glazedDonut: createGlazedDonutSprite(PLAYER_SIZE),
+  enemy: createBacteriaSprite(ENEMY_SIZE),
+  bigEnemy: createBacteriaSpritePurple(BIG_ENEMY_SIZE),
+  blackDust: createBlackDustSprite(BLACK_DUST_SIZE),
+  boss: createClampBossSprite(BOSS_RADIUS * 2.6),
+  smallAnt: createSmallAntSprite(20), // 집단지성 스킬용 작은 개미
+};
+// Cache buster - 1759478679

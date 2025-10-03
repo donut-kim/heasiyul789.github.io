@@ -226,8 +226,10 @@ export function spawnBoss() {
 
 // 타임어택 모드 보스 생성
 export function spawnTimeAttackBoss(vectorCopy) {
-  const bossTypes = ['ladybug', 'ant', 'butterfly', 'cat', 'dog'];
+  const bossTypes = ['ladybug', 'queenAnt', 'butterfly', 'cat', 'dog'];
   const bossType = bossTypes[state.timeAttackBossIndex % bossTypes.length];
+
+  console.log(`[보스 스폰] 인덱스: ${state.timeAttackBossIndex}, 타입: ${bossType}`);
 
   const angle = randRange(0, Math.PI * 2);
   const distance = 600;
@@ -240,8 +242,55 @@ export function spawnTimeAttackBoss(vectorCopy) {
   const bossHP = 200; // 레이어 테스트용
 
   state.boss = createBossAtPosition(bossPos, bossHP, bossType, state.timeAttackBossIndex + 1);
+  console.log(`[보스 생성 완료] state.boss.bossType: ${state.boss.bossType}`);
+
+  // 개미 보스 전용 집단지성 스킬 초기화
+  if (bossType === 'queenAnt') {
+    state.boss.swarmSkillNextTime = performance.now() + 10000; // 첫 스킬은 10초 후 (밀리초)
+    state.boss.swarmSkillActive = false;
+  }
+
   state.timeAttackBossIndex++;
   // bossWarningTimer는 돌진 스킬용이므로 보스 스폰 시 설정하지 않음
+}
+
+// 작은 개미 소환 (집단지성 스킬)
+export function spawnSwarmAnts(sprites) {
+  const totalAnts = 120; // 총 120마리
+  const directions = 12; // 12방향 (시계 1시~12시)
+  const antsPerDirection = totalAnts / directions; // 방향당 10마리
+
+  for (let dir = 0; dir < directions; dir++) {
+    // 시계 방향 각도 (1시 = -60도, 2시 = -30도, ...)
+    const angle = (dir * (Math.PI * 2 / directions)) - Math.PI / 2; // 12시부터 시작하도록 조정
+
+    for (let i = 0; i < antsPerDirection; i++) {
+      const distance = 400 + i * 60; // 간격을 두고 줄지어 소환
+      const spawnPos = vector(
+        state.playerPos.x + Math.cos(angle) * distance,
+        state.playerPos.y + Math.sin(angle) * distance
+      );
+
+      // 분홍 적보다 50% 빠른 속도
+      const baseSpeed = constants.BIG_ENEMY_SPEED * 1.5;
+
+      state.enemies.push({
+        id: enemyIdCounter++,
+        pos: spawnPos,
+        speed: baseSpeed,
+        health: 7, // HP 7
+        size: constants.BIG_ENEMY_SIZE, // 분홍세균과 동일한 크기
+        sprite: sprites.smallAnt,
+        xpValue: 0, // 경험치 없음
+        xpReward: 0,
+        scoreReward: 0,
+        type: 'smallAnt',
+        isSwarmAnt: true
+      });
+    }
+  }
+
+  console.log('[집단지성] 120마리 개미 소환 완료');
 }
 
 // 치약 아이템 생성

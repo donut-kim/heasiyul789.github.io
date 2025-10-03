@@ -164,7 +164,7 @@ export const UPGRADE_DEFINITIONS = {
   sprinkle: { title: '스프링클', max: 3 },
   deulgireum_rapid: { title: '들기름', max: 1 },
   blade: { title: '킴스클럽', max: 5 },
-  em_field: { title: '슈크림', max: 3 },
+  em_field: { title: '슈크림', max: 5 },
   ganjang_gim: { title: '간장김', max: 1 },
   kim_bugak: { title: '김부각', max: 1 },
   hp_increase: { title: '최대 HP 증가', max: 5 },
