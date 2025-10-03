@@ -48,8 +48,10 @@ function filterUniqueNicknames(rankings) {
 
   // 시간 기준 내림차순 정렬 (시간이 같으면 점수로 정렬)
   const sortedRankings = rankings.sort((a, b) => {
-    if (b.survivalTime !== a.survivalTime) {
-      return b.survivalTime - a.survivalTime; // 시간 긴 순
+    const timeA = typeof a.survivalTime === 'string' ? parseInt(a.survivalTime, 10) : a.survivalTime;
+    const timeB = typeof b.survivalTime === 'string' ? parseInt(b.survivalTime, 10) : b.survivalTime;
+    if (timeB !== timeA) {
+      return timeB - timeA; // 시간 긴 순
     }
     return b.finalScore - a.finalScore; // 시간 같으면 점수 높은 순
   });
@@ -64,8 +66,10 @@ function filterUniqueNicknames(rankings) {
 
   // Map의 값들을 배열로 변환하고 시간 기준으로 재정렬
   return Array.from(nicknameMap.values()).sort((a, b) => {
-    if (b.survivalTime !== a.survivalTime) {
-      return b.survivalTime - a.survivalTime;
+    const timeA = typeof a.survivalTime === 'string' ? parseInt(a.survivalTime, 10) : a.survivalTime;
+    const timeB = typeof b.survivalTime === 'string' ? parseInt(b.survivalTime, 10) : b.survivalTime;
+    if (timeB !== timeA) {
+      return timeB - timeA;
     }
     return b.finalScore - a.finalScore;
   });
@@ -110,10 +114,22 @@ export async function checkAndSaveRanking(state, computeFinalScoreDetails) {
   }
 }
 
-export function formatSurvivalTime(seconds) {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+export function formatSurvivalTime(timeData) {
+  // MMSS 형식 문자열인 경우 (예: "1500" → "15:00")
+  if (typeof timeData === 'string' && timeData.length >= 4) {
+    const minutes = timeData.substring(0, 2);
+    const seconds = timeData.substring(2, 4);
+    return `${parseInt(minutes)}:${seconds}`;
+  }
+
+  // 숫자인 경우 (하위 호환)
+  if (typeof timeData === 'number') {
+    const minutes = Math.floor(timeData / 60);
+    const remainingSeconds = Math.floor(timeData % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  return '0:00';
 }
 
 export function getCharacterDisplayName(character) {
