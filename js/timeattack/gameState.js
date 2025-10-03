@@ -48,6 +48,10 @@ export const state = {
   bladeCooldowns: new Map(),
   tornadoes: [],
   lastBladeAngle: 0,
+  bladeRotationCount: 0, // 블레이드 회전 수
+  bladeActive: true, // 블레이드 활성화 상태
+  bladeInactiveTimer: 0, // 비활성화 타이머
+  bladeOpacity: 1.0, // 블레이드 투명도 (0~1)
   emFieldCount: 0,
   emTargetsPerField: 1,
   emCooldown: constants.EM_FIELD_BASE_INTERVAL,
@@ -105,6 +109,7 @@ export const state = {
   magnetItems: [], // 맵에 드랍된 자석 아이템들
   magnetSpawnTimer: 60, // 자석 아이템 스폰 타이머 (1분 후 첫 자석 스폰)
   magnetFlashTimer: 0, // 자석 아이템 획득 시 화면 효과
+  bulletIndex: 0, // 김 탄환 고유 인덱스 (김부각 관통 추적용)
 };
 
 export const keys = new Set();

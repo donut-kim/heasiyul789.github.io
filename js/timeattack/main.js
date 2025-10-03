@@ -1725,6 +1725,7 @@ function startGame() {
   resetGameplayState();
   recomputePlayerStats(); // 탄환 갯수 포함 플레이어 스탯 초기화
 
+
   // 타임어택 모드 CSS 클래스 추가
   document.body.classList.add('timeattack-mode');
 
@@ -1775,10 +1776,10 @@ const skillData = {
     description: '세균이 무서워 빨리도망가자!!'
   },
   attack_speed: {
-    name: '공속 증가',
-    title: '공격 속도',
+    name: '올리브유',
+    title: '올리브유',
     option: (next) => `공격속도 +${next * 10}%`,
-    description: '조금 더 빠르게 때려볼까 !?'
+    description: '아침공복에 한숟갈, 다이어트 +1 !'
   },
   multi_shot: {
     name: '김 추가',
@@ -1873,6 +1874,15 @@ function rollUpgradeCards() {
 
   if (hasMaxEmField && hasMagnet && !hasElectrocution && Math.random() < 0.1 && cards.length < 3) {
     cards.push({ key: 'electrocution' });
+  }
+
+  // 융합 스킬 조건: 김 공격 레벨 5 + 올리브유 1 이상 시 20% 확률로 김부각 추가
+  const hasMaxMultiShot = state.upgradeLevels.multi_shot >= 5;
+  const hasAttackSpeed = state.upgradeLevels.attack_speed >= 1;
+  const hasKimBugak = state.upgradeLevels.kim_bugak > 0;
+
+  if (hasMaxMultiShot && hasAttackSpeed && !hasKimBugak && Math.random() < 0.2 && cards.length < 3) {
+    cards.push({ key: 'kim_bugak' });
   }
 
   return cards;
@@ -2941,22 +2951,52 @@ function recomputeBlades(dt) {
   state.blades.length = 0;
   const bladeCount = state.upgradeLevels.blade;
   if (bladeCount > 0) {
+    const fadeDuration = timeAttackConstants.TIME_ATTACK_BLADE_FADE_DURATION;
+
+    // 비활성화 타이머 처리
+    if (!state.bladeActive) {
+      state.bladeInactiveTimer -= dt;
+
+      // 페이드 인 애니메이션 (재활성화 직전)
+      if (state.bladeInactiveTimer <= fadeDuration) {
+        state.bladeOpacity = 1.0 - (state.bladeInactiveTimer / fadeDuration);
+      } else {
+        state.bladeOpacity = 0;
+      }
+
+      if (state.bladeInactiveTimer <= 0) {
+        state.bladeActive = true;
+        state.bladeRotationCount = 0; // 회전수 초기화
+        state.bladeOpacity = 1.0;
+      }
+
+      // 페이드 인 중에는 블레이드 표시하지만 공격 안 함
+      if (state.bladeInactiveTimer > fadeDuration) {
+        return;
+      }
+    } else {
+      state.bladeOpacity = 1.0;
+    }
+
     const tau = Math.PI * 2;
     const previousAngle = state.bladeAngle;
     state.bladeAngle = (state.bladeAngle + dt * currentBladeRotationSpeed) % tau;
 
     // 블레이드가 한 바퀴 완주했는지 확인 (0 지점을 지났는지)
-    if (previousAngle > state.bladeAngle) {
+    if (previousAngle > state.bladeAngle && state.bladeActive) {
       // 토네이도 발사
       spawnTornado();
 
       // 회전수 증가
-      if (!state.bladeRotationCount) state.bladeRotationCount = 0;
       state.bladeRotationCount++;
-    }
 
-    // 회전수 초기화
-    if (!state.bladeRotationCount) state.bladeRotationCount = 0;
+      // 3바퀴 완주 시 비활성화 시작
+      if (state.bladeRotationCount >= timeAttackConstants.TIME_ATTACK_BLADE_ROTATION_CYCLE) {
+        state.bladeActive = false;
+        state.bladeInactiveTimer = timeAttackConstants.TIME_ATTACK_BLADE_INACTIVE_DURATION + fadeDuration;
+        state.bladeOpacity = 1.0; // 페이드 아웃 시작
+      }
+    }
 
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
@@ -3048,7 +3088,8 @@ function spawnProjectile(direction, options = {}) {
     penetratesObstacles: state.hasKimBugak || options.isBlueGim,
     size: bulletSize,
     sprite: bulletSprite,
-    isBlueGim: options.isBlueGim || false
+    isBlueGim: options.isBlueGim || false,
+    index: state.bulletIndex++ // 고유 인덱스 부여
   });
 }
 
@@ -3208,6 +3249,15 @@ function handleBullets(dt) {
     for (let i = 0; i < state.enemies.length; i++) {
       const enemy = state.enemies[i];
       if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2)) {
+        // 김부각: 같은 탄환 index로 이미 맞은 적인지 확인
+        if (bullet.penetratesObstacles) {
+          if (!enemy.hitByBullets) enemy.hitByBullets = new Set();
+          if (enemy.hitByBullets.has(bullet.index)) {
+            continue; // 이미 이 탄환에 맞았으면 스킵
+          }
+          enemy.hitByBullets.add(bullet.index); // 맞은 탄환 기록
+        }
+
         // 1 데미지 (보라색 큰 적은 health:4로 시작)
         enemy.health = (enemy.health || 1) - 1;
 
@@ -3216,6 +3266,11 @@ function handleBullets(dt) {
           onEnemyRemoved(defeated);
           grantRewardForEnemy(defeated);
           i -= 1; // 배열 보정
+        }
+
+        // 김부각은 관통하므로 consumed 하지 않음
+        if (bullet.penetratesObstacles) {
+          continue; // 다음 적도 확인
         }
 
         // 관통 처리 (간장김 보유 시 1회)
@@ -3230,8 +3285,20 @@ function handleBullets(dt) {
     }
     if (!consumed && state.boss) {
       if (circleIntersects(bullet.pos, bulletRadius, state.boss.pos, constants.BOSS_RADIUS)) {
-        state.boss.health -= 1;
-        state.score += constants.BOSS_HIT_SCORE;
+        // 김부각: 같은 탄환 index로 이미 맞은 보스인지 확인
+        if (bullet.penetratesObstacles) {
+          if (!state.boss.hitByBullets) state.boss.hitByBullets = new Set();
+          if (!state.boss.hitByBullets.has(bullet.index)) {
+            state.boss.hitByBullets.add(bullet.index); // 맞은 탄환 기록
+            state.boss.health -= 1;
+            state.score += constants.BOSS_HIT_SCORE;
+          }
+          // 김부각은 관통하므로 consumed 하지 않음
+        } else {
+          state.boss.health -= 1;
+          state.score += constants.BOSS_HIT_SCORE;
+        }
+
         if (state.boss.health <= 0) {
           const defeatedBoss = state.boss;
           state.boss = null;
@@ -3243,11 +3310,13 @@ function handleBullets(dt) {
           );
           handleVictory();
         }
-        if (bullet.pierce && bullet.pierce > 0) {
+
+        if (bullet.penetratesObstacles) {
+          // 김부각은 소멸하지 않음
+        } else if (bullet.pierce && bullet.pierce > 0) {
           bullet.pierce -= 1;   // 관통 소모 후 계속 진행
         } else {
           consumed = true;      // 관통 없으면 탄환 소멸
-          break;
         }
       }
     }
@@ -3745,7 +3814,8 @@ function handleEnemies(dt) {
     }
 
     let killed = false;
-    if (state.blades.length > 0) {
+    // 블레이드가 완전히 활성화 상태일 때만 공격
+    if (state.blades.length > 0 && state.bladeActive) {
       const bladeSizeForHit = constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
       for (const blade of state.blades) {
         if (circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, blade.pos, bladeSizeForHit / 2)) {
@@ -3764,7 +3834,7 @@ function handleEnemies(dt) {
 
           // 자연스러운 넉백 적용
           if (enemy.health > 0) {
-            const knockbackDistance = 50; // 20 -> 50으로 증가
+            const knockbackDistance = 25; // 50 -> 25 (50% 감소)
             const direction = vectorNormalize(vectorSub(enemy.pos, blade.pos));
 
             // 넉백 속도 벡터 초기화 또는 누적
@@ -3773,7 +3843,7 @@ function handleEnemies(dt) {
             }
 
             // 넉백 추가 (기존 속도에 더하기)
-            const knockbackForce = vectorScale(direction, knockbackDistance * 8); // 3 -> 8로 증가
+            const knockbackForce = vectorScale(direction, knockbackDistance * 4); // 8 -> 4 (50% 감소)
             enemy.knockbackVelocity = vectorAdd(enemy.knockbackVelocity, knockbackForce);
           }
 
@@ -3837,7 +3907,7 @@ function handleEnemyProjectiles(dt) {
       }
     }
 
-    if (!state.gameOver && state.blades.length > 0) {
+    if (!state.gameOver && state.blades.length > 0 && state.bladeActive) {
       const bladeSizeForBoss = constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
 
       for (const blade of state.blades) {
@@ -3989,6 +4059,10 @@ function render(dt = 0) {
   }
 
   if (state.blades.length > 0) {
+    // 블레이드 투명도 적용
+    const previousAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = state.bladeOpacity || 1.0;
+
     for (const blade of state.blades) {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
       let bladeSize = constants.BLADE_SIZE;
@@ -3997,6 +4071,9 @@ function render(dt = 0) {
 
       drawSprite(sprite, blade.pos, bladeSize);
     }
+
+    // 투명도 복원
+    ctx.globalAlpha = previousAlpha;
   }
 
   // 토네이도 렌더링 (타임어택 모드에서는 표시 안함)

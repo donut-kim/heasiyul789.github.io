@@ -157,7 +157,7 @@ export const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun 
 // 업그레이드 정의
 export const UPGRADE_DEFINITIONS = {
   speed: { title: '이속 증가', max: 5 },
-  attack_speed: { title: '공속 증가', max: 5 },
+  attack_speed: { title: '올리브유', max: 5 },
   multi_shot: { title: '김 추가', max: 5 },
   magnet: { title: '잼 자석', max: 5 },
   double_shot: { title: '더블 발사', max: 3 },
