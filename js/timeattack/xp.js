@@ -39,7 +39,8 @@ export function spawnXpCrumbs(origin, totalXp) {
       driftTimer: randRange(0, Math.PI * 2),
       pulse: randRange(0, Math.PI * 2),
       xp: baseXp + bonus,
-      size: randRange(10, 16)
+      size: randRange(10, 16),
+      lifetime: 30 // 30초 후 사라짐
     });
   }
 }
@@ -104,6 +105,14 @@ export function updateXpCrumbs(dt, playerPos, magnetRadius = 28) {
   for (const crumb of state.xpCrumbs) {
     crumb.driftTimer += dt;
     crumb.pulse += dt * 4;
+
+    // 생존 시간 감소
+    if (crumb.lifetime !== undefined) {
+      crumb.lifetime -= dt;
+      if (crumb.lifetime <= 0) {
+        continue; // 시간 초과된 빵가루는 제거
+      }
+    }
 
     // 자석 효과 처리
     if (crumb.isMagnetized && crumb.magnetDelay !== undefined) {

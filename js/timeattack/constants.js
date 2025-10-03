@@ -157,14 +157,14 @@ export const FONT_STACK = "500 16px 'Apple SD Gothic Neo','NanumGothic','Malgun 
 // 업그레이드 정의
 export const UPGRADE_DEFINITIONS = {
   speed: { title: '이속 증가', max: 5 },
-  attack_speed: { title: '공속 증가', max: 5 },
+  attack_speed: { title: '올리브유', max: 5 },
   multi_shot: { title: '김 추가', max: 5 },
   magnet: { title: '잼 자석', max: 5 },
   double_shot: { title: '더블 발사', max: 3 },
   sprinkle: { title: '스프링클', max: 3 },
   deulgireum_rapid: { title: '들기름', max: 1 },
   blade: { title: '킴스클럽', max: 5 },
-  em_field: { title: '슈크림', max: 3 },
+  em_field: { title: '슈크림', max: 5 },
   ganjang_gim: { title: '간장김', max: 1 },
   kim_bugak: { title: '김부각', max: 1 },
   hp_increase: { title: '최대 HP 증가', max: 5 },

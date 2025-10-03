@@ -75,7 +75,8 @@ import {
   spawnToothpasteItem,
   spawnMagnetItem,
   getEnemySizeForMode,
-  getStageSpeedMultiplier
+  getStageSpeedMultiplier,
+  spawnSwarmAnts
 } from './obj.js';
 import {
   findTimeAttackTarget,
@@ -93,9 +94,13 @@ import {
   drawTimeAttackBossWarning,
   drawBlackDustWarning,
   drawGameStartMessage,
-  drawTimeAttackBossHP
+  drawTimeAttackBossHP,
+  updateBanner,
+  drawBanner,
+  showBanner
 } from './banner.js';
 import { drawDonutShopBackground } from './background.js';
+import { scheduleEvents, updateEventGift, drawEventGift, resetEventGift } from './eventGift.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -1428,6 +1433,95 @@ function createTornadoSprite(size) {
   return off;
 }
 
+// 작은 개미 스프라이트 (집단지성 스킬용 - 여왕개미와 비슷하지만 날개 없음)
+function createSmallAntSprite(size) {
+  const off = document.createElement('canvas');
+  off.width = size;
+  off.height = size;
+  const ctx = off.getContext('2d');
+  const half = size / 2;
+  ctx.translate(half, half);
+  const s = size / 2;
+
+  // 복부
+  const abdomenGrad = ctx.createRadialGradient(0, s * 0.3, 0, 0, s * 0.3, s * 0.65);
+  abdomenGrad.addColorStop(0, '#2a2a2a');
+  abdomenGrad.addColorStop(0.6, '#1a1a1a');
+  abdomenGrad.addColorStop(1, '#0a0a0a');
+  ctx.fillStyle = abdomenGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, s * 0.3, s * 0.55, s * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 가슴
+  const thoraxGrad = ctx.createRadialGradient(0, -s * 0.2, 0, 0, -s * 0.2, s * 0.4);
+  thoraxGrad.addColorStop(0, '#3a3a3a');
+  thoraxGrad.addColorStop(0.7, '#2a2a2a');
+  thoraxGrad.addColorStop(1, '#1a1a1a');
+  ctx.fillStyle = thoraxGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, -s * 0.2, s * 0.4, s * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 머리
+  const headGrad = ctx.createRadialGradient(0, -s * 0.8, s * 0.1, 0, -s * 0.8, s * 0.35);
+  headGrad.addColorStop(0, '#2a2a2a');
+  headGrad.addColorStop(0.7, '#1a1a1a');
+  headGrad.addColorStop(1, '#0a0a0a');
+  ctx.fillStyle = headGrad;
+  ctx.beginPath();
+  ctx.arc(0, -s * 0.8, s * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 더듬이
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = s * 0.06;
+  ctx.lineCap = 'round';
+  [-1, 1].forEach(dir => {
+    ctx.beginPath();
+    ctx.moveTo(dir * s * 0.2, -s * 1.0);
+    ctx.quadraticCurveTo(dir * s * 0.4, -s * 1.3, dir * s * 0.5, -s * 1.35);
+    ctx.stroke();
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath();
+    ctx.arc(dir * s * 0.5, -s * 1.35, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // 다리 6개
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = s * 0.07;
+  [[-s * 0.35, -s * 0.5], [s * 0.35, -s * 0.5]].forEach(([sx, sy]) => {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx * 1.8, sy - s * 0.2);
+    ctx.lineTo(sx * 2.2, sy);
+    ctx.stroke();
+  });
+  [[-s * 0.4, -s * 0.15], [s * 0.4, -s * 0.15]].forEach(([sx, sy]) => {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx * 1.9, sy);
+    ctx.lineTo(sx * 2.2, sy + s * 0.2);
+    ctx.stroke();
+  });
+  [[-s * 0.45, s * 0.2], [s * 0.45, s * 0.2]].forEach(([sx, sy]) => {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx * 1.7, sy + s * 0.3);
+    ctx.lineTo(sx * 2.0, sy + s * 0.5);
+    ctx.stroke();
+  });
+
+  // 눈
+  ctx.fillStyle = '#aa0000';
+  ctx.beginPath();
+  ctx.arc(-s * 0.15, -s * 0.85, s * 0.12, 0, Math.PI * 2);
+  ctx.arc(s * 0.15, -s * 0.85, s * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  return off;
+}
 
 const sprites = {
   player: createDonutSprite(constants.PLAYER_SIZE),
@@ -1439,12 +1533,13 @@ const sprites = {
   orangeLadybug: createOrangeLadybugSprite(constants.ORANGE_LADYBUG_SIZE),
   boss: createClampBossSprite(constants.BOSS_RADIUS * 3.2),
   bossSprites: {
+    queenAnt: createAntBossSprite(constants.BOSS_RADIUS * 3.2),
     ladybug: createLadybugBossSprite(constants.BOSS_RADIUS * 3.2),
-    ant: createAntBossSprite(constants.BOSS_RADIUS * 3.2),
     butterfly: createButterflyBossSprite(constants.BOSS_RADIUS * 3.2),
     cat: createCatBossSprite(constants.BOSS_RADIUS * 3.2),
     dog: createDogBossSprite(constants.BOSS_RADIUS * 3.2),
   },
+  smallAnt: createSmallAntSprite(constants.BIG_ENEMY_SIZE),
   blades: constants.GIM_VARIANTS.map((label) => createGimSprite(constants.BLADE_SIZE, label)),
   bullet: createSeaweedSprite(constants.BULLET_SIZE),
   kimBugakBullet: createKimBugakSprite(Math.round(constants.BULLET_SIZE * 2)),
@@ -1725,6 +1820,7 @@ function startGame() {
   resetGameplayState();
   recomputePlayerStats(); // 탄환 갯수 포함 플레이어 스탯 초기화
 
+
   // 타임어택 모드 CSS 클래스 추가
   document.body.classList.add('timeattack-mode');
 
@@ -1737,6 +1833,11 @@ function startGame() {
   timeAttackBackgroundBounds = null;
   ensureChunksAroundPlayer();
   updateHud(); // reset HUD to reflect fresh state (score, time, skills)
+
+  // 이벤트 선물 초기화 및 스케줄링
+  resetEventGift();
+  scheduleEvents();
+
   state.started = true;
   state.paused = false;
   state.gameStartTime = performance.now();
@@ -1775,10 +1876,10 @@ const skillData = {
     description: '세균이 무서워 빨리도망가자!!'
   },
   attack_speed: {
-    name: '공속 증가',
-    title: '공격 속도',
+    name: '올리브유',
+    title: '올리브유',
     option: (next) => `공격속도 +${next * 10}%`,
-    description: '조금 더 빠르게 때려볼까 !?'
+    description: '아침공복에 한숟갈, 다이어트 +1 !'
   },
   multi_shot: {
     name: '김 추가',
@@ -1873,6 +1974,15 @@ function rollUpgradeCards() {
 
   if (hasMaxEmField && hasMagnet && !hasElectrocution && Math.random() < 0.1 && cards.length < 3) {
     cards.push({ key: 'electrocution' });
+  }
+
+  // 융합 스킬 조건: 김 공격 레벨 5 + 올리브유 1 이상 시 20% 확률로 김부각 추가
+  const hasMaxMultiShot = state.upgradeLevels.multi_shot >= 5;
+  const hasAttackSpeed = state.upgradeLevels.attack_speed >= 1;
+  const hasKimBugak = state.upgradeLevels.kim_bugak > 0;
+
+  if (hasMaxMultiShot && hasAttackSpeed && !hasKimBugak && Math.random() < 0.2 && cards.length < 3) {
+    cards.push({ key: 'kim_bugak' });
   }
 
   return cards;
@@ -2200,8 +2310,11 @@ function processLevelUps() {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = xpRequired(state.level);
-    state.playerHealth = getPlayerMaxHealth();
+
+    // 레벨업 시 HP +2 회복 (최대 HP를 넘지 않도록)
+    state.playerHealth = Math.min(state.playerHealth + 2, getPlayerMaxHealth());
     state.hpBarTimer = 1.5;
+
     state.pendingLevelBlast = (state.pendingLevelBlast || 0) + 1;
     openUpgradeSelection();
     if (state.selectingUpgrade) break;
@@ -2304,6 +2417,48 @@ function updateBoss(dt) {
     }
   }
 
+  // 개미 보스는 집단지성 스킬 사용
+  if (boss.bossType === 'queenAnt') {
+    const now = performance.now();
+    const timeUntilSkill = boss.swarmSkillNextTime - now;
+
+    // 스킬 3초 전에 경고 텍스트 표시
+    if (timeUntilSkill <= 3000 && timeUntilSkill > 0 && !boss.swarmSkillWarningShown) {
+      boss.swarmSkillWarningTimer = timeUntilSkill / 1000; // 남은 시간만큼 텍스트 표시 (ms를 초로 변환)
+      boss.swarmSkillWarningShown = true;
+    }
+
+    // 다음 스킬 발동 시간이 되면 발동
+    if (now >= boss.swarmSkillNextTime) {
+      // 집단지성 스킬 발동
+      boss.swarmSkillWarningTimer = 3; // 스킬 발동 시 3초간 텍스트 표시
+      spawnSwarmAnts(sprites);
+
+      // 다음 스킬은 30초 후
+      boss.swarmSkillNextTime = now + 30000; // 30초 = 30000ms
+      boss.swarmSkillWarningShown = false; // 다음 경고를 위해 리셋
+    }
+
+    // 집단지성 경고 타이머 업데이트
+    if (boss.swarmSkillWarningTimer > 0) {
+      boss.swarmSkillWarningTimer -= dt;
+    }
+
+    // 여왕개미는 플레이어를 따라다니기만 함 (돌진 스킬 없음)
+    const toPlayer = vectorSub(state.playerPos, boss.pos);
+    const targetDir = vectorLengthSq(toPlayer) > 0 ? vectorNormalize(toPlayer) : vector(0, 0);
+    boss.direction = targetDir;
+    boss.facingAngle = Math.atan2(targetDir.y, targetDir.x);
+
+    if (vectorLengthSq(targetDir) > 0) {
+      const baseSpeed = constants.ENEMY_BASE_SPEED;
+      const bossSpeed = baseSpeed * getStageSpeedMultiplier() * timeAttackConstants.TIME_ATTACK_ENEMY_SPEED_FACTOR * 1.5; // 50% 속도 증가
+      boss.pos = vectorAdd(boss.pos, vectorScale(targetDir, bossSpeed * dt));
+      clampWorldPosition(boss.pos);
+    }
+    return;
+  }
+
   // 무당벌레 보스는 점프 스킬만 사용 (기존 돌진 스킬 스킵)
   if (boss.bossType === 'ladybug') {
     const isJumping = updateLadybugJumpSkill(boss, state, dt);
@@ -2311,7 +2466,7 @@ function updateBoss(dt) {
       return; // 점프 중에는 일반 이동 안함
     }
   } else {
-    // 다른 보스들은 기존 돌진 스킬 사용
+    // 나비, 고양이, 강아지 보스는 기존 돌진 스킬 사용
     switch (boss.state) {
       case 'windup': {
         boss.windupTimer -= dt;
@@ -2591,8 +2746,17 @@ if (isMobile && canvas) {
 function update(dt) {
   if (state.paused) return;
   const activePlay = !state.selectingUpgrade && !state.victory && !state.gameOver;
+
+  // 이벤트 선물 업데이트 (보스 전투 중에도 실행)
+  if (activePlay) {
+    updateEventGift(dt, state.elapsed);
+  }
+
   if (activePlay && !state.boss) {
     state.elapsed += dt; // 게임 시간 (보스 전투 중에는 멈춤)
+
+    // 배너 업데이트
+    updateBanner(dt);
 
     // 타임어택 모드 시간 체크 (15분 = 900초)
     if (state.elapsed >= 900) {
@@ -2610,10 +2774,13 @@ function update(dt) {
     if (currentBossTime) {
       const timeUntilBoss = currentBossTime - state.elapsed;
 
-      // 5초 전에 보스 알림 표시
-      if (timeUntilBoss <= 5 && timeUntilBoss > 0 && !state.bossWarningShown) {
-        state.bossSpawnWarningTimer = 5; // 5초간 경고 표시 (배너는 자동으로 표시됨)
+      // 3초 전에 보스 알림 표시
+      if (timeUntilBoss <= 3 && timeUntilBoss > 0 && !state.bossWarningShown) {
+        state.bossSpawnWarningTimer = 3; // 3초간 경고 표시
         state.bossWarningShown = true;
+        // 보스 배너와 검은먼지 배너가 겹치면 검은먼지 배너 숨김
+        state.blackDustWarningActive = false;
+        console.log('[보스 등장 배너] 3초 후 보스 등장!');
       }
 
       // 정각에 보스 스폰
@@ -2655,7 +2822,7 @@ function update(dt) {
       // 보스 스폰 시간(180초의 배수)과 겹치는지 체크
       const bossSpawnTimes = [180, 360, 540, 720, 900];
       const nextBossTime = bossSpawnTimes[state.timeAttackBossIndex];
-      const isBossSpawnSoon = nextBossTime && (nextBossTime - state.elapsed) <= 5; // 보스 스폰 5초 전
+      const isBossSpawnSoon = nextBossTime && (nextBossTime - state.elapsed) <= 3; // 보스 스폰 3초 전
 
       if (state.nextBlackDustSpawn <= 3 && state.nextBlackDustSpawn > 0 && !isBossSpawnSoon) {
         // 3초 전부터 경고 표시
@@ -2941,22 +3108,52 @@ function recomputeBlades(dt) {
   state.blades.length = 0;
   const bladeCount = state.upgradeLevels.blade;
   if (bladeCount > 0) {
+    const fadeDuration = timeAttackConstants.TIME_ATTACK_BLADE_FADE_DURATION;
+
+    // 비활성화 타이머 처리
+    if (!state.bladeActive) {
+      state.bladeInactiveTimer -= dt;
+
+      // 페이드 인 애니메이션 (재활성화 직전)
+      if (state.bladeInactiveTimer <= fadeDuration) {
+        state.bladeOpacity = 1.0 - (state.bladeInactiveTimer / fadeDuration);
+      } else {
+        state.bladeOpacity = 0;
+      }
+
+      if (state.bladeInactiveTimer <= 0) {
+        state.bladeActive = true;
+        state.bladeRotationCount = 0; // 회전수 초기화
+        state.bladeOpacity = 1.0;
+      }
+
+      // 페이드 인 중에는 블레이드 표시하지만 공격 안 함
+      if (state.bladeInactiveTimer > fadeDuration) {
+        return;
+      }
+    } else {
+      state.bladeOpacity = 1.0;
+    }
+
     const tau = Math.PI * 2;
     const previousAngle = state.bladeAngle;
     state.bladeAngle = (state.bladeAngle + dt * currentBladeRotationSpeed) % tau;
 
     // 블레이드가 한 바퀴 완주했는지 확인 (0 지점을 지났는지)
-    if (previousAngle > state.bladeAngle) {
+    if (previousAngle > state.bladeAngle && state.bladeActive) {
       // 토네이도 발사
       spawnTornado();
 
       // 회전수 증가
-      if (!state.bladeRotationCount) state.bladeRotationCount = 0;
       state.bladeRotationCount++;
-    }
 
-    // 회전수 초기화
-    if (!state.bladeRotationCount) state.bladeRotationCount = 0;
+      // 3바퀴 완주 시 비활성화 시작
+      if (state.bladeRotationCount >= timeAttackConstants.TIME_ATTACK_BLADE_ROTATION_CYCLE) {
+        state.bladeActive = false;
+        state.bladeInactiveTimer = timeAttackConstants.TIME_ATTACK_BLADE_INACTIVE_DURATION + fadeDuration;
+        state.bladeOpacity = 1.0; // 페이드 아웃 시작
+      }
+    }
 
     const step = tau / bladeCount;
     for (let i = 0; i < bladeCount; i++) {
@@ -3048,7 +3245,8 @@ function spawnProjectile(direction, options = {}) {
     penetratesObstacles: state.hasKimBugak || options.isBlueGim,
     size: bulletSize,
     sprite: bulletSprite,
-    isBlueGim: options.isBlueGim || false
+    isBlueGim: options.isBlueGim || false,
+    index: state.bulletIndex++ // 고유 인덱스 부여
   });
 }
 
@@ -3208,6 +3406,15 @@ function handleBullets(dt) {
     for (let i = 0; i < state.enemies.length; i++) {
       const enemy = state.enemies[i];
       if (circleIntersects(bullet.pos, bulletRadius, enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2)) {
+        // 김부각: 같은 탄환 index로 이미 맞은 적인지 확인
+        if (bullet.penetratesObstacles) {
+          if (!enemy.hitByBullets) enemy.hitByBullets = new Set();
+          if (enemy.hitByBullets.has(bullet.index)) {
+            continue; // 이미 이 탄환에 맞았으면 스킵
+          }
+          enemy.hitByBullets.add(bullet.index); // 맞은 탄환 기록
+        }
+
         // 1 데미지 (보라색 큰 적은 health:4로 시작)
         enemy.health = (enemy.health || 1) - 1;
 
@@ -3216,6 +3423,11 @@ function handleBullets(dt) {
           onEnemyRemoved(defeated);
           grantRewardForEnemy(defeated);
           i -= 1; // 배열 보정
+        }
+
+        // 김부각은 관통하므로 consumed 하지 않음
+        if (bullet.penetratesObstacles) {
+          continue; // 다음 적도 확인
         }
 
         // 관통 처리 (간장김 보유 시 1회)
@@ -3230,8 +3442,20 @@ function handleBullets(dt) {
     }
     if (!consumed && state.boss) {
       if (circleIntersects(bullet.pos, bulletRadius, state.boss.pos, constants.BOSS_RADIUS)) {
-        state.boss.health -= 1;
-        state.score += constants.BOSS_HIT_SCORE;
+        // 김부각: 같은 탄환 index로 이미 맞은 보스인지 확인
+        if (bullet.penetratesObstacles) {
+          if (!state.boss.hitByBullets) state.boss.hitByBullets = new Set();
+          if (!state.boss.hitByBullets.has(bullet.index)) {
+            state.boss.hitByBullets.add(bullet.index); // 맞은 탄환 기록
+            state.boss.health -= 1;
+            state.score += constants.BOSS_HIT_SCORE;
+          }
+          // 김부각은 관통하므로 consumed 하지 않음
+        } else {
+          state.boss.health -= 1;
+          state.score += constants.BOSS_HIT_SCORE;
+        }
+
         if (state.boss.health <= 0) {
           const defeatedBoss = state.boss;
           state.boss = null;
@@ -3243,11 +3467,13 @@ function handleBullets(dt) {
           );
           handleVictory();
         }
-        if (bullet.pierce && bullet.pierce > 0) {
+
+        if (bullet.penetratesObstacles) {
+          // 김부각은 소멸하지 않음
+        } else if (bullet.pierce && bullet.pierce > 0) {
           bullet.pierce -= 1;   // 관통 소모 후 계속 진행
         } else {
           consumed = true;      // 관통 없으면 탄환 소멸
-          break;
         }
       }
     }
@@ -3512,11 +3738,10 @@ function triggerEmField() {
         const idx = state.enemies.indexOf(enemy);
         if (idx !== -1) {
           enemy.health = (enemy.health || 1) - 1;
-          // 감전 스킬 보유 시 감전 효과 적용
+          // 감전 스킬 보유 시 1초 스턴 효과 적용
           if (state.upgradeLevels.electrocution > 0) {
             enemy.electrocuted = true;
-            enemy.electrocutionTimer = 2.0; // 2초 감전
-            enemy.electrocutionFlash = 0.5;
+            enemy.electrocutionTimer = 1.0; // 1초 스턴
           }
           if (enemy.health <= 0) {
             const defeated = state.enemies.splice(idx, 1)[0];
@@ -3530,11 +3755,10 @@ function triggerEmField() {
         if (boss) {
           boss.health -= 1;
           state.score += constants.BOSS_HIT_SCORE;
-          // 감전 스킬 보유 시 감전 효과 적용
+          // 감전 스킬 보유 시 1초 스턴 효과 적용
           if (state.upgradeLevels.electrocution > 0) {
             boss.electrocuted = true;
-            boss.electrocutionTimer = 2.0; // 2초 감전
-            boss.electrocutionFlash = 0.5;
+            boss.electrocutionTimer = 1.0; // 1초 스턴
           }
           if (boss.health <= 0) {
             const defeatedBoss = state.boss;
@@ -3735,7 +3959,7 @@ function handleEnemies(dt) {
     }
 
     if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, state.playerPos, constants.PLAYER_SIZE / 2)) {
-      state.playerHealth -= 1;
+      // state.playerHealth -= 1; // 테스트용 무적
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
@@ -3745,7 +3969,8 @@ function handleEnemies(dt) {
     }
 
     let killed = false;
-    if (state.blades.length > 0) {
+    // 블레이드가 완전히 활성화 상태일 때만 공격
+    if (state.blades.length > 0 && state.bladeActive) {
       const bladeSizeForHit = constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
       for (const blade of state.blades) {
         if (circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, blade.pos, bladeSizeForHit / 2)) {
@@ -3764,7 +3989,7 @@ function handleEnemies(dt) {
 
           // 자연스러운 넉백 적용
           if (enemy.health > 0) {
-            const knockbackDistance = 50; // 20 -> 50으로 증가
+            const knockbackDistance = 25; // 50 -> 25 (50% 감소)
             const direction = vectorNormalize(vectorSub(enemy.pos, blade.pos));
 
             // 넉백 속도 벡터 초기화 또는 누적
@@ -3773,7 +3998,7 @@ function handleEnemies(dt) {
             }
 
             // 넉백 추가 (기존 속도에 더하기)
-            const knockbackForce = vectorScale(direction, knockbackDistance * 8); // 3 -> 8로 증가
+            const knockbackForce = vectorScale(direction, knockbackDistance * 4); // 8 -> 4 (50% 감소)
             enemy.knockbackVelocity = vectorAdd(enemy.knockbackVelocity, knockbackForce);
           }
 
@@ -3807,7 +4032,7 @@ function handleEnemyProjectiles(dt) {
       projectile.pos, projectile.size / 2,
       state.playerPos, constants.PLAYER_SIZE / 2
     )) {
-      state.playerHealth -= 1;
+      // state.playerHealth -= 1; // 테스트용 무적
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
@@ -3822,7 +4047,7 @@ function handleEnemyProjectiles(dt) {
 
   if (state.boss) {
     if (state.playerInvuln <= 0 && circleIntersects(state.boss.pos, constants.BOSS_RADIUS, state.playerPos, constants.PLAYER_SIZE / 2)) {
-      state.playerHealth -= 2;
+      // state.playerHealth -= 2; // 테스트용 무적
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
 
@@ -3837,7 +4062,7 @@ function handleEnemyProjectiles(dt) {
       }
     }
 
-    if (!state.gameOver && state.blades.length > 0) {
+    if (!state.gameOver && state.blades.length > 0 && state.bladeActive) {
       const bladeSizeForBoss = constants.BLADE_SIZE * timeAttackConstants.TIME_ATTACK_BLADE_SIZE_SCALE;
 
       for (const blade of state.blades) {
@@ -3950,13 +4175,25 @@ function render(dt = 0) {
     const spr = enemy.sprite || sprites.enemy;
     let sz = enemy.size || constants.ENEMY_SIZE;
 
-    drawSprite(spr, enemy.pos, sz);
+    // 작은 개미는 플레이어를 향하도록 회전
+    if (enemy.type === 'smallAnt') {
+      const screen = worldToScreen(enemy.pos);
+      const toPlayer = vectorSub(state.playerPos, enemy.pos);
+      const angle = Math.atan2(toPlayer.y, toPlayer.x);
 
-    // 효과는 항상 표시 (중요한 피드백)
-    if (enemy.electrocuted && enemy.electrocutionFlash > 0) {
-      drawElectrocutionEffect(enemy.pos, sz);
+      // 스프라이트가 위쪽을 향하도록 그려져 있으므로 90도(Math.PI/2) 오프셋 추가
+      const spriteAngleOffset = Math.PI / 2;
+
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(angle + spriteAngleOffset);
+      ctx.drawImage(spr, -sz / 2, -sz / 2, sz, sz);
+      ctx.restore();
+    } else {
+      drawSprite(spr, enemy.pos, sz);
     }
 
+    // 효과는 항상 표시 (중요한 피드백)
     if (enemy.burning) {
       drawBurnEffect(enemy.pos, sz, enemy.burnFlash || 0);
     }
@@ -3989,6 +4226,10 @@ function render(dt = 0) {
   }
 
   if (state.blades.length > 0) {
+    // 블레이드 투명도 적용
+    const previousAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = state.bladeOpacity || 1.0;
+
     for (const blade of state.blades) {
       const sprite = sprites.blades[blade.spriteIndex] || sprites.blades[sprites.blades.length - 1];
       let bladeSize = constants.BLADE_SIZE;
@@ -3997,6 +4238,9 @@ function render(dt = 0) {
 
       drawSprite(sprite, blade.pos, bladeSize);
     }
+
+    // 투명도 복원
+    ctx.globalAlpha = previousAlpha;
   }
 
   // 토네이도 렌더링 (타임어택 모드에서는 표시 안함)
@@ -4006,7 +4250,7 @@ function render(dt = 0) {
 
   drawPlayer();
 
-  if (state.boss && (state.bossSpawnWarningTimer > 0 || state.bossWarningTimer > 0)) {
+  if (state.bossSpawnWarningTimer > 0 || (state.boss && state.bossWarningTimer > 0) || (state.boss && state.boss.swarmSkillWarningTimer > 0)) {
     drawBossWarning();
   }
 
@@ -4014,6 +4258,9 @@ function render(dt = 0) {
   if (state.boss) {
     drawTimeAttackBossHP(ctx, state, getWorldDims);
   }
+
+  // 배너 표시 (이벤트용)
+  drawBanner(ctx, getWorldDims);
 
   // 타임어택 모드 검은먼지 경고 표시
   if (state.blackDustWarningActive) {
@@ -4048,6 +4295,9 @@ function render(dt = 0) {
   renderJumpWarning(ctx, state, dt, worldToScreen);
   renderChargeWarning(ctx, state, dt);
   renderLandingEffect(ctx, state, dt, worldToScreen);
+
+  // 이벤트 선물 렌더링 (라이더, 먼지, 선물상자)
+  drawEventGift(ctx, worldToScreen);
 
   drawPlayerHPBar();
 
@@ -4842,6 +5092,143 @@ function drawLadybugWings(ctx, boss, size) {
   ctx.restore();
 }
 
+// 여왕개미 다리와 더듬이 기어가는 애니메이션
+function drawQueenAntLegs(ctx, boss, size, elapsed) {
+  const s = size / 2;
+
+  // 다리 움직임 속도 (빠른 걸음)
+  const legSpeed = 10;
+  const legWave = Math.sin(elapsed * legSpeed);
+  const legWave2 = Math.sin(elapsed * legSpeed + Math.PI); // 반대 위상
+
+  // 더듬이 움직임 (느리고 부드럽게)
+  const antennaSpeed = 5;
+  const antennaWave = Math.sin(elapsed * antennaSpeed) * 0.15; // -0.15 ~ 0.15
+
+  ctx.strokeStyle = '#0a0a0a';
+  ctx.lineWidth = s * 0.08;
+  ctx.lineCap = 'round';
+
+  // 더듬이 그리기 (다리보다 먼저 그려서 뒤에 배치)
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = s * 0.06;
+
+  // 왼쪽 더듬이
+  ctx.save();
+  ctx.translate(-s * 0.2, -s * 1.0);
+  ctx.rotate(antennaWave); // 좌우로 흔들림
+
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-s * 0.2, -s * 0.3, -s * 0.3, -s * 0.35);
+  ctx.stroke();
+
+  // 더듬이 끝 마디
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath();
+  ctx.arc(-s * 0.3, -s * 0.35, s * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // 오른쪽 더듬이
+  ctx.save();
+  ctx.translate(s * 0.2, -s * 1.0);
+  ctx.rotate(-antennaWave); // 왼쪽과 반대로 흔들림
+
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(s * 0.2, -s * 0.3, s * 0.3, -s * 0.35);
+  ctx.stroke();
+
+  // 더듬이 끝 마디
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath();
+  ctx.arc(s * 0.3, -s * 0.35, s * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // 다리 그리기 (더 굵고 약간 밝게 해서 움직임이 보이도록)
+  ctx.strokeStyle = '#2a2a2a'; // 약간 밝은 회색
+  ctx.lineWidth = s * 0.12; // 더 굵게
+
+  // 왼쪽 다리 3쌍 (앞, 중간, 뒤)
+  const leftLegs = [
+    [-s * 0.35, -s * 0.5], // 앞다리
+    [-s * 0.4, -s * 0.15],  // 중간다리
+    [-s * 0.45, s * 0.2]    // 뒷다리
+  ];
+
+  // 오른쪽 다리 3쌍
+  const rightLegs = [
+    [s * 0.35, -s * 0.5],
+    [s * 0.4, -s * 0.15],
+    [s * 0.45, s * 0.2]
+  ];
+
+  // 왼쪽 다리 그리기
+  leftLegs.forEach(([sx, sy], index) => {
+    // 각 다리마다 위상 차이를 줘서 걷는 느낌
+    const wave = index % 2 === 0 ? legWave : legWave2;
+    const legAngle = wave * 0.4; // 다리 움직임 각도 증가
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(legAngle);
+
+    // 다리 외곽선 (검은색)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = s * 0.14;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-s * 0.8, -s * 0.1);
+    ctx.lineTo(-s * 1.2, s * 0.1);
+    ctx.stroke();
+
+    // 다리 안쪽 (밝은 회색)
+    ctx.strokeStyle = '#3a3a3a';
+    ctx.lineWidth = s * 0.09;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-s * 0.8, -s * 0.1);
+    ctx.lineTo(-s * 1.2, s * 0.1);
+    ctx.stroke();
+
+    ctx.restore();
+  });
+
+  // 오른쪽 다리 그리기
+  rightLegs.forEach(([sx, sy], index) => {
+    const wave = index % 2 === 0 ? legWave2 : legWave; // 왼쪽과 반대 위상
+    const legAngle = wave * 0.4;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(-legAngle); // 오른쪽은 반대 방향
+
+    // 다리 외곽선 (검은색)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = s * 0.14;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(s * 0.8, -s * 0.1);
+    ctx.lineTo(s * 1.2, s * 0.1);
+    ctx.stroke();
+
+    // 다리 안쪽 (밝은 회색)
+    ctx.strokeStyle = '#3a3a3a';
+    ctx.lineWidth = s * 0.09;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(s * 0.8, -s * 0.1);
+    ctx.lineTo(s * 1.2, s * 0.1);
+    ctx.stroke();
+
+    ctx.restore();
+  });
+}
+
 // 무당벌레 등딱지 그리기 함수 (열린 상태)
 function drawLadybugShell(ctx, boss, size) {
   // 등딱지 열림 각도
@@ -4930,10 +5317,25 @@ function drawBossEntity(boss) {
     drawLadybugWings(ctx, boss, size);
   }
 
-  const bossSprite = (sprites.bossSprites && sprites.bossSprites[boss.bossType])
-    ? sprites.bossSprites[boss.bossType]
-    : sprites.bossSprites?.default || sprites.boss;
+  // 타임어택에서는 정의된 보스 스프라이트만 사용
+  const bossSprite = sprites.bossSprites[boss.bossType];
+
+  if (!bossSprite) {
+    console.error('[보스 렌더링 에러]', {
+      bossType: boss.bossType,
+      availableSprites: Object.keys(sprites.bossSprites),
+      sprite: bossSprite,
+      bossSpritesObject: sprites.bossSprites
+    });
+    return;
+  }
+
   ctx.drawImage(bossSprite, -size / 2, -size / 2, size, size);
+
+  // 여왕개미 기어가는 애니메이션 (다리와 더듬이를 보스 위에 그려서 보이게 함)
+  if (boss.bossType === 'queenAnt') {
+    drawQueenAntLegs(ctx, boss, size, state.elapsed);
+  }
 
   // 무당벌레 등딱지 애니메이션 (점프 경고 중이거나 점프 중일 때)
   if (boss.bossType === 'ladybug' && (boss.jumpWarning || boss.isJumping)) {
@@ -4988,6 +5390,41 @@ function drawBossWarning() {
     ctx.shadowBlur = 20;
     ctx.fillStyle = '#ff4444';
     ctx.fillText('돌진!', screenX, screenY);
+
+    // 그림자 효과 초기화
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+  }
+
+  // 집단지성 스킬 경고 표시
+  if (state.boss && state.boss.swarmSkillWarningTimer > 0) {
+    const { halfW, halfH } = getWorldDims();
+    const screenX = halfW;
+    const screenY = halfH * 0.3;
+
+    // 텍스트 그림자 효과
+    ctx.font = "900 64px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // 검은색 그림자
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillText('집단지성!', screenX + 3, screenY + 3);
+
+    // 빨간색 메인 텍스트
+    ctx.fillStyle = '#ff0000';
+    ctx.fillText('집단지성!', screenX, screenY);
+
+    // 흰색 테두리
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeText('집단지성!', screenX, screenY);
+
+    // 빨간색 글로우 효과
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ff4444';
+    ctx.fillText('집단지성!', screenX, screenY);
 
     // 그림자 효과 초기화
     ctx.shadowColor = 'transparent';
