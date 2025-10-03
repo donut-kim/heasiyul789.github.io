@@ -93,9 +93,12 @@ import {
   drawTimeAttackBossWarning,
   drawBlackDustWarning,
   drawGameStartMessage,
-  drawTimeAttackBossHP
+  drawTimeAttackBossHP,
+  updateBanner,
+  drawBanner
 } from './banner.js';
 import { drawDonutShopBackground } from './background.js';
+import { scheduleEvents, updateEventGift, drawEventGift, resetEventGift } from './eventGift.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -1738,6 +1741,11 @@ function startGame() {
   timeAttackBackgroundBounds = null;
   ensureChunksAroundPlayer();
   updateHud(); // reset HUD to reflect fresh state (score, time, skills)
+
+  // 이벤트 선물 초기화 및 스케줄링
+  resetEventGift();
+  scheduleEvents();
+
   state.started = true;
   state.paused = false;
   state.gameStartTime = performance.now();
@@ -2210,8 +2218,11 @@ function processLevelUps() {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = xpRequired(state.level);
-    state.playerHealth = getPlayerMaxHealth();
+
+    // 레벨업 시 HP +2 회복 (최대 HP를 넘지 않도록)
+    state.playerHealth = Math.min(state.playerHealth + 2, getPlayerMaxHealth());
     state.hpBarTimer = 1.5;
+
     state.pendingLevelBlast = (state.pendingLevelBlast || 0) + 1;
     openUpgradeSelection();
     if (state.selectingUpgrade) break;
@@ -2603,6 +2614,12 @@ function update(dt) {
   const activePlay = !state.selectingUpgrade && !state.victory && !state.gameOver;
   if (activePlay && !state.boss) {
     state.elapsed += dt; // 게임 시간 (보스 전투 중에는 멈춤)
+
+    // 이벤트 선물 업데이트
+    updateEventGift(dt, state.elapsed);
+
+    // 배너 업데이트
+    updateBanner(dt);
 
     // 타임어택 모드 시간 체크 (15분 = 900초)
     if (state.elapsed >= 900) {
@@ -4092,6 +4109,9 @@ function render(dt = 0) {
     drawTimeAttackBossHP(ctx, state, getWorldDims);
   }
 
+  // 배너 표시 (이벤트용)
+  drawBanner(ctx, getWorldDims);
+
   // 타임어택 모드 검은먼지 경고 표시
   if (state.blackDustWarningActive) {
     drawBlackDustWarning(ctx, state, getWorldDims, timeAttackConstants);
@@ -4125,6 +4145,9 @@ function render(dt = 0) {
   renderJumpWarning(ctx, state, dt, worldToScreen);
   renderChargeWarning(ctx, state, dt);
   renderLandingEffect(ctx, state, dt, worldToScreen);
+
+  // 이벤트 선물 렌더링 (라이더, 먼지, 선물상자)
+  drawEventGift(ctx, worldToScreen);
 
   drawPlayerHPBar();
 

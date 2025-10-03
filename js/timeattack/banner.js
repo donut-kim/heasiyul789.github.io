@@ -1,6 +1,80 @@
 // 타임어택 모드 배너 UI
 import * as timeAttackConstants from './timeAttackConstants.js';
 
+// 배너 상태
+let activeBanner = null;
+
+// 일반 배너 표시 (이벤트용)
+export function showBanner(text, duration, backgroundColor = '#8B4513') {
+  activeBanner = {
+    text,
+    timer: duration,
+    maxDuration: duration,
+    backgroundColor
+  };
+}
+
+// 배너 업데이트 (매 프레임 호출)
+export function updateBanner(dt) {
+  if (activeBanner) {
+    activeBanner.timer -= dt;
+    if (activeBanner.timer <= 0) {
+      activeBanner = null;
+    }
+  }
+}
+
+// 배너 렌더링
+export function drawBanner(ctx, getWorldDims) {
+  if (!activeBanner) return;
+
+  const { worldW, worldH } = getWorldDims();
+  const bannerHeight = 70;
+  const bannerY = worldH * 0.08;
+
+  // 페이드 효과
+  const fadeTime = 0.5;
+  let opacity = 1;
+  if (activeBanner.timer < fadeTime) {
+    opacity = activeBanner.timer / fadeTime;
+  } else if (activeBanner.maxDuration - activeBanner.timer < fadeTime) {
+    opacity = (activeBanner.maxDuration - activeBanner.timer) / fadeTime;
+  }
+
+  ctx.save();
+
+  // 배경
+  const bgColor = activeBanner.backgroundColor;
+  ctx.fillStyle = bgColor.includes('rgba') ? bgColor : `${bgColor}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`;
+  ctx.fillRect(0, bannerY, worldW, bannerHeight);
+
+  // 상하단 라인
+  ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.8})`;
+  ctx.fillRect(0, bannerY, worldW, 2);
+  ctx.fillRect(0, bannerY + bannerHeight - 2, worldW, 2);
+
+  // 텍스트
+  const centerX = worldW / 2;
+  const centerY = bannerY + bannerHeight / 2;
+
+  ctx.font = "800 32px 'Apple SD Gothic Neo','NanumGothic','Malgun Gothic','Noto Sans KR',sans-serif";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // 텍스트 그림자
+  ctx.shadowColor = `rgba(0, 0, 0, ${opacity * 0.5})`;
+  ctx.shadowBlur = 6;
+
+  // 흰색 텍스트
+  ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+  ctx.fillText(activeBanner.text, centerX, centerY);
+
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+
+  ctx.restore();
+}
+
 // 보스 출현 배너
 export function drawTimeAttackBossWarning(ctx, state, getWorldDims) {
   const { worldW, worldH } = getWorldDims();
