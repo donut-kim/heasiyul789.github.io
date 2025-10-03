@@ -3272,7 +3272,7 @@ function fireDirections(directions, doubleShotLevel, options = {}) {
 }
 
 function triggerSemiCircleBurst(targetDir, multiShotLevel) {
-  const arcCount = multiShotLevel >= 5 ? 7 : 4;
+  const arcCount = multiShotLevel >= 5 ? 4 : 2; // 4레벨: 2개, 5레벨: 4개
   if (arcCount <= 0) return;
 
   let dir = targetDir;
@@ -3284,14 +3284,13 @@ function triggerSemiCircleBurst(targetDir, multiShotLevel) {
   const span = Math.PI; // 180도 반원
   const startAngle = baseAngle + span / 2;
   const step = arcCount === 1 ? 0 : span / (arcCount - 1);
-  const doubleShot = state.upgradeLevels.double_shot;
 
   const queue = [];
   for (let i = 0; i < arcCount; i++) {
     const angle = startAngle - step * i; // 왼쪽(+)에서 오른쪽(-)으로 순서대로
     queue.push({
       dir: vector(Math.cos(angle), Math.sin(angle)),
-      doubleShotLevel: doubleShot,
+      doubleShotLevel: 0, // 더블샷 비활성화 (총 개수만 arcCount로 제한)
       rangeMultiplier: 1.5,
       isBlueGim: true, // 4레벨 이상에서는 파래김으로 변경
     });
@@ -3959,7 +3958,7 @@ function handleEnemies(dt) {
     }
 
     if (state.playerInvuln <= 0 && circleIntersects(enemy.pos, (enemy.size || constants.ENEMY_SIZE) / 2, state.playerPos, constants.PLAYER_SIZE / 2)) {
-      // state.playerHealth -= 1; // 테스트용 무적
+      state.playerHealth -= 1;
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
@@ -4032,7 +4031,7 @@ function handleEnemyProjectiles(dt) {
       projectile.pos, projectile.size / 2,
       state.playerPos, constants.PLAYER_SIZE / 2
     )) {
-      // state.playerHealth -= 1; // 테스트용 무적
+      state.playerHealth -= 1;
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
       if (state.playerHealth <= 0) {
@@ -4047,7 +4046,7 @@ function handleEnemyProjectiles(dt) {
 
   if (state.boss) {
     if (state.playerInvuln <= 0 && circleIntersects(state.boss.pos, constants.BOSS_RADIUS, state.playerPos, constants.PLAYER_SIZE / 2)) {
-      // state.playerHealth -= 2; // 테스트용 무적
+      state.playerHealth -= 2;
       state.playerInvuln = constants.PLAYER_INVULN_TIME;
       state.hpBarTimer = 1.0;
 
